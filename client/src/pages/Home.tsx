@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
+  Coins,
   Copy,
   ExternalLink,
   Eye,
@@ -65,7 +66,7 @@ const EXPLORER_BY_NETWORK: Record<Network, string> = {
 };
 
 const PREVIEW_WALLETS: WalletRecord[] = [
-  { address: "SP2JXKMSH3R0W2C7Y8N9M5FJQ6N8R4A1C0K5Q3P2", label: "Primary wallet", source: "preview" },
+  { address: "SP7CD8EB3GT9N5PFW8TPY9CMF84208V7KB0EPAPR", label: "My wallet", source: "watch-only" },
   { address: "SP3K8BC0D9S4V5C7Q2W6Y1P8H0R3M9N7F4T6G2J1", label: "Treasury", source: "preview" },
 ];
 
@@ -78,6 +79,105 @@ const PREVIEW_ASSETS: Asset[] = [
 ];
 
 const graphBars = [36, 49, 42, 64, 55, 72, 68, 81, 73, 91, 83, 96, 92, 100, 95, 108, 101, 116, 108, 123, 116, 129, 122, 140];
+
+const STSTX_CONTRACT = "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststx-token";
+const STSTX_DATA_CONTRACT = "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stx-v2";
+const ZEST_RECEIPT_CONTRACT = "SP2VCQJGH7PHP2DJK7Z0V48AGBHQAW3R3ZW1QF4N.zststx-token";
+const STSTX_LP_CONTRACT = "SM1793C4R5PZ4NS4VQ4WMP7SKKYVH8JZEWSZ9HCCR.stableswap-pool-stx-ststx-v-1-4";
+
+type StstxActivity = {
+  txid: string;
+  label: string;
+  detail: string;
+  amount: string;
+  date: string;
+  tone: "green" | "orange" | "blue";
+};
+
+type StstxTrackerData = {
+  directBalance: number;
+  zestBalance: number;
+  lpBalance: number;
+  ratio: number;
+  supply: number;
+  activities: StstxActivity[];
+  unsupported?: boolean;
+};
+
+const EMPTY_STSTX_DATA: StstxTrackerData = {
+  directBalance: 0,
+  zestBalance: 0,
+  lpBalance: 0,
+  ratio: 0,
+  supply: 0,
+  activities: [],
+};
+
+function parseUintRepr(repr?: string) {
+  const match = repr?.match(/u(\d+)/);
+  return match ? Number(match[1]) / 1_000_000 : 0;
+}
+
+function formatActivityDate(date?: string) {
+  if (!date) return "Unknown date";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(date));
+}
+
+async function fetchStstxTracker(address: string, network: Network): Promise<StstxTrackerData> {
+  if (network !== "mainnet") return { ...EMPTY_STSTX_DATA, unsupported: true };
+
+  const [balancesResponse, ratioResponse, metadataResponse, transactionsResponse] = await Promise.all([
+    fetch(`${API_BY_NETWORK[network]}/extended/v1/address/${address}/balances?proof=0`),
+    fetch(`${API_BY_NETWORK[network]}/v2/contracts/call-read/${STSTX_DATA_CONTRACT.replace(".", "/")}/get-stx-per-ststx`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sender: address, arguments: [] }),
+    }),
+    fetch(`${API_BY_NETWORK[network]}/metadata/v1/ft?symbol=stSTX&limit=20`),
+    fetch(`${API_BY_NETWORK[network]}/extended/v1/address/${address}/transactions?limit=50&offset=0`),
+  ]);
+  if (!balancesResponse.ok || !ratioResponse.ok) throw new Error("The Stacks API did not return stSTX data.");
+
+  const balances = await balancesResponse.json();
+  const ratioPayload = await ratioResponse.json();
+  const metadata = metadataResponse.ok ? await metadataResponse.json() : { results: [] };
+  const transactions = transactionsResponse.ok ? await transactionsResponse.json() : { results: [] };
+  const fungible = balances.fungible_tokens || {};
+  const balanceOf = (contract: string, assetName: string) => Number(fungible[`${contract}::${assetName}`]?.balance || 0) / 1_000_000;
+  const ratioHex = ratioPayload?.result;
+  const ratio = ratioHex ? Number(BigInt(`0x${ratioHex.slice(4)}`)) / 1_000_000 : 0;
+  const ststxMetadata = (metadata.results || []).find((token: { contract_principal?: string }) => token.contract_principal === STSTX_CONTRACT);
+  const supply = Number(ststxMetadata?.total_supply || 0) / 1_000_000;
+  const activities = (transactions.results || [])
+    .filter((transaction: unknown) => {
+      const serialized = JSON.stringify(transaction).toLowerCase();
+      return serialized.includes("ststx") || serialized.includes("zststx") || serialized.includes("stx-ststx");
+    })
+    .slice(0, 8)
+    .map((transaction: { tx_id: string; block_time_iso?: string; contract_call?: { function_name?: string; function_args?: Array<{ repr?: string }> } }) => {
+      const functionName = transaction.contract_call?.function_name || "on-chain activity";
+      const amount = transaction.contract_call?.function_args?.map((arg) => parseUintRepr(arg.repr)).find((value) => value > 0) || 0;
+      const isSupply = functionName === "supply";
+      const isSwap = functionName.includes("swap");
+      return {
+        txid: transaction.tx_id,
+        label: isSupply ? "Supplied stSTX to Zest" : isSwap ? "Swapped in stSTX pool" : functionName.replaceAll("-", " "),
+        detail: `${formatActivityDate(transaction.block_time_iso)} · ${transaction.tx_id.slice(0, 8)}…`,
+        amount: amount ? `${formatNumber(amount)} stSTX` : "stSTX position",
+        date: transaction.block_time_iso || "",
+        tone: isSupply ? "blue" : isSwap ? "orange" : "green",
+      };
+    });
+
+  return {
+    directBalance: balanceOf(STSTX_CONTRACT, "ststx"),
+    zestBalance: balanceOf(ZEST_RECEIPT_CONTRACT, "zststx"),
+    lpBalance: balanceOf(STSTX_LP_CONTRACT, "pool-token"),
+    ratio,
+    supply,
+    activities,
+  };
+}
 
 function compactAddress(address: string) {
   return `${address.slice(0, 7)}…${address.slice(-5)}`;
@@ -189,11 +289,79 @@ function AssetIcon({ asset }: { asset: Asset }) {
   return <span className={`asset-icon asset-icon--${asset.tone}`}>{asset.icon}</span>;
 }
 
+function StstxTracker({ address, network }: { address: string; network: Network }) {
+  const [data, setData] = useState<StstxTrackerData>(EMPTY_STSTX_DATA);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [showAllActivity, setShowAllActivity] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    void fetchStstxTracker(address, network)
+      .then((nextData) => {
+        if (!cancelled) setData(nextData);
+      })
+      .catch((nextError: unknown) => {
+        if (!cancelled) setError(nextError instanceof Error ? nextError.message : "Could not load stSTX data.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [address, network, refreshKey]);
+
+  const trackedStstx = data.directBalance + data.zestBalance;
+  const backingStx = trackedStstx * data.ratio;
+  const visibleActivity = showAllActivity ? data.activities : data.activities.slice(0, 4);
+
+  return (
+    <div className="ststx-page">
+      <div className="page-heading ststx-heading">
+        <div>
+          <div className="eyebrow"><span className="eyebrow-line" /> PROTOCOL / STSTX</div>
+          <h1>stSTX <em>tracker</em></h1>
+          <p>Follow your liquid-staked STX across your wallet and DeFi positions.</p>
+        </div>
+        <div className="heading-actions">
+          <span className="sync-label"><span className="sync-dot" /> {loading ? "Syncing on-chain" : "Live from Hiro API"}</span>
+          <button className="icon-button" onClick={() => setRefreshKey((value) => value + 1)} aria-label="Refresh stSTX data"><RefreshCw size={17} className={loading ? "spin" : ""} /></button>
+          <a className="primary-button" href="https://app.stackingdao.com" target="_blank" rel="noreferrer">Open StackingDAO <ArrowUpRight size={15} /></a>
+        </div>
+      </div>
+
+      {data.unsupported && <div className="ststx-alert"><CircleHelp size={16} /><span>stSTX tracking is currently enabled for mainnet. Switch the network selector above to mainnet for live protocol data.</span></div>}
+      {error && <div className="ststx-alert ststx-alert--error"><CircleHelp size={16} /><span>{error}</span><button onClick={() => setRefreshKey((value) => value + 1)}>Retry</button></div>}
+
+      <div className="ststx-hero-grid">
+        <div className="ststx-hero card-surface">
+          <div className="ststx-hero__glow" />
+          <div className="ststx-hero__top"><div className="ststx-token-lockup"><span className="ststx-token-mark">s</span><div><span className="card-label">TRACKED EXPOSURE</span><strong>Stacked STX</strong></div></div><span className="ststx-live"><span /> MAINNET</span></div>
+          <div className="ststx-main-value">{loading ? "—" : formatNumber(trackedStstx)} <span>stSTX</span></div>
+          <div className="ststx-sub-value">≈ {loading ? "—" : formatNumber(backingStx)} STX backing value</div>
+          <div className="ststx-hero__stats"><div><span>DIRECT WALLET</span><strong>{loading ? "—" : formatNumber(data.directBalance)}</strong></div><div><span>DEPLOYED IN DEFI</span><strong>{loading ? "—" : formatNumber(data.zestBalance)}</strong></div><div><span>LP TOKENS</span><strong>{loading ? "—" : formatNumber(data.lpBalance)}</strong></div></div>
+        </div>
+        <div className="ststx-rate card-surface"><div className="section-heading"><div><span className="card-label">ON-CHAIN RATE</span><h2>stSTX / STX</h2></div><span className="rate-live"><span /> READ-ONLY</span></div><div className="rate-value">{loading || !data.ratio ? "—" : data.ratio.toFixed(6)} <span>STX</span></div><p>STX backing each 1 stSTX based on the StackingDAO data contract.</p><div className="rate-foot"><div><span>PROTOCOL APY</span><strong>UP TO 10%</strong></div><div><span>REWARD MODEL</span><strong>AUTO-COMPOUND</strong></div></div><a href="https://explorer.hiro.so/txid/SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stx-v2?chain=mainnet" target="_blank" rel="noreferrer" className="contract-link">View data contract <ExternalLink size={13} /></a></div>
+      </div>
+
+      <div className="ststx-metrics-grid"><div className="metric-card"><span className="metric-card__icon metric-card__icon--green"><ArrowUpRight size={16} /></span><div><span className="card-label">BACKING VALUE</span><strong>{loading ? "—" : `${formatNumber(backingStx)} STX`}</strong><small>Converted at live ratio</small></div></div><div className="metric-card"><span className="metric-card__icon metric-card__icon--orange"><Coins size={16} /></span><div><span className="card-label">TOTAL SUPPLY</span><strong>{loading ? "—" : `${formatNumber(data.supply)} stSTX`}</strong><small>From token metadata index</small></div></div><div className="metric-card"><span className="metric-card__icon metric-card__icon--blue"><ShieldCheck size={16} /></span><div><span className="card-label">POSITION TYPE</span><strong>NON-CUSTODIAL</strong><small>Wallet remains in control</small></div></div></div>
+
+      <div className="ststx-content-grid"><div className="positions-card card-surface"><div className="section-heading"><div><span className="card-label">POSITION BREAKDOWN</span><h2>Where your stSTX is</h2></div><span className="position-count">{loading ? "—" : "3 sources"}</span></div><div className="position-list"><div className="position-row"><div className="position-row__identity"><span className="position-icon position-icon--wallet"><Wallet size={16} /></span><div><strong>Wallet balance</strong><span>Direct stSTX token balance</span></div></div><div className="position-row__amount"><strong>{loading ? "—" : formatNumber(data.directBalance)}</strong><span>stSTX</span></div><span className="position-status">{data.directBalance > 0 ? "AVAILABLE" : "EMPTY"}</span></div><div className="position-row"><div className="position-row__identity"><span className="position-icon position-icon--blue"><BarChart3 size={16} /></span><div><strong>Zest lending</strong><span>Receipt tokens detected on-chain</span></div></div><div className="position-row__amount"><strong>{loading ? "—" : formatNumber(data.zestBalance)}</strong><span>zstSTX</span></div><span className="position-status position-status--active">DEPLOYED</span></div><div className="position-row"><div className="position-row__identity"><span className="position-icon position-icon--orange"><Sparkles size={16} /></span><div><strong>STX / stSTX liquidity</strong><span>StableSwap LP position</span></div></div><div className="position-row__amount"><strong>{loading ? "—" : formatNumber(data.lpBalance)}</strong><span>LP tokens</span></div><span className="position-status position-status--active">LIQUIDITY</span></div></div><div className="position-note"><CircleHelp size={14} /> LP tokens are shown separately and are not added to the stSTX exposure total.</div></div><div className="protocol-card card-surface"><div className="protocol-card__top"><span className="ststx-token-mark ststx-token-mark--small">s</span><div><span className="card-label">ABOUT STSTX</span><strong>Liquid staking, kept liquid.</strong></div></div><p>stSTX represents staked STX with auto-compounding rewards while remaining usable across the Stacks DeFi ecosystem.</p><div className="protocol-tags"><span>NO LOCK-UP</span><span>STX YIELD</span><span>SIP-010</span></div><a href="https://docs.stackingdao.com/stackingdao/the-stacking-dao-app/ststx-liquid-stx-staking-with-stx-rewards/ststx-basics.md" target="_blank" rel="noreferrer">Read protocol docs <ArrowUpRight size={14} /></a></div></div>
+
+      <div className="activity-card card-surface"><div className="section-heading"><div><span className="card-label">ON-CHAIN HISTORY</span><h2>Recent stSTX activity</h2></div><button className="text-button" onClick={() => setShowAllActivity((value) => !value)}>{showAllActivity ? "Show less" : "View all"} <ArrowUpRight size={14} /></button></div>{loading ? <div className="ststx-loading"><Loader2 size={18} className="spin" /> Reading wallet activity…</div> : data.activities.length === 0 ? <div className="ststx-loading">No recent stSTX-related transactions found for this address.</div> : <div className="activity-list">{visibleActivity.map((activity) => <a className="activity-row" key={activity.txid} href={`https://explorer.hiro.so/txid/${activity.txid}?chain=${network}`} target="_blank" rel="noreferrer"><span className={`activity-icon activity-icon--${activity.tone}`}>{activity.tone === "blue" ? <ArrowDownLeft size={15} /> : activity.tone === "orange" ? <RefreshCw size={15} /> : <Sparkles size={15} />}</span><span className="activity-copy"><strong>{activity.label}</strong><small>{activity.detail}</small></span><span className="activity-amount">{activity.amount}</span><ExternalLink size={14} className="activity-external" /></a>)}</div>}</div>
+
+      <div className="ststx-disclaimer"><ShieldCheck size={14} /><span>Read-only tracker. Data comes from the public Hiro Stacks API and StackingDAO contracts; protocol APY is an indicative maximum, not a guaranteed return.</span></div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [network, setNetwork] = useState<Network>("mainnet");
   const [assets, setAssets] = useState<Asset[]>(PREVIEW_ASSETS);
   const [wallets, setWallets] = useState<WalletRecord[]>(PREVIEW_WALLETS);
-  const [activeAddress, setActiveAddress] = useState(PREVIEW_WALLETS[0].address);
+  const [activeAddress, setActiveAddress] = useState("SP7CD8EB3GT9N5PFW8TPY9CMF84208V7KB0EPAPR");
   const [search, setSearch] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -201,6 +369,7 @@ export default function Home() {
   const [watchAddress, setWatchAddress] = useState("");
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [activeView, setActiveView] = useState<"overview" | "ststx">("overview");
   const [isPreview, setIsPreview] = useState(true);
 
   const visibleAssets = useMemo(() => {
@@ -339,6 +508,7 @@ export default function Home() {
             <div className="nav-label">WORKSPACE</div>
             <button className="nav-item nav-item--active"><LayoutDashboard size={18} /><span>Overview</span><span className="nav-count">01</span></button>
             <button className="nav-item" onClick={() => setIsAddOpen(true)}><Wallet size={18} /><span>Wallets</span><span className="nav-count">{wallets.length}</span></button>
+            <button className={`nav-item ${activeView === "ststx" ? "nav-item--active" : ""}`} onClick={() => { setActiveView("ststx"); setIsMobileNavOpen(false); }}><Coins size={18} /><span>stSTX tracker</span><span className="nav-count nav-count--new">NEW</span></button>
             <button className="nav-item" onClick={() => toast.info("Activity timeline is coming next.")}><BarChart3 size={18} /><span>Activity</span></button>
             <button className="nav-item" onClick={() => toast.info("Settings are coming next.")}><Settings2 size={18} /><span>Settings</span></button>
           </nav>
@@ -354,6 +524,8 @@ export default function Home() {
         </aside>
 
         <main className="main-content">
+          {activeView === "overview" ? (
+          <>
           <div className="page-heading">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> PORTFOLIO / {network.toUpperCase()}</div>
@@ -396,6 +568,10 @@ export default function Home() {
           <section className="wallets-section"><div className="section-heading section-heading--wallets"><div><span className="card-label">CONNECTED SOURCES</span><h2>Wallets <span>{wallets.length}</span></h2></div><button className="text-button" onClick={() => setIsAddOpen(true)}>Manage wallets <ArrowUpRight size={14} /></button></div><div className="wallet-grid">{wallets.slice(0, 3).map((wallet, index) => <div className={`wallet-card ${wallet.address === activeAddress ? "wallet-card--active" : ""}`} key={wallet.address}><div className="wallet-card__top"><span className="wallet-badge"><Wallet size={16} /></span><span className="wallet-source">{wallet.source === "preview" ? "SAMPLE" : wallet.source === "connected" ? "CONNECTED" : "WATCH ONLY"}</span><button onClick={() => viewExplorer(wallet.address)} aria-label="Open explorer"><ExternalLink size={15} /></button></div><div className="wallet-card__name">{wallet.label}</div><button className="wallet-card__address" onClick={() => { setActiveAddress(wallet.address); void loadAddress(wallet.address, { source: wallet.source, label: wallet.label }); }}><span>{compactAddress(wallet.address)}</span><Copy size={13} /></button><div className="wallet-card__bottom"><span>{wallet.address === activeAddress ? <><span className="wallet-active-dot" /> Active wallet</> : "Stacks address"}</span><span className="wallet-network">{network === "mainnet" ? "MAINNET" : "TESTNET"}</span></div></div>)}<button className="add-wallet-card" onClick={() => setIsAddOpen(true)}><span><Plus size={20} /></span><strong>Add a wallet</strong><small>Connect or track an address</small></button></div></section>
 
           <footer className="main-footer"><span>Stackfolio <span className="footer-divider">/</span> Built for Stacks</span><span className="footer-links"><a href="https://docs.stacks.co" target="_blank" rel="noreferrer">Docs <ExternalLink size={12} /></a><a href="https://explorer.hiro.so" target="_blank" rel="noreferrer">Explorer <ExternalLink size={12} /></a><span><Link2 size={13} /> Public API</span></span></footer>
+          </>
+          ) : (
+            <StstxTracker address={activeAddress} network={network} />
+          )}
         </main>
       </div>
 

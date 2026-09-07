@@ -67,18 +67,7 @@ const EXPLORER_BY_NETWORK: Record<Network, string> = {
 
 const PREVIEW_WALLETS: WalletRecord[] = [
   { address: "SP7CD8EB3GT9N5PFW8TPY9CMF84208V7KB0EPAPR", label: "My wallet", source: "watch-only" },
-  { address: "SP3K8BC0D9S4V5C7Q2W6Y1P8H0R3M9N7F4T6G2J1", label: "Treasury", source: "preview" },
 ];
-
-const PREVIEW_ASSETS: Asset[] = [
-  { id: "stx", symbol: "STX", name: "Stacks", balance: "8,450.00", rawBalance: 8450, price: 1.83, change: 5.42, icon: "S", tone: "orange" },
-  { id: "sbtc", symbol: "sBTC", name: "Bitcoin on Stacks", balance: "0.0814", rawBalance: 0.0814, price: 104820, change: 2.18, icon: "₿", tone: "gold" },
-  { id: "alex", symbol: "ALEX", name: "ALEX Token", balance: "24,180.00", rawBalance: 24180, price: 0.071, change: -1.84, icon: "A", tone: "purple", contract: "alexgo::alex" },
-  { id: "usda", symbol: "USDA", name: "Arkadiko USDA", balance: "1,248.32", rawBalance: 1248.32, price: 1, change: 0.02, icon: "$", tone: "blue", contract: "arkadiko-token::usda-token" },
-  { id: "ordi", symbol: "ORDI", name: "Ordinance", balance: "42.00", rawBalance: 42, price: 31.4, change: 3.21, icon: "O", tone: "green", contract: "ordi-token::ordi" },
-];
-
-const graphBars = [36, 49, 42, 64, 55, 72, 68, 81, 73, 91, 83, 96, 92, 100, 95, 108, 101, 116, 108, 123, 116, 129, 122, 140];
 
 const STSTX_CONTRACT = "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststx-token";
 const STSTX_DATA_CONTRACT = "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stx-v2";
@@ -153,6 +142,12 @@ async function fetchSafe(input: string, init?: RequestInit) {
   } catch {
     return null;
   }
+}
+
+async function fetchMarketPrices() {
+  const response = await fetchSafe("https://api.coingecko.com/api/v3/simple/price?ids=blockstack,bitcoin&vs_currencies=usd&include_24hr_change=true");
+  if (!response?.ok) return {} as Record<string, { usd?: number; usd_24h_change?: number }>;
+  return (await response.json()) as Record<string, { usd?: number; usd_24h_change?: number }>;
 }
 
 async function fetchHistoricalRates(address: string, network: Network): Promise<RateHistoryPoint[]> {
@@ -299,7 +294,10 @@ async function fetchPortfolio(address: string, network: Network) {
   const data = await response.json();
   const stxBalance = Number(data?.stx?.balance || 0) / 1_000_000;
   const fungibleTokens = Object.entries(data?.fungible_tokens || {}) as Array<[string, { balance?: string }] >;
-  const tokenContracts = Array.from(new Set(fungibleTokens.map(([assetIdentifier]) => assetIdentifier.split("::")[0]))).slice(0, 11);
+  const nonZeroTokens = fungibleTokens.filter(([, item]) => Number(item?.balance || 0) > 0);
+  const preferredTokens = nonZeroTokens.filter(([assetIdentifier]) => /sbtc|ststx|zststx|pool-token/i.test(assetIdentifier));
+  const selectedFungibleTokens = [...preferredTokens, ...nonZeroTokens.filter((entry) => !preferredTokens.includes(entry))].slice(0, 14);
+  const tokenContracts = Array.from(new Set(selectedFungibleTokens.map(([assetIdentifier]) => assetIdentifier.split("::")[0])));
   const metadataByContract = new Map<string, TokenMetadata>();
 
   if (tokenContracts.length) {
@@ -307,10 +305,20 @@ async function fetchPortfolio(address: string, network: Network) {
     tokenContracts.forEach((contract) => metadataUrl.searchParams.append("contract", contract));
     const metadataResponse = await fetch(metadataUrl);
     if (metadataResponse.ok) {
-      const metadata = (await metadataResponse.json()) as TokenMetadata[];
+      const metadataPayload = (await metadataResponse.json()) as TokenMetadata[] | { results?: TokenMetadata[] };
+      const metadata = Array.isArray(metadataPayload) ? metadataPayload : metadataPayload.results || [];
       metadata.forEach((token) => metadataByContract.set(token.contract_id, token));
     }
   }
+
+  const marketPrices = await fetchMarketPrices();
+  const priceForSymbol = (symbol: string) => {
+    const normalized = symbol.toLowerCase();
+    if (normalized === "stx") return marketPrices.blockstack;
+    if (normalized === "sbtc" || normalized === "btc") return marketPrices.bitcoin;
+    if (["usda", "usdh", "susdh", "aeusdc", "zaeusdc", "usdc"].includes(normalized)) return { usd: 1, usd_24h_change: 0 };
+    return undefined;
+  };
 
   const assets: Asset[] = [
     {
@@ -319,26 +327,27 @@ async function fetchPortfolio(address: string, network: Network) {
       name: "Stacks",
       balance: formatTokenBalance(stxBalance),
       rawBalance: stxBalance,
-      price: 1.83,
-      change: null,
+      price: priceForSymbol("STX")?.usd ?? null,
+      change: priceForSymbol("STX")?.usd_24h_change ?? null,
       icon: "S",
       tone: "orange",
     },
-    ...fungibleTokens.slice(0, 11).map(([contract, item]) => {
+    ...selectedFungibleTokens.map(([contract, item]) => {
       const contractPrincipal = contract.split("::")[0];
       const metadata = metadataByContract.get(contractPrincipal);
       const decimals = metadata?.decimals ?? 0;
       const symbol = metadata?.symbol || tokenSymbolFromContract(contract);
       const rawAmount = item?.balance || "0";
       const rawBalance = Number(rawAmount) / 10 ** decimals;
+      const marketPrice = priceForSymbol(symbol);
       return {
         id: contract,
         symbol,
         name: metadata?.name || contractPrincipal.replaceAll("-", " "),
         balance: formatRawTokenBalance(rawAmount, decimals),
         rawBalance,
-        price: null,
-        change: null,
+        price: marketPrice?.usd ?? null,
+        change: marketPrice?.usd_24h_change ?? null,
         icon: symbol.slice(0, 1),
         tone: tokenTone(symbol),
         contract,
@@ -445,7 +454,7 @@ function StstxTracker({ address, network }: { address: string; network: Network 
 
 export default function Home() {
   const [network, setNetwork] = useState<Network>("mainnet");
-  const [assets, setAssets] = useState<Asset[]>(PREVIEW_ASSETS);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [wallets, setWallets] = useState<WalletRecord[]>(PREVIEW_WALLETS);
   const [activeAddress, setActiveAddress] = useState("SP7CD8EB3GT9N5PFW8TPY9CMF84208V7KB0EPAPR");
   const [search, setSearch] = useState("");
@@ -468,8 +477,12 @@ export default function Home() {
     () => assets.reduce((total, asset) => total + (asset.price || 0) * asset.rawBalance, 0),
     [assets],
   );
-  const allocationTotal = assets.reduce((total, asset) => total + asset.rawBalance * (asset.price || 0), 0) || 1;
-  const topAssets = assets.slice(0, 4).map((asset) => ({ ...asset, share: ((asset.rawBalance * (asset.price || 0)) / allocationTotal) * 100 }));
+  const pricedAssets = assets.filter((asset) => asset.price !== null && asset.rawBalance > 0);
+  const allocationTotal = pricedAssets.reduce((total, asset) => total + asset.rawBalance * (asset.price || 0), 0) || 1;
+  const topAssets = pricedAssets.slice(0, 4).map((asset) => ({ ...asset, share: ((asset.rawBalance * (asset.price || 0)) / allocationTotal) * 100 }));
+  const allocationColors = ["#ff8a3d", "#e3ba5d", "#a78bfa", "#69a7ff", "#89dd93"];
+  let allocationCursor = 0;
+  const allocationGradient = pricedAssets.length ? `conic-gradient(${pricedAssets.map((asset, index) => { const start = allocationCursor; allocationCursor += ((asset.rawBalance * (asset.price || 0)) / allocationTotal) * 100; return `${allocationColors[index % allocationColors.length]} ${start}% ${allocationCursor}%`; }).join(", ")})` : "conic-gradient(#1c2520 0 100%)";
 
   async function loadAddress(address: string, options?: { source?: WalletRecord["source"]; label?: string; toastOnSuccess?: boolean }) {
     setIsRefreshing(true);
@@ -549,6 +562,8 @@ export default function Home() {
       if (address) {
         void loadAddress(address, { source: "connected", label: "Connected wallet" });
       }
+    } else if (activeAddress) {
+      void loadAddress(activeAddress, { source: "watch-only", label: "My wallet" });
     }
     // Wallet state should only be checked once when the app boots.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -630,15 +645,16 @@ export default function Home() {
           <section className="top-grid">
             <div className="balance-card card-surface">
               <div className="balance-card__grid" />
-              <div className="balance-card__topline"><span className="card-label">TOTAL TRACKED VALUE</span><span className="live-tag"><span /> {isPreview ? "PREVIEW" : "LIVE"}</span></div>
+              <div className="balance-card__topline"><span className="card-label">TOTAL PRICED VALUE</span><span className="live-tag"><span /> {isPreview ? "PREVIEW" : "LIVE"}</span></div>
               <div className="balance-amount">{isPrivacyMode ? "••••••" : `$${formatNumber(totalEstimatedValue, 2)}`}<span>USD</span></div>
-              <div className="balance-change"><span className="change-positive"><ArrowUpRight size={15} /> +8.24%</span><span className="muted-text">vs. last 30 days</span></div>
+              <div className="balance-change">{isRefreshing ? <span className="sync-label"><Loader2 size={14} className="spin" /> Syncing balances</span> : <span className="change-positive"><Check size={14} /> Live wallet data</span>}<span className="muted-text">from Hiro API</span></div>
               <div className="balance-card__bottom"><div><span>NETWORK</span><strong><span className="network-mini-dot" /> STX {network}</strong></div><div><span>ASSETS</span><strong>{assets.length || "—"}</strong></div><div><span>WALLETS</span><strong>{wallets.length}</strong></div></div>
             </div>
             <div className="performance-card card-surface">
-              <div className="section-heading"><div><span className="card-label">PERFORMANCE</span><h2>30 day activity</h2></div><div className="range-selector"><span className="range-selector--active">30D</span><span>90D</span><span>1Y</span></div></div>
-              <div className="performance-stat"><strong>+8.24%</strong><span>portfolio growth</span></div>
-              <div className="chart-wrap"><div className="chart-y"><span>$14k</span><span>$10k</span><span>$6k</span><span>$2k</span></div><div className="bar-chart">{graphBars.map((height, index) => <span key={index} style={{ height: `${height}px`, animationDelay: `${index * 18}ms` }} className={index > 16 ? "bar-chart__bar bar-chart__bar--active" : "bar-chart__bar"} />)}</div><div className="chart-x"><span>Aug 08</span><span>Aug 23</span><span>Sep 07</span></div></div>
+              <div className="section-heading"><div><span className="card-label">LIVE SNAPSHOT</span><h2>Wallet composition</h2></div><span className="live-tag"><span /> ON-CHAIN</span></div>
+              <div className="performance-stat"><strong>{assets.length || "—"}</strong><span>assets with balance</span></div>
+              <div className="live-composition"><div><span className="live-composition__label">DIRECT STX</span><strong>{isRefreshing ? "—" : `${formatTokenBalance(assets.find((asset) => asset.id === "stx")?.rawBalance || 0)} STX`}</strong></div><div><span className="live-composition__label">DIRECT STSTX</span><strong>{isRefreshing ? "—" : `${formatTokenBalance(assets.find((asset) => asset.symbol.toLowerCase() === "ststx")?.rawBalance || 0)} stSTX`}</strong></div><div><span className="live-composition__label">PRICED VALUE</span><strong>{isRefreshing ? "—" : `$${formatNumber(totalEstimatedValue, 2)}`}</strong></div></div>
+              <div className="live-composition__note"><Check size={14} /> Balances synced directly from your watch-only wallet.</div>
             </div>
           </section>
 
@@ -648,7 +664,7 @@ export default function Home() {
               <div className="asset-table-wrap"><table className="asset-table"><thead><tr><th>ASSET</th><th>BALANCE</th><th>EST. VALUE</th><th>30D</th><th /></tr></thead><tbody>{visibleAssets.map((asset) => <tr key={asset.id}><td><div className="asset-cell"><AssetIcon asset={asset} /><div><strong>{asset.symbol}</strong><span>{asset.name}</span></div></div></td><td><strong>{isPrivacyMode ? "••••" : asset.balance}</strong><span className="asset-unit"> {asset.symbol}</span></td><td>{asset.price ? <><strong>{isPrivacyMode ? "••••" : `$${formatNumber(asset.rawBalance * asset.price)}`}</strong><span className="asset-unit"> USD</span></> : <span className="muted-text">Not priced</span>}</td><td>{asset.change === null ? <span className="muted-text">—</span> : <span className={asset.change >= 0 ? "change-positive" : "change-negative"}>{asset.change >= 0 ? "+" : ""}{asset.change.toFixed(2)}%</span>}</td><td><button className="row-arrow" onClick={() => asset.contract && toast.info(`${asset.contract} is a SIP-010 token.`)} aria-label={`View ${asset.symbol}`}><ArrowUpRight size={15} /></button></td></tr>)}{visibleAssets.length === 0 && <tr><td colSpan={5}><div className="empty-state"><Search size={20} /><strong>No assets found</strong><span>Try a different search.</span></div></td></tr>}</tbody></table></div>
               <div className="table-footer"><span>Showing {visibleAssets.length} of {assets.length} assets</span><button onClick={() => toast.info("Token metadata explorer is coming next.")}>View all tokens <ArrowUpRight size={14} /></button></div>
             </div>
-            <div className="allocation-card card-surface"><div className="section-heading"><div><span className="card-label">ALLOCATION</span><h2>By asset</h2></div><button className="more-button" aria-label="Allocation help" onClick={() => toast.info("Allocation uses estimated USD value where available.")}><CircleHelp size={16} /></button></div><div className="allocation-visual"><div className="donut" style={{ background: `conic-gradient(#ff8a3d 0 61%, #e3ba5d 61% 79%, #a78bfa 79% 91%, #69a7ff 91% 96%, #89dd93 96% 100%)` }}><div className="donut__inner"><strong>{assets.length}</strong><span>assets</span></div></div><div className="allocation-list">{topAssets.map((asset) => <div className="allocation-row" key={asset.id}><div><span className={`allocation-dot allocation-dot--${asset.tone}`} />{asset.symbol}</div><strong>{asset.price ? `${asset.share.toFixed(1)}%` : "—"}</strong></div>)}</div></div><div className="allocation-note"><span><Sparkles size={14} /> Diversified across {wallets.length} wallets</span><ArrowUpRight size={14} /></div></div>
+            <div className="allocation-card card-surface"><div className="section-heading"><div><span className="card-label">ALLOCATION</span><h2>By priced asset</h2></div><button className="more-button" aria-label="Allocation help" onClick={() => toast.info("Allocation uses estimated USD value where available.")}><CircleHelp size={16} /></button></div><div className="allocation-visual"><div className="donut" style={{ background: allocationGradient }}><div className="donut__inner"><strong>{pricedAssets.length}</strong><span>priced</span></div></div><div className="allocation-list">{topAssets.map((asset) => <div className="allocation-row" key={asset.id}><div><span className={`allocation-dot allocation-dot--${asset.tone}`} />{asset.symbol}</div><strong>{`${asset.share.toFixed(1)}%`}</strong></div>)}</div></div><div className="allocation-note"><span><Sparkles size={14} /> Known prices across {wallets.length} wallet</span><ArrowUpRight size={14} /></div></div>
           </section>
 
           <section className="wallets-section"><div className="section-heading section-heading--wallets"><div><span className="card-label">CONNECTED SOURCES</span><h2>Wallets <span>{wallets.length}</span></h2></div><button className="text-button" onClick={() => setIsAddOpen(true)}>Manage wallets <ArrowUpRight size={14} /></button></div><div className="wallet-grid">{wallets.slice(0, 3).map((wallet, index) => <div className={`wallet-card ${wallet.address === activeAddress ? "wallet-card--active" : ""}`} key={wallet.address}><div className="wallet-card__top"><span className="wallet-badge"><Wallet size={16} /></span><span className="wallet-source">{wallet.source === "preview" ? "SAMPLE" : wallet.source === "connected" ? "CONNECTED" : "WATCH ONLY"}</span><button onClick={() => viewExplorer(wallet.address)} aria-label="Open explorer"><ExternalLink size={15} /></button></div><div className="wallet-card__name">{wallet.label}</div><button className="wallet-card__address" onClick={() => { setActiveAddress(wallet.address); void loadAddress(wallet.address, { source: wallet.source, label: wallet.label }); }}><span>{compactAddress(wallet.address)}</span><Copy size={13} /></button><div className="wallet-card__bottom"><span>{wallet.address === activeAddress ? <><span className="wallet-active-dot" /> Active wallet</> : "Stacks address"}</span><span className="wallet-network">{network === "mainnet" ? "MAINNET" : "TESTNET"}</span></div></div>)}<button className="add-wallet-card" onClick={() => setIsAddOpen(true)}><span><Plus size={20} /></span><strong>Add a wallet</strong><small>Connect or track an address</small></button></div></section>

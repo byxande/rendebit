@@ -278,3 +278,11 @@ h1 em { color: #caff4a; font-style: normal; }
 .ststx-metrics-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 1080px) { .ststx-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .ststx-metrics-grid { grid-template-columns: 1fr; } }
+
+.live-composition { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: auto; padding-top: 22px; border-top: 1px solid rgba(255,255,255,.08); }
+.live-composition > div { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.live-composition__label { color: #778277; font: 8px "IBM Plex Mono", monospace; letter-spacing: .08em; }
+.live-composition strong { color: #d5ded1; font: 11px "IBM Plex Mono", monospace; white-space: nowrap; }
+.live-composition__note { display: flex; align-items: center; gap: 7px; margin-top: 17px; color: #758076; font-size: 10px; }
+.live-composition__note svg { color: #caff4a; flex: 0 0 auto; }
+@media (max-width: 760px) { .live-composition { gap: 8px; }.live-composition strong { font-size: 9px; }.live-composition__label { font-size: 7px; }.live-composition__note { font-size: 9px; } }

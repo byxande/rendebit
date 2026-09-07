@@ -84,6 +84,7 @@ const STSTX_CONTRACT = "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststx-token";
 const STSTX_DATA_CONTRACT = "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stx-v2";
 const ZEST_RECEIPT_CONTRACT = "SP2VCQJGH7PHP2DJK7Z0V48AGBHQAW3R3ZW1QF4N.zststx-token";
 const STSTX_LP_CONTRACT = "SM1793C4R5PZ4NS4VQ4WMP7SKKYVH8JZEWSZ9HCCR.stableswap-pool-stx-ststx-v-1-4";
+const HISTORY_DAYS = [30, 25, 20, 15, 10, 5, 0];
 
 type StstxActivity = {
   txid: string;
@@ -94,12 +95,22 @@ type StstxActivity = {
   tone: "green" | "orange" | "blue";
 };
 
+type RateHistoryPoint = {
+  date: string;
+  label: string;
+  ratio: number;
+};
+
 type StstxTrackerData = {
   directBalance: number;
   zestBalance: number;
   lpBalance: number;
   ratio: number;
   supply: number;
+  stxPrice: number;
+  stxChange24h: number;
+  apy: number;
+  rateHistory: RateHistoryPoint[];
   activities: StstxActivity[];
   unsupported?: boolean;
 };
@@ -110,6 +121,10 @@ const EMPTY_STSTX_DATA: StstxTrackerData = {
   lpBalance: 0,
   ratio: 0,
   supply: 0,
+  stxPrice: 0,
+  stxChange24h: 0,
+  apy: 0,
+  rateHistory: [],
   activities: [],
 };
 
@@ -123,29 +138,82 @@ function formatActivityDate(date?: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(date));
 }
 
+function parseClarityUint(hex?: string) {
+  if (!hex) return 0;
+  try {
+    return Number(BigInt(`0x${hex.slice(4)}`)) / 1_000_000;
+  } catch {
+    return 0;
+  }
+}
+
+async function fetchSafe(input: string, init?: RequestInit) {
+  try {
+    return await fetch(input, init);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchHistoricalRates(address: string, network: Network): Promise<RateHistoryPoint[]> {
+  if (network !== "mainnet") return [];
+  const now = Math.floor(Date.now() / 1_000);
+  const blocks = await Promise.all(HISTORY_DAYS.map(async (daysAgo) => {
+    const timestamp = now - daysAgo * 86_400;
+    const response = await fetchSafe(`${API_BY_NETWORK[network]}/extended/v2/blocks/by-block-time/${timestamp}`);
+    if (!response?.ok) return null;
+    const block = await response.json();
+    return { blockTime: Number(block.block_time) * 1_000, tip: String(block.index_block_hash || "").replace(/^0x/, "") };
+  }));
+
+  const points = await Promise.all(blocks.map(async (block) => {
+    if (!block?.tip) return null;
+    const response = await fetchSafe(`${API_BY_NETWORK[network]}/v2/contracts/call-read/${STSTX_DATA_CONTRACT.replace(".", "/")}/get-stx-per-ststx?tip=${block.tip}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sender: address, arguments: [] }),
+    });
+    if (!response?.ok) return null;
+    const payload = await response.json();
+    const ratio = parseClarityUint(payload?.result);
+    if (!ratio) return null;
+    return {
+      date: new Date(block.blockTime).toISOString(),
+      label: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(block.blockTime)),
+      ratio,
+    };
+  }));
+  return points.filter((point): point is RateHistoryPoint => Boolean(point));
+}
+
 async function fetchStstxTracker(address: string, network: Network): Promise<StstxTrackerData> {
   if (network !== "mainnet") return { ...EMPTY_STSTX_DATA, unsupported: true };
 
-  const [balancesResponse, ratioResponse, metadataResponse, transactionsResponse] = await Promise.all([
-    fetch(`${API_BY_NETWORK[network]}/extended/v1/address/${address}/balances?proof=0`),
-    fetch(`${API_BY_NETWORK[network]}/v2/contracts/call-read/${STSTX_DATA_CONTRACT.replace(".", "/")}/get-stx-per-ststx`, {
+  const [balancesResponse, ratioResponse, metadataResponse, transactionsResponse, priceResponse, apyResponse] = await Promise.all([
+    fetchSafe(`${API_BY_NETWORK[network]}/extended/v1/address/${address}/balances?proof=0`),
+    fetchSafe(`${API_BY_NETWORK[network]}/v2/contracts/call-read/${STSTX_DATA_CONTRACT.replace(".", "/")}/get-stx-per-ststx`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ sender: address, arguments: [] }),
     }),
-    fetch(`${API_BY_NETWORK[network]}/metadata/v1/ft?symbol=stSTX&limit=20`),
-    fetch(`${API_BY_NETWORK[network]}/extended/v1/address/${address}/transactions?limit=50&offset=0`),
+    fetchSafe(`${API_BY_NETWORK[network]}/metadata/v1/ft?symbol=stSTX&limit=20`),
+    fetchSafe(`${API_BY_NETWORK[network]}/extended/v1/address/${address}/transactions?limit=50&offset=0`),
+    fetchSafe("https://api.coingecko.com/api/v3/simple/price?ids=blockstack&vs_currencies=usd&include_24hr_change=true"),
+    fetchSafe("https://app.stackingdao.com/api/apy?v=2"),
   ]);
-  if (!balancesResponse.ok || !ratioResponse.ok) throw new Error("The Stacks API did not return stSTX data.");
+  if (!balancesResponse?.ok || !ratioResponse?.ok) throw new Error("The Stacks API did not return stSTX data.");
 
+  const historicalRatesPromise = fetchHistoricalRates(address, network);
   const balances = await balancesResponse.json();
   const ratioPayload = await ratioResponse.json();
-  const metadata = metadataResponse.ok ? await metadataResponse.json() : { results: [] };
-  const transactions = transactionsResponse.ok ? await transactionsResponse.json() : { results: [] };
+  const metadata = metadataResponse?.ok ? await metadataResponse.json() : { results: [] };
+  const transactions = transactionsResponse?.ok ? await transactionsResponse.json() : { results: [] };
+  const priceData = priceResponse?.ok ? await priceResponse.json() : {};
+  const apyData = apyResponse?.ok ? await apyResponse.json() : {};
+  const rateHistory = await historicalRatesPromise;
   const fungible = balances.fungible_tokens || {};
   const balanceOf = (contract: string, assetName: string) => Number(fungible[`${contract}::${assetName}`]?.balance || 0) / 1_000_000;
-  const ratioHex = ratioPayload?.result;
-  const ratio = ratioHex ? Number(BigInt(`0x${ratioHex.slice(4)}`)) / 1_000_000 : 0;
+  const ratio = parseClarityUint(ratioPayload?.result);
   const ststxMetadata = (metadata.results || []).find((token: { contract_principal?: string }) => token.contract_principal === STSTX_CONTRACT);
   const supply = Number(ststxMetadata?.total_supply || 0) / 1_000_000;
   const activities = (transactions.results || [])
@@ -175,6 +243,10 @@ async function fetchStstxTracker(address: string, network: Network): Promise<Sts
     lpBalance: balanceOf(STSTX_LP_CONTRACT, "pool-token"),
     ratio,
     supply,
+    stxPrice: Number(priceData?.blockstack?.usd || 0),
+    stxChange24h: Number(priceData?.blockstack?.usd_24h_change || 0),
+    apy: Number(apyData?.ststx || 0),
+    rateHistory,
     activities,
   };
 }
@@ -315,7 +387,19 @@ function StstxTracker({ address, network }: { address: string; network: Network 
 
   const trackedStstx = data.directBalance + data.zestBalance;
   const backingStx = trackedStstx * data.ratio;
+  const backingUsd = backingStx * data.stxPrice;
+  const impliedStstxUsd = data.ratio * data.stxPrice;
   const visibleActivity = showAllActivity ? data.activities : data.activities.slice(0, 4);
+  const chartMin = data.rateHistory.length ? Math.min(...data.rateHistory.map((point) => point.ratio)) : 0;
+  const chartMax = data.rateHistory.length ? Math.max(...data.rateHistory.map((point) => point.ratio)) : 1;
+  const chartRange = Math.max(chartMax - chartMin, 0.000001);
+  const chartPoints = data.rateHistory.map((point, index) => ({
+    ...point,
+    x: data.rateHistory.length === 1 ? 300 : 34 + index * (532 / (data.rateHistory.length - 1)),
+    y: 166 - ((point.ratio - chartMin) / chartRange) * 126,
+  }));
+  const chartPolyline = chartPoints.map((point) => `${point.x},${point.y}`).join(" ");
+  const chartArea = chartPoints.length ? `M ${chartPoints[0].x} 166 L ${chartPoints.map((point) => `${point.x} ${point.y}`).join(" L ")} L ${chartPoints[chartPoints.length - 1].x} 166 Z` : "";
 
   return (
     <div className="ststx-page">
@@ -340,13 +424,15 @@ function StstxTracker({ address, network }: { address: string; network: Network 
           <div className="ststx-hero__glow" />
           <div className="ststx-hero__top"><div className="ststx-token-lockup"><span className="ststx-token-mark">s</span><div><span className="card-label">TRACKED EXPOSURE</span><strong>Stacked STX</strong></div></div><span className="ststx-live"><span /> MAINNET</span></div>
           <div className="ststx-main-value">{loading ? "—" : formatNumber(trackedStstx)} <span>stSTX</span></div>
-          <div className="ststx-sub-value">≈ {loading ? "—" : formatNumber(backingStx)} STX backing value</div>
+          <div className="ststx-sub-value">≈ {loading ? "—" : formatNumber(backingStx)} STX backing value <span className="ststx-usd-note">≈ {loading || !backingUsd ? "—" : `$${formatNumber(backingUsd)}`} USD</span></div>
           <div className="ststx-hero__stats"><div><span>DIRECT WALLET</span><strong>{loading ? "—" : formatNumber(data.directBalance)}</strong></div><div><span>DEPLOYED IN DEFI</span><strong>{loading ? "—" : formatNumber(data.zestBalance)}</strong></div><div><span>LP TOKENS</span><strong>{loading ? "—" : formatNumber(data.lpBalance)}</strong></div></div>
         </div>
-        <div className="ststx-rate card-surface"><div className="section-heading"><div><span className="card-label">ON-CHAIN RATE</span><h2>stSTX / STX</h2></div><span className="rate-live"><span /> READ-ONLY</span></div><div className="rate-value">{loading || !data.ratio ? "—" : data.ratio.toFixed(6)} <span>STX</span></div><p>STX backing each 1 stSTX based on the StackingDAO data contract.</p><div className="rate-foot"><div><span>PROTOCOL APY</span><strong>UP TO 10%</strong></div><div><span>REWARD MODEL</span><strong>AUTO-COMPOUND</strong></div></div><a href="https://explorer.hiro.so/txid/SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stx-v2?chain=mainnet" target="_blank" rel="noreferrer" className="contract-link">View data contract <ExternalLink size={13} /></a></div>
+        <div className="ststx-rate card-surface"><div className="section-heading"><div><span className="card-label">ON-CHAIN RATE</span><h2>stSTX / STX</h2></div><span className="rate-live"><span /> READ-ONLY</span></div><div className="rate-value">{loading || !data.ratio ? "—" : data.ratio.toFixed(6)} <span>STX</span></div><div className="rate-usd">≈ {loading || !impliedStstxUsd ? "—" : `$${formatNumber(impliedStstxUsd)}`} per stSTX</div><p>STX backing each 1 stSTX based on the StackingDAO data contract.</p><div className="rate-foot"><div><span>PROTOCOL APY</span><strong>{loading || !data.apy ? "—" : `${data.apy.toFixed(2)}%`}</strong></div><div><span>REWARD MODEL</span><strong>AUTO-COMPOUND</strong></div></div><a href="https://explorer.hiro.so/txid/SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stx-v2?chain=mainnet" target="_blank" rel="noreferrer" className="contract-link">View data contract <ExternalLink size={13} /></a></div>
       </div>
 
-      <div className="ststx-metrics-grid"><div className="metric-card"><span className="metric-card__icon metric-card__icon--green"><ArrowUpRight size={16} /></span><div><span className="card-label">BACKING VALUE</span><strong>{loading ? "—" : `${formatNumber(backingStx)} STX`}</strong><small>Converted at live ratio</small></div></div><div className="metric-card"><span className="metric-card__icon metric-card__icon--orange"><Coins size={16} /></span><div><span className="card-label">TOTAL SUPPLY</span><strong>{loading ? "—" : `${formatNumber(data.supply)} stSTX`}</strong><small>From token metadata index</small></div></div><div className="metric-card"><span className="metric-card__icon metric-card__icon--blue"><ShieldCheck size={16} /></span><div><span className="card-label">POSITION TYPE</span><strong>NON-CUSTODIAL</strong><small>Wallet remains in control</small></div></div></div>
+      <div className="ststx-metrics-grid"><div className="metric-card"><span className="metric-card__icon metric-card__icon--green"><ArrowUpRight size={16} /></span><div><span className="card-label">PORTFOLIO VALUE</span><strong>{loading || !backingUsd ? "—" : `$${formatNumber(backingUsd)}`}</strong><small>{loading ? "Reading price" : "STX backing in USD"}</small></div></div><div className="metric-card"><span className="metric-card__icon metric-card__icon--orange"><Sparkles size={16} /></span><div><span className="card-label">IMPLIED STSTX PRICE</span><strong>{loading || !impliedStstxUsd ? "—" : `$${formatNumber(impliedStstxUsd, 4)}`}</strong><small>Based on live ratio</small></div></div><div className="metric-card"><span className="metric-card__icon metric-card__icon--blue"><BarChart3 size={16} /></span><div><span className="card-label">STX SPOT PRICE</span><strong>{loading || !data.stxPrice ? "—" : `$${formatNumber(data.stxPrice)}`}</strong><small className={data.stxChange24h >= 0 ? "change-positive" : "change-negative"}>{loading ? "Price feed" : `${data.stxChange24h >= 0 ? "+" : ""}${data.stxChange24h.toFixed(2)}% / 24h`}</small></div></div><div className="metric-card"><span className="metric-card__icon metric-card__icon--gold"><Coins size={16} /></span><div><span className="card-label">TOTAL SUPPLY</span><strong>{loading ? "—" : `${formatNumber(data.supply)} stSTX`}</strong><small>From token metadata index</small></div></div></div>
+
+      <div className="rate-history-card card-surface"><div className="section-heading"><div><span className="card-label">HISTORICAL RATE</span><h2>stSTX / STX evolution</h2></div><span className="rate-live"><span /> {loading ? "SYNCING" : "ON-CHAIN"}</span></div>{loading ? <div className="ststx-loading rate-chart-loading"><Loader2 size={18} className="spin" /> Loading historical blocks…</div> : data.rateHistory.length === 0 ? <div className="ststx-loading rate-chart-loading">Historical rate points are temporarily unavailable.</div> : <><div className="rate-chart-wrap"><svg viewBox="0 0 600 205" role="img" aria-label="Historical stSTX to STX exchange rate"><defs><linearGradient id="rate-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#caff4a" stopOpacity=".22" /><stop offset="100%" stopColor="#caff4a" stopOpacity="0" /></linearGradient></defs><line x1="34" y1="40" x2="566" y2="40" /><line x1="34" y1="103" x2="566" y2="103" /><line x1="34" y1="166" x2="566" y2="166" /><text x="0" y="44">{chartMax.toFixed(3)}</text><text x="0" y="107">{((chartMax + chartMin) / 2).toFixed(3)}</text><text x="0" y="170">{chartMin.toFixed(3)}</text>{chartArea && <path d={chartArea} fill="url(#rate-area)" />}{chartPolyline && <polyline points={chartPolyline} fill="none" stroke="#caff4a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}{chartPoints.map((point) => <circle key={point.date} cx={point.x} cy={point.y} r="4" fill="#111718" stroke="#caff4a" strokeWidth="2" />)}</svg></div><div className="rate-chart-labels">{chartPoints.map((point) => <span key={point.date}>{point.label}</span>)}</div></>}</div>
 
       <div className="ststx-content-grid"><div className="positions-card card-surface"><div className="section-heading"><div><span className="card-label">POSITION BREAKDOWN</span><h2>Where your stSTX is</h2></div><span className="position-count">{loading ? "—" : "3 sources"}</span></div><div className="position-list"><div className="position-row"><div className="position-row__identity"><span className="position-icon position-icon--wallet"><Wallet size={16} /></span><div><strong>Wallet balance</strong><span>Direct stSTX token balance</span></div></div><div className="position-row__amount"><strong>{loading ? "—" : formatNumber(data.directBalance)}</strong><span>stSTX</span></div><span className="position-status">{data.directBalance > 0 ? "AVAILABLE" : "EMPTY"}</span></div><div className="position-row"><div className="position-row__identity"><span className="position-icon position-icon--blue"><BarChart3 size={16} /></span><div><strong>Zest lending</strong><span>Receipt tokens detected on-chain</span></div></div><div className="position-row__amount"><strong>{loading ? "—" : formatNumber(data.zestBalance)}</strong><span>zstSTX</span></div><span className="position-status position-status--active">DEPLOYED</span></div><div className="position-row"><div className="position-row__identity"><span className="position-icon position-icon--orange"><Sparkles size={16} /></span><div><strong>STX / stSTX liquidity</strong><span>StableSwap LP position</span></div></div><div className="position-row__amount"><strong>{loading ? "—" : formatNumber(data.lpBalance)}</strong><span>LP tokens</span></div><span className="position-status position-status--active">LIQUIDITY</span></div></div><div className="position-note"><CircleHelp size={14} /> LP tokens are shown separately and are not added to the stSTX exposure total.</div></div><div className="protocol-card card-surface"><div className="protocol-card__top"><span className="ststx-token-mark ststx-token-mark--small">s</span><div><span className="card-label">ABOUT STSTX</span><strong>Liquid staking, kept liquid.</strong></div></div><p>stSTX represents staked STX with auto-compounding rewards while remaining usable across the Stacks DeFi ecosystem.</p><div className="protocol-tags"><span>NO LOCK-UP</span><span>STX YIELD</span><span>SIP-010</span></div><a href="https://docs.stackingdao.com/stackingdao/the-stacking-dao-app/ststx-liquid-stx-staking-with-stx-rewards/ststx-basics.md" target="_blank" rel="noreferrer">Read protocol docs <ArrowUpRight size={14} /></a></div></div>
 

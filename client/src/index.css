@@ -254,3 +254,27 @@ h1 em { color: #caff4a; font-style: normal; }
 .activity-card { margin-bottom: 17px; }.activity-list { margin-top: 16px; }.activity-row { display: grid; grid-template-columns: 30px 1fr auto 15px; align-items: center; gap: 11px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.06); text-decoration: none; }.activity-row:hover .activity-copy strong, .activity-row:hover .activity-external { color: #caff4a; }.activity-icon { width: 29px; height: 29px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }.activity-icon--green { color: #caff4a; background: rgba(202,255,74,.1); }.activity-icon--blue { color: #73b4ff; background: rgba(100,171,255,.1); }.activity-icon--orange { color: #ff9d62; background: rgba(255,137,75,.1); }.activity-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }.activity-copy strong { color: #d9e0d5; font-size: 11px; transition: color .18s; }.activity-copy small { color: #6e796f; font: 9px "IBM Plex Mono", monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.activity-amount { color: #afc69a; font: 10px "IBM Plex Mono", monospace; white-space: nowrap; }.activity-external { color: #58665a; transition: color .18s; }.ststx-loading { min-height: 130px; display: flex; align-items: center; justify-content: center; gap: 9px; color: #758077; font-size: 11px; }.ststx-disclaimer { gap: 7px; color: #657066; font-size: 9px; line-height: 1.5; }.ststx-disclaimer svg { color: #849b6c; flex: 0 0 auto; }
 @media (max-width: 1080px) { .ststx-hero-grid, .ststx-content-grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .ststx-heading { display: block; }.ststx-heading .heading-actions { align-items: center; }.ststx-hero { min-height: 255px; padding: 21px 20px; }.ststx-hero__stats { left: 20px; right: 20px; gap: 18px; }.ststx-hero__stats strong { font-size: 9px; }.ststx-rate { min-height: 245px; padding: 20px; }.ststx-metrics-grid { grid-template-columns: 1fr; }.positions-card, .protocol-card, .activity-card { padding: 20px; }.position-row { grid-template-columns: 1fr auto; gap: 8px; }.position-status { grid-column: 2; justify-content: flex-end; }.position-row__amount { grid-row: 1; grid-column: 2; }.position-row__identity { grid-row: 1 / span 2; }.activity-row { grid-template-columns: 30px 1fr auto; }.activity-external { display: none; }.activity-amount { font-size: 9px; }.ststx-alert { align-items: flex-start; }.ststx-alert span { line-height: 1.45; } }
+
+.rate-history-card { padding: 23px 25px 20px; margin-bottom: 17px; }
+.rate-history-card h2 { text-transform: none; }
+.rate-chart-loading { min-height: 175px; }
+.rate-chart-wrap { margin-top: 22px; height: 190px; }
+.rate-chart-wrap svg { width: 100%; height: 100%; overflow: visible; }
+.rate-chart-wrap line { stroke: rgba(255,255,255,.08); stroke-width: 1; stroke-dasharray: 3 5; }
+.rate-chart-wrap text { fill: #667269; font: 9px "IBM Plex Mono", monospace; }
+.rate-chart-wrap path { animation: fade-chart .6s var(--ease-out) both; }
+.rate-chart-wrap polyline { filter: drop-shadow(0 0 7px rgba(202,255,74,.25)); animation: draw-chart .75s var(--ease-out) both; stroke-dasharray: 900; stroke-dashoffset: 900; }
+.rate-chart-wrap circle { transition: r .18s, fill .18s; animation: fade-chart .4s var(--ease-out) both; }
+.rate-chart-wrap circle:hover { r: 6; fill: #caff4a; }
+.rate-chart-labels { display: flex; justify-content: space-between; gap: 10px; margin: 1px 2px 0 34px; color: #667269; font: 9px "IBM Plex Mono", monospace; }
+.rate-usd { color: #afc96b; font: 10px "IBM Plex Mono", monospace; margin-top: 6px; }
+.ststx-usd-note { color: #afc96b; margin-left: 5px; }
+.metric-card__icon--gold { color: #e5c46a; background: rgba(229,196,106,.1); }
+@keyframes draw-chart { to { stroke-dashoffset: 0; } }
+@keyframes fade-chart { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 760px) { .rate-history-card { padding: 20px; }.rate-chart-wrap { height: 175px; }.rate-chart-labels { margin-left: 27px; font-size: 8px; }.rate-chart-labels span:nth-child(2), .rate-chart-labels span:nth-last-child(2) { display: none; }.ststx-usd-note { display: block; margin: 6px 0 0; }.ststx-main-value { margin-top: 29px; } }
+
+/* USD metrics stay balanced on wide screens and collapse cleanly on smaller devices. */
+.ststx-metrics-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1080px) { .ststx-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .ststx-metrics-grid { grid-template-columns: 1fr; } }

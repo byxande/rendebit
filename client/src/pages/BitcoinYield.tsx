@@ -35,6 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -47,7 +48,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-type SectionId = "inicio" | "rendimento" | "lotes" | "resgate" | "fiscal" | "reservas" | "empresas" | "ajuda";
+type SectionId = "inicio" | "depositar" | "rendimento" | "lotes" | "resgate" | "fiscal" | "reservas" | "empresas" | "ajuda";
 
 type NavItem = {
   id: SectionId;
@@ -70,6 +71,19 @@ type RedemptionQuoteView = {
   pixDestinationMasked: string;
 };
 
+type PixDepositRecord = {
+  id: number;
+  amountBrl: string;
+  status: "created" | "awaiting_payment" | "paid" | "expired" | "cancelled" | "manual_review";
+  pixCopyPaste: string | null;
+  qrCodeText: string | null;
+  providerReference: string | null;
+  endToEndId: string | null;
+  expiresAt: Date | string;
+  paidAt: Date | string | null;
+  createdAt: Date | string;
+};
+
 type PurchaseRecord = {
   id: string;
   date: string;
@@ -83,6 +97,7 @@ type PurchaseRecord = {
 
 const navItems: NavItem[] = [
   { id: "inicio", label: "Visão geral", icon: Home },
+  { id: "depositar", label: "Depositar via Pix", icon: ArrowDownToLine },
   { id: "rendimento", label: "Meu rendimento", icon: TrendingUp },
   { id: "lotes", label: "Meus aportes", icon: Layers3 },
   { id: "resgate", label: "Resgatar via Pix", icon: QrCode },
@@ -182,7 +197,7 @@ function DemoPill() {
   return <span className="br-demo-pill"><Sparkles size={13} /> Ambiente demonstrativo</span>;
 }
 
-function YieldSummary({ onRedeem, onAddMoney }: { onRedeem: () => void; onAddMoney: () => void }) {
+function YieldSummary({ onRedeem, onDeposit, onAddMoney }: { onRedeem: () => void; onDeposit: () => void; onAddMoney: () => void }) {
   return (
     <>
       <section className="br-hero-grid">
@@ -201,7 +216,8 @@ function YieldSummary({ onRedeem, onAddMoney }: { onRedeem: () => void; onAddMon
             <span className="br-positive">+5,63%</span>
           </div>
           <div className="br-balance-actions">
-            <button type="button" className="br-primary light" onClick={onAddMoney}>Comprar com reais <ArrowRight size={17} /></button>
+            <button type="button" className="br-primary light" onClick={onDeposit}>Depositar via Pix <ArrowDownToLine size={17} /></button>
+            <button type="button" className="br-secondary light" onClick={onAddMoney}>Comprar Bitcoin</button>
             <button type="button" className="br-secondary light" onClick={onRedeem}>Resgatar via Pix</button>
           </div>
         </div>
@@ -366,6 +382,74 @@ function RedeemPage({
   );
 }
 
+function PixDepositPage({ deposits, availableBrl, amount, setAmount, authenticated, loading, onCreate, onPay, onLogin }: {
+  deposits: PixDepositRecord[];
+  availableBrl: number;
+  amount: string;
+  setAmount: (value: string) => void;
+  authenticated: boolean;
+  loading: boolean;
+  onCreate: () => void;
+  onPay: (depositId: number) => void;
+  onLogin: () => void;
+}) {
+  const active = deposits.find(item => item.status === "awaiting_payment") ?? null;
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  const [now, setNow] = useState(Date.now());
+  const secondsLeft = active ? Math.max(0, Math.floor((new Date(active.expiresAt).getTime() - now) / 1000)) : 0;
+
+  useEffect(() => {
+    if (!active?.qrCodeText) { setQrDataUrl(""); return; }
+    void QRCode.toDataURL(active.qrCodeText, { width: 260, margin: 1, color: { dark: "#082d33", light: "#ffffff" } }).then(setQrDataUrl);
+  }, [active?.id, active?.qrCodeText]);
+
+  useEffect(() => {
+    if (!active || secondsLeft <= 0) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [active?.id, secondsLeft]);
+
+  const statusLabel: Record<PixDepositRecord["status"], string> = {
+    created: "Criado",
+    awaiting_payment: "Aguardando Pix",
+    paid: "Saldo disponível",
+    expired: "Expirado",
+    cancelled: "Cancelado",
+    manual_review: "Em análise",
+  };
+
+  if (!authenticated) return <div className="br-stack"><section className="br-page-hero compact"><div><span className="br-eyebrow">DEPÓSITO VIA PIX</span><h1>Entre para gerar seu QR Code.</h1><p>Use uma conta Google/Gmail ou Apple no portal seguro. Nenhum Pix real é movimentado no sandbox.</p><button className="br-primary" type="button" onClick={onLogin}>Entrar com Gmail ou Apple <ArrowRight size={16} /></button></div><div className="br-big-icon"><QrCode /></div></section></div>;
+
+  return (
+    <div className="br-stack">
+      <section className="br-page-hero compact br-pix-hero"><div><span className="br-eyebrow">SALDO EM REAIS</span><h1>Deposite via Pix.</h1><p>Gere uma cobrança, copie o código ou use o QR Code. O saldo só é creditado após a confirmação do pagamento.</p></div><div className="br-pix-balance"><small>Disponível na conta</small><strong>{currency.format(availableBrl)}</strong><span><ShieldCheck size={14} /> Separado do caixa da empresa</span></div></section>
+
+      <div className="br-pix-grid">
+        <section className="br-panel br-pix-create">
+          <span className="br-eyebrow">NOVO DEPÓSITO</span><h2>Quanto deseja depositar?</h2>
+          <div className="br-amount-field"><span>R$</span><input inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} aria-label="Valor do depósito Pix" /></div>
+          <div className="br-buy-chips"><button type="button" onClick={() => setAmount("100,00")}>R$ 100</button><button type="button" onClick={() => setAmount("500,00")}>R$ 500</button><button type="button" onClick={() => setAmount("1.000,00")}>R$ 1.000</button></div>
+          <div className="br-pix-rules"><span><Check /> Crédito somente após confirmação</span><span><Check /> Cobrança válida por 15 minutos</span><span><Check /> Sem taxa no sandbox</span></div>
+          <button className="br-primary full" type="button" onClick={onCreate} disabled={loading || parseBrl(amount) < 10 || parseBrl(amount) > 1_000_000}><QrCode size={17} /> {loading ? "Gerando…" : "Gerar QR Code Pix"}</button>
+          <p className="br-dialog-footnote"><ShieldCheck size={13} /> Em produção, a titularidade e a assinatura do webhook serão verificadas pelo parceiro Pix.</p>
+        </section>
+
+        <section className="br-panel br-pix-charge">
+          {!active ? <div className="br-pix-empty"><QrCode /><h3>Nenhuma cobrança aberta</h3><p>Escolha um valor para gerar um QR Code demonstrativo.</p></div> : <>
+            <div className="br-pix-charge-head"><div><span className="br-eyebrow">COBRANÇA ATIVA</span><h2>{currency.format(Number(active.amountBrl))}</h2></div><span className={`br-pix-timer ${secondsLeft === 0 ? "expired" : ""}`}>{secondsLeft > 0 ? `${String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:${String(secondsLeft % 60).padStart(2, "0")}` : "Expirada"}</span></div>
+            {qrDataUrl && <img className="br-pix-qr" src={qrDataUrl} alt="QR Code da cobrança Pix sandbox" />}
+            <div className="br-pix-code"><span>Pix Copia e Cola</span><code>{active.pixCopyPaste}</code><CopyButton value={active.pixCopyPaste ?? ""} label="Copiar código" /></div>
+            <button className="br-outline full" type="button" onClick={() => onPay(active.id)} disabled={loading || secondsLeft === 0}><BadgeCheck size={16} /> Simular pagamento no sandbox</button>
+            <p className="br-inline-note">Em produção, este botão não existe: o crédito ocorre somente após webhook assinado e conciliação.</p>
+          </>}
+        </section>
+      </div>
+
+      <section className="br-panel br-table-card br-pix-history"><div className="br-section-head"><div><span className="br-eyebrow">HISTÓRICO PIX</span><h2>Depósitos e conciliação</h2></div><span className="br-help-honesty"><ReceiptText size={15} /> {deposits.length} registros</span></div>{deposits.length === 0 ? <div className="br-ops-empty">Nenhum depósito Pix registrado.</div> : <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Valor</th><th>Status</th><th>Referência</th><th>Confirmação</th></tr></thead><tbody>{deposits.map(item => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString("pt-BR")}</td><td><b>{currency.format(Number(item.amountBrl))}</b></td><td><span className={`br-status ${item.status === "paid" ? "" : "warning"}`}><i /> {item.status === "awaiting_payment" && new Date(item.expiresAt).getTime() <= now ? "Expirado" : statusLabel[item.status]}</span></td><td className="mono">{item.providerReference ?? "—"}</td><td className="mono">{item.endToEndId ?? "—"}</td></tr>)}</tbody></table></div>}</section>
+    </div>
+  );
+}
+
 function FiscalPage() {
   return (
     <div className="br-stack">
@@ -431,6 +515,7 @@ export default function BitcoinYield() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const utils = trpc.useUtils();
   const profileQuery = trpc.onboarding.get.useQuery(undefined, { enabled: isAuthenticated });
+  const pixDepositsQuery = trpc.pixDeposits.summary.useQuery(undefined, { enabled: isAuthenticated });
   const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated });
   const redemptionsQuery = trpc.redemptions.summary.useQuery(undefined, { enabled: isAuthenticated });
   const [section, setSection] = useState<SectionId>(() => {
@@ -438,10 +523,13 @@ export default function BitcoinYield() {
     return navItems.some(item => item.id === requested) ? requested as SectionId : "inicio";
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(() => new URLSearchParams(window.location.search).get("login") === "1");
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [addMoneyOpen, setAddMoneyOpen] = useState(false);
+  const [onboardingIntent, setOnboardingIntent] = useState<"purchase" | "deposit">("purchase");
   const [amount, setAmount] = useState("0,01500000");
   const [addAmount, setAddAmount] = useState("1.000,00");
+  const [pixDepositAmount, setPixDepositAmount] = useState("500,00");
   const [purchaseStep, setPurchaseStep] = useState<PurchaseStep>("eligibility");
   const [quoteSeconds, setQuoteSeconds] = useState(59);
   const [quoteNonce, setQuoteNonce] = useState(0);
@@ -458,6 +546,7 @@ export default function BitcoinYield() {
   const [pixAccount, setPixAccount] = useState("Banco Inter •••• 4821");
   const [serverQuote, setServerQuote] = useState<Awaited<ReturnType<typeof createQuoteMutation.mutateAsync>> | null>(null);
   const activeLabel = useMemo(() => navItems.find((item) => item.id === section)?.label ?? "Visão geral", [section]);
+  const loginProviderLabel = user?.loginMethod?.toLowerCase().includes("apple") ? "Conta Apple" : user?.loginMethod?.toLowerCase().includes("google") ? "Conta Google" : "Conta autenticada";
   const localPurchaseQuote = useMemo(() => {
     const amountInBrl = parseBrl(addAmount);
     const serviceFee = amountInBrl * 0.005;
@@ -476,6 +565,8 @@ export default function BitcoinYield() {
 
   const saveProfileMutation = trpc.onboarding.save.useMutation();
   const verifyKycMutation = trpc.onboarding.simulateKycApproval.useMutation();
+  const createPixDepositMutation = trpc.pixDeposits.create.useMutation();
+  const settlePixDepositMutation = trpc.pixDeposits.simulatePayment.useMutation();
   const createQuoteMutation = trpc.purchases.createQuote.useMutation();
   const confirmPurchaseMutation = trpc.purchases.confirm.useMutation();
   const createRedemptionQuoteMutation = trpc.redemptions.createQuote.useMutation();
@@ -519,10 +610,46 @@ export default function BitcoinYield() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function requestLogin() {
+    setLoginOpen(true);
+  }
+
+  async function createPixDeposit() {
+    if (!isAuthenticated) { requestLogin(); return; }
+    if (profileQuery.data?.verificationStatus !== "verified") {
+      setOnboardingIntent("deposit");
+      setPurchaseStep("eligibility");
+      setEligibility({ resident: false, cpf: false, pix: false });
+      setAddMoneyOpen(true);
+      return;
+    }
+    try {
+      const deposit = await createPixDepositMutation.mutateAsync({ amountBrl: parseBrl(pixDepositAmount), idempotencyKey: `pix-deposit-${crypto.randomUUID()}` });
+      await pixDepositsQuery.refetch();
+      toast.success("QR Code Pix gerado", { description: `${currency.format(Number(deposit.amountBrl))} aguardando pagamento no sandbox.` });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar a cobrança Pix.");
+    }
+  }
+
+  async function settlePixDeposit(depositId: number) {
+    try {
+      const deposit = await settlePixDepositMutation.mutateAsync({ depositId, idempotencyKey: `pix-payment-${depositId}-${crypto.randomUUID()}` });
+      await Promise.all([
+        utils.pixDeposits.summary.invalidate(),
+        utils.purchases.ledger.invalidate(),
+        user?.role === "admin" ? utils.treasury.ledger.invalidate() : Promise.resolve(),
+      ]);
+      toast.success("Depósito Pix confirmado no sandbox", { description: `${currency.format(Number(deposit.amountBrl))} agora aparece no saldo em reais.` });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível confirmar o depósito Pix.");
+    }
+  }
+
   async function prepareRedemption() {
     if (!isAuthenticated) {
       toast.info("Entre na sua conta para solicitar um resgate no sandbox.");
-      startLogin();
+      requestLogin();
       return;
     }
     const btcAmount = Number(amount.replace(",", "."));
@@ -568,9 +695,10 @@ export default function BitcoinYield() {
   function openPurchase() {
     if (!isAuthenticated) {
       toast.info("Entre na sua conta para registrar compras no sandbox.");
-      startLogin();
+      requestLogin();
       return;
     }
+    setOnboardingIntent("purchase");
     setPurchaseStep("eligibility");
     setQuoteSeconds(59);
     setEligibility({ resident: false, cpf: false, pix: false });
@@ -600,6 +728,14 @@ export default function BitcoinYield() {
       });
       if (profileQuery.data?.verificationStatus !== "verified") {
         await verifyKycMutation.mutateAsync({ idempotencyKey: `kyc-${user?.id}-${crypto.randomUUID()}` });
+      }
+      if (onboardingIntent === "deposit") {
+        const deposit = await createPixDepositMutation.mutateAsync({ amountBrl: parseBrl(pixDepositAmount), idempotencyKey: `pix-deposit-${crypto.randomUUID()}` });
+        await Promise.all([utils.onboarding.get.invalidate(), utils.pixDeposits.summary.invalidate()]);
+        setAddMoneyOpen(false);
+        navigate("depositar");
+        toast.success("Conta verificada e QR Code gerado", { description: `${currency.format(Number(deposit.amountBrl))} aguardando pagamento no sandbox.` });
+        return;
       }
       const quote = await createQuoteMutation.mutateAsync({ amountBrl: parseBrl(addAmount), idempotencyKey: `quote-${crypto.randomUUID()}` });
       setServerQuote(quote);
@@ -641,16 +777,17 @@ export default function BitcoinYield() {
       </header>
       <aside className={`br-sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>RENDEBIT</b><small>BITCOIN EM REAIS</small></div></div>
-        <div className="br-profile"><div className="br-avatar">{user?.name?.slice(0, 2).toUpperCase() || "AB"}</div><div><b>Olá, {user?.name?.split(" ")[0] || "Alexandre"}</b><span>{isAuthenticated ? "Conta autenticada" : "Modo de leitura"} <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
+        <div className="br-profile"><div className="br-avatar">{user?.name?.slice(0, 2).toUpperCase() || "AB"}</div><div><b>Olá, {user?.name?.split(" ")[0] || "Alexandre"}</b><span>{isAuthenticated ? loginProviderLabel : "Modo de leitura"} <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
         <nav>{navItems.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => navigate(id)} type="button"><Icon size={19} /><span>{label}</span>{id === "empresas" && <em>B2B</em>}</button>)}</nav>
         <div className="br-sidebar-security"><ShieldCheck /><div><b>Ambiente protegido</b><span>Seus dados e posições são demonstrativos.</span></div></div>
         <div className="br-sidebar-footer"><button type="button" onClick={() => toast.success("Atendimento demonstrativo iniciado")}>Atendimento</button>{user?.role === "admin" && <button type="button" onClick={() => { window.location.href = "/operacao"; }}>Operação</button>}<span>v0.2 sandbox</span></div>
       </aside>
 
       <main className="br-main">
-        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => isAuthenticated ? toast.success("Conta e dados sincronizados com o sandbox.") : startLogin()}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? "Conta conectada" : "Entrar"} <ChevronDown size={14} /></button></div></div>
+        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => isAuthenticated ? toast.success("Conta e dados sincronizados com o sandbox.") : requestLogin()}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? "Conta conectada" : "Entrar"} <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => navigate("resgate")} onAddMoney={openPurchase} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Compre com reais</h3><p>Você escolhe quanto quer colocar e vê tudo explicado em BRL.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Ative o rendimento</h3><p>A estratégia é aplicada nos bastidores e o resultado aparece em reais.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para depositar via Pix, acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Deposite com Pix</h3><p>Você coloca reais na conta e acompanha a confirmação do pagamento.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Compre e ative</h3><p>A estratégia é aplicada nos bastidores e o resultado aparece em reais.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
+          {section === "depositar" && <PixDepositPage deposits={(pixDepositsQuery.data?.deposits ?? []) as PixDepositRecord[]} availableBrl={pixDepositsQuery.data?.availableBrl ?? 0} amount={pixDepositAmount} setAmount={setPixDepositAmount} authenticated={isAuthenticated} loading={createPixDepositMutation.isPending || settlePixDepositMutation.isPending || pixDepositsQuery.isLoading} onCreate={() => void createPixDeposit()} onPay={depositId => void settlePixDeposit(depositId)} onLogin={requestLogin} />}
           {section === "rendimento" && <YieldPage />}
           {section === "lotes" && <LotsPage purchases={purchases} />}
           {section === "resgate" && <RedeemPage amount={amount} setAmount={value => { setAmount(value); setRedemptionQuote(null); }} availableBtc={isAuthenticated ? redemptionsQuery.data?.availableBtc ?? 0 : 0.284215} pixDestination={profileQuery.data?.pixAccountMasked ?? ""} quote={redemptionQuote} quoteSeconds={redemptionQuoteSeconds} redemptions={redemptionsQuery.data?.redemptions ?? []} authenticated={isAuthenticated} loading={createRedemptionQuoteMutation.isPending || redemptionsQuery.isLoading} onQuote={() => void prepareRedemption()} />}
@@ -660,6 +797,18 @@ export default function BitcoinYield() {
           {section === "ajuda" && <HelpPage />}
         </div>
       </main>
+
+      <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
+        <DialogContent className="br-confirm-dialog br-login-dialog">
+          <div className="br-login-shield"><LockKeyhole /></div>
+          <DialogHeader><DialogTitle>Entre na RendeBit</DialogTitle><DialogDescription>Use sua conta Google — incluindo Gmail — ou Apple. A autenticação acontece no portal seguro e a RendeBit não recebe sua senha.</DialogDescription></DialogHeader>
+          <div className="br-social-login">
+            <button type="button" onClick={() => { setLoginOpen(false); startLogin(); }}><span className="br-google-mark">G</span><b>Continuar com Google</b><small>Contas Gmail e Google Workspace</small><ArrowRight size={16} /></button>
+            <button type="button" onClick={() => { setLoginOpen(false); startLogin(); }}><span className="br-apple-mark">A</span><b>Continuar com Apple</b><small>Entrar com Apple ID</small><ArrowRight size={16} /></button>
+          </div>
+          <div className="br-login-note"><ShieldCheck size={15} /><span>Na próxima tela, confirme Google ou Apple no portal oficial. A sessão usa cookie seguro, nonce de uso único e proteção contra login CSRF.</span></div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={redeemOpen} onOpenChange={open => { setRedeemOpen(open); if (!open && redemptionStep === "success") { setRedemptionQuote(null); setRedemptionQuoteSeconds(0); setCompletedRedemption(null); } }}>
         <DialogContent className="br-confirm-dialog br-redemption-dialog">
@@ -680,10 +829,10 @@ export default function BitcoinYield() {
           <div className="br-purchase-progress" aria-label={`Etapa ${purchaseStep === "eligibility" ? 1 : purchaseStep === "quote" ? 2 : 3} de 3`}><span className={purchaseStep !== "success" ? "active" : "done"}><i>{purchaseStep === "success" ? <Check size={11} /> : "1"}</i> Cadastro</span><b /><span className={purchaseStep === "quote" ? "active" : purchaseStep === "success" ? "done" : ""}><i>{purchaseStep === "success" ? <Check size={11} /> : "2"}</i> Cotação</span><b /><span className={purchaseStep === "success" ? "active" : ""}><i>3</i> Conclusão</span></div>
 
           {purchaseStep === "eligibility" && <>
-            <DialogHeader><DialogTitle>Vamos preparar sua compra</DialogTitle><DialogDescription>Confirme seus dados básicos para comprar Bitcoin com reais. Tudo abaixo é demonstrativo.</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>{onboardingIntent === "deposit" ? "Vamos preparar seu depósito Pix" : "Vamos preparar sua compra"}</DialogTitle><DialogDescription>{onboardingIntent === "deposit" ? "Confirme residência, CPF e titularidade da conta antes de gerar a cobrança. Tudo abaixo é demonstrativo." : "Confirme seus dados básicos para comprar Bitcoin com reais. Tudo abaixo é demonstrativo."}</DialogDescription></DialogHeader>
             <div className="br-eligibility-grid"><label><span>Nome completo</span><input value={legalName} onChange={(event) => setLegalName(event.target.value)} /></label><label><span>CPF mascarado</span><input value={cpfMasked} onChange={(event) => setCpfMasked(event.target.value)} /></label><label><span>Residência</span><select defaultValue="BR"><option value="BR">Brasil</option></select></label><label><span>Conta Pix mascarada</span><input value={pixAccount} onChange={(event) => setPixAccount(event.target.value)} /></label></div>
             <div className="br-check-stack"><label><input type="checkbox" checked={eligibility.resident} onChange={(event) => setEligibility((value) => ({ ...value, resident: event.target.checked }))} /><span><b>Sou residente no Brasil</b><small>Produto demonstrado apenas para residentes no país.</small></span></label><label><input type="checkbox" checked={eligibility.cpf} onChange={(event) => setEligibility((value) => ({ ...value, cpf: event.target.checked }))} /><span><b>Meu CPF está regular e verificado</b><small>Identificação necessária antes de movimentar valores reais.</small></span></label><label><input type="checkbox" checked={eligibility.pix} onChange={(event) => setEligibility((value) => ({ ...value, pix: event.target.checked }))} /><span><b>A conta Pix é da minha titularidade</b><small>Compras e resgates usam uma conta com o mesmo titular.</small></span></label></div>
-            <button className="br-primary full" type="button" disabled={!isEligible || saveProfileMutation.isPending || verifyKycMutation.isPending || createQuoteMutation.isPending} onClick={() => void continueToQuote()}>{saveProfileMutation.isPending || verifyKycMutation.isPending || createQuoteMutation.isPending ? <RefreshCw className="animate-spin" size={17} /> : <ArrowRight size={17} />} Verificar e gerar cotação</button>
+            <button className="br-primary full" type="button" disabled={!isEligible || saveProfileMutation.isPending || verifyKycMutation.isPending || createQuoteMutation.isPending || createPixDepositMutation.isPending} onClick={() => void continueToQuote()}>{saveProfileMutation.isPending || verifyKycMutation.isPending || createQuoteMutation.isPending || createPixDepositMutation.isPending ? <RefreshCw className="animate-spin" size={17} /> : <ArrowRight size={17} />} {onboardingIntent === "deposit" ? "Verificar e gerar QR Code" : "Verificar e gerar cotação"}</button>
             <p className="br-dialog-footnote"><ShieldCheck size={13} /> O sandbox persiste apenas dados mascarados e simula a aprovação do provedor KYC.</p>
           </>}
 
@@ -709,6 +858,16 @@ export default function BitcoinYield() {
 
 function HelpPage() {
   const faqs = [
+    {
+      category: "Primeiros passos",
+      question: "Posso entrar com Gmail ou Apple?",
+      answer: "Sim. A entrada usa o portal seguro com Google — incluindo Gmail e Google Workspace — ou Apple. A RendeBit recebe apenas os dados básicos autorizados e nunca vê sua senha.",
+    },
+    {
+      category: "Depósitos",
+      question: "Como deposito reais via Pix?",
+      answer: "Escolha Depositar via Pix, informe o valor e gere a cobrança. Você pode escanear o QR Code ou copiar o código. No sandbox, use o botão de simulação; em produção, o saldo só será creditado depois de um webhook assinado e da conciliação do parceiro Pix.",
+    },
     {
       category: "Primeiros passos",
       question: "O que é a Conta RendeBit?",

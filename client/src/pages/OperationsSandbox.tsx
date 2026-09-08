@@ -28,6 +28,7 @@ export default function OperationsSandbox() {
   const settingsQuery = trpc.treasury.settings.useQuery(undefined, { enabled: isAdmin });
   const distributionsQuery = trpc.treasury.distributions.useQuery(undefined, { enabled: isAdmin });
   const ledgerQuery = trpc.treasury.ledger.useQuery(undefined, { enabled: isAdmin });
+  const pixDepositsQuery = trpc.pixDeposits.operationalList.useQuery(undefined, { enabled: isAdmin });
   const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated });
   const redemptionsQuery = trpc.redemptions.operationalList.useQuery(undefined, { enabled: isAdmin });
   const [organizationName, setOrganizationName] = useState("Organização RendeBit");
@@ -80,6 +81,7 @@ export default function OperationsSandbox() {
 
   const settings = settingsQuery.data;
   const entries = ledgerQuery.data ?? [];
+  const pixDeposits = pixDepositsQuery.data ?? [];
   const redemptions = redemptionsQuery.data ?? [];
   const distributions = distributionsQuery.data ?? [];
   const grossRevenue = entries.filter(item => item.entryType === "fee_revenue" && item.currency === "BRL").reduce((sum, item) => sum + Number(item.amount), 0);
@@ -116,7 +118,7 @@ export default function OperationsSandbox() {
       <div className="br-ops-status-grid">
         <article className="br-panel"><Database /><small>Persistência</small><b>Banco ativo</b><span>{purchasesQuery.data?.length ?? 0} compras registradas</span></article>
         <article className="br-panel"><BadgeCheck /><small>KYC</small><b>Adaptador sandbox</b><span>Webhook idempotente</span></article>
-        <article className="br-panel"><Landmark /><small>Pix e custódia</small><b>Eventos simulados</b><span>{redemptions.length} resgates registrados</span></article>
+        <article className="br-panel"><Landmark /><small>Pix e custódia</small><b>Eventos simulados</b><span>{pixDeposits.length} depósitos • {redemptions.length} resgates</span></article>
         <article className="br-panel"><WalletCards /><small>Tesouraria</small><b>{settings?.status === "ready" ? "Pronta" : "Bloqueada"}</b><span>{settings?.stacksWalletAddress ? `${settings.stacksWalletAddress.slice(0, 8)}…` : "Carteira não informada"}</span></article>
       </div>
 
@@ -148,6 +150,11 @@ export default function OperationsSandbox() {
       <section className="br-panel br-table-card">
         <div className="br-section-head"><div><span className="br-eyebrow">APROVAÇÕES</span><h2>Repasses simulados</h2></div><span className="br-help-honesty"><CheckCircle2 size={15} /> Aprovação explícita</span></div>
         {distributions.length === 0 ? <div className="br-ops-empty">Nenhum fechamento criado ainda.</div> : <div className="br-table-scroll"><table><thead><tr><th>Período</th><th>Receita</th><th>Reservas</th><th>Distribuível</th><th>Destino</th><th>Status</th><th>Ação</th></tr></thead><tbody>{distributions.map(item => <tr key={item.id}><td><b>{item.periodKey}</b></td><td>{currency.format(Number(item.grossRevenueBrl))}</td><td>{currency.format(Number(item.taxReserveBrl) + Number(item.operationalReserveBrl))}</td><td><b>{currency.format(Number(item.distributableProfitBrl))}</b><small className="br-asset-estimate">≈ {item.estimatedAssetAmount} {item.distributionAsset}</small></td><td className="mono">{item.stacksWalletAddress ? `${item.stacksWalletAddress.slice(0, 9)}…${item.stacksWalletAddress.slice(-5)}` : "Não configurado"}</td><td><span className={`br-ops-state ${item.status === "simulated_sent" ? "ready" : ""}`}>{item.status === "blocked" ? "Bloqueado" : item.status === "pending_approval" ? "Aguardando" : "Simulado"}</span></td><td>{item.status === "pending_approval" ? <button className="br-small-action" type="button" onClick={() => approve.mutate({ distributionId: item.id })}>Aprovar simulação</button> : item.transactionId ?? "—"}</td></tr>)}</tbody></table></div>}
+      </section>
+
+      <section className="br-panel br-table-card">
+        <div className="br-section-head"><div><span className="br-eyebrow">DEPÓSITOS VIA PIX</span><h2>Cobranças e conciliação</h2></div><span className="br-help-honesty"><ArrowRight size={15} /> {pixDeposits.length} registros</span></div>
+        {pixDeposits.length === 0 ? <div className="br-ops-empty">Nenhum depósito Pix registrado ainda.</div> : <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Cliente</th><th>Valor BRL</th><th>Status</th><th>Cobrança</th><th>EndToEndId</th></tr></thead><tbody>{pixDeposits.map(item => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString("pt-BR")}</td><td>#{item.userId}</td><td><b>{currency.format(Number(item.amountBrl))}</b></td><td><span className={`br-ops-state ${item.status === "paid" ? "ready" : ""}`}>{item.status}</span></td><td className="mono">{item.providerReference || "—"}</td><td className="mono">{item.endToEndId || "—"}</td></tr>)}</tbody></table></div>}
       </section>
 
       <section className="br-panel br-table-card">

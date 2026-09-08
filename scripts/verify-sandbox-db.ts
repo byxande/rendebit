@@ -2,6 +2,7 @@ import { eq, like } from "drizzle-orm";
 import {
   customerProfiles,
   ledgerEntries,
+  pixDeposits,
   profitDistributions,
   providerEvents,
   purchaseQuotes,
@@ -16,6 +17,7 @@ import {
   createPurchaseQuote,
   createRedemptionQuote,
   getAvailableBtcBalance,
+  getAvailableBrlBalance,
   getDb,
   recordProviderEvent,
   updateTreasurySettings,
@@ -24,6 +26,7 @@ import {
 } from "../server/db";
 import { calculatePurchaseQuote, calculateRedemptionQuote } from "../server/finance";
 import { confirmPurchaseWorkflow } from "../server/services/purchaseOrchestrator";
+import { createPixDepositWorkflow, settlePixDepositWorkflow } from "../server/services/pixDepositOrchestrator";
 import { confirmRedemptionWorkflow } from "../server/services/redemptionOrchestrator";
 
 const db = await getDb();
@@ -63,6 +66,13 @@ try {
     payload: { result: "duplicate", mode: "verification" },
   });
   if (firstEvent?.id !== duplicateEvent?.id) throw new Error("Idempotência de webhook falhou.");
+
+  const firstDeposit = await createPixDepositWorkflow({ userId, amountBrl: 500, idempotencyKey: `pix-deposit-${suffix}` });
+  const duplicateDeposit = await createPixDepositWorkflow({ userId, amountBrl: 500, idempotencyKey: `pix-deposit-${suffix}` });
+  if (firstDeposit.id !== duplicateDeposit.id || firstDeposit.status !== "awaiting_payment") throw new Error("Idempotência da cobrança Pix falhou.");
+  const paidDeposit = await settlePixDepositWorkflow({ userId, depositId: firstDeposit.id, idempotencyKey: `pix-payment-${suffix}` });
+  const duplicatePayment = await settlePixDepositWorkflow({ userId, depositId: firstDeposit.id, idempotencyKey: `pix-payment-${suffix}` });
+  if (paidDeposit.id !== duplicatePayment.id || await getAvailableBrlBalance(userId) !== 500) throw new Error("Liquidação ou saldo Pix falhou.");
 
   const quote = calculatePurchaseQuote(1_000);
   const storedQuote = await createPurchaseQuote({
@@ -110,6 +120,8 @@ try {
 
   const counts = {
     profiles: (await db.select().from(customerProfiles).where(eq(customerProfiles.userId, userId))).length,
+    pixDeposits: (await db.select().from(pixDeposits).where(eq(pixDeposits.userId, userId))).length,
+    pixProviderEvents: (await db.select().from(providerEvents).where(like(providerEvents.idempotencyKey, `pix-deposit-${firstDeposit.id}:%`))).length,
     quotes: (await db.select().from(purchaseQuotes).where(eq(purchaseQuotes.userId, userId))).length,
     purchases: (await db.select().from(purchases).where(eq(purchases.userId, userId))).length,
     redemptionQuotes: (await db.select().from(redemptionQuotes).where(eq(redemptionQuotes.userId, userId))).length,
@@ -118,9 +130,14 @@ try {
     providerEvents: (await db.select().from(providerEvents).where(like(providerEvents.idempotencyKey, `%${suffix}%`))).length,
     closings: (await db.select().from(profitDistributions).where(eq(profitDistributions.ownerUserId, userId))).length,
   };
+  if (counts.pixProviderEvents !== 2) throw new Error("Trilha de eventos Pix incompleta.");
   console.log(JSON.stringify({ ok: true, counts, status: firstClosing?.status }, null, 2));
 } finally {
   if (userId !== null) {
+    const ownedPixDeposits = await db.select({ id: pixDeposits.id }).from(pixDeposits).where(eq(pixDeposits.userId, userId));
+    for (const deposit of ownedPixDeposits) {
+      await db.delete(providerEvents).where(like(providerEvents.idempotencyKey, `pix-deposit-${deposit.id}:%`));
+    }
     const ownedPurchases = await db.select({ id: purchases.id }).from(purchases).where(eq(purchases.userId, userId));
     for (const purchase of ownedPurchases) {
       await db.delete(ledgerEntries).where(eq(ledgerEntries.purchaseId, purchase.id));
@@ -132,6 +149,7 @@ try {
     await db.delete(ledgerEntries).where(eq(ledgerEntries.userId, userId));
     await db.delete(profitDistributions).where(eq(profitDistributions.ownerUserId, userId));
     await db.delete(treasurySettings).where(eq(treasurySettings.ownerUserId, userId));
+    await db.delete(pixDeposits).where(eq(pixDeposits.userId, userId));
     await db.delete(purchases).where(eq(purchases.userId, userId));
     await db.delete(purchaseQuotes).where(eq(purchaseQuotes.userId, userId));
     await db.delete(redemptions).where(eq(redemptions.userId, userId));

@@ -38,6 +38,22 @@ export const customerProfiles = mysqlTable("customer_profiles", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const pixDeposits = mysqlTable("pix_deposits", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  amountBrl: decimal("amountBrl", { precision: 18, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["created", "awaiting_payment", "paid", "expired", "cancelled", "manual_review"]).default("created").notNull(),
+  idempotencyKey: varchar("idempotencyKey", { length: 120 }).notNull().unique(),
+  providerReference: varchar("providerReference", { length: 140 }),
+  endToEndId: varchar("endToEndId", { length: 140 }),
+  qrCodeText: text("qrCodeText"),
+  pixCopyPaste: text("pixCopyPaste"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  paidAt: timestamp("paidAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const purchaseQuotes = mysqlTable("purchase_quotes", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id),
@@ -113,7 +129,9 @@ export const ledgerEntries = mysqlTable("ledger_entries", {
   userId: int("userId").references(() => users.id),
   purchaseId: int("purchaseId").references(() => purchases.id),
   redemptionId: int("redemptionId").references(() => redemptions.id),
+  pixDepositId: int("pixDepositId").references(() => pixDeposits.id),
   entryType: mysqlEnum("entryType", [
+    "pix_deposit",
     "customer_cash_in",
     "buy_btc",
     "fee_revenue",
@@ -189,6 +207,7 @@ export const profitDistributions = mysqlTable("profit_distributions", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+export type PixDeposit = typeof pixDeposits.$inferSelect;
 export type PurchaseQuote = typeof purchaseQuotes.$inferSelect;
 export type Purchase = typeof purchases.$inferSelect;
 export type RedemptionQuote = typeof redemptionQuotes.$inferSelect;

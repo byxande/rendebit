@@ -9,6 +9,8 @@ export interface KycProvider {
 }
 
 export interface PixProvider {
+  createCashInCharge(input: { depositId: number; amountBrl: string; expiresAt: Date; idempotencyKey: string }): Promise<ProviderResult<{ amountBrl: string; pixCopyPaste: string; qrCodeText: string; expiresAt: string }>>;
+  confirmCashInCharge(input: { depositId: number; amountBrl: string; idempotencyKey: string }): Promise<ProviderResult<{ amountBrl: string; endToEndId: string }>>;
   settleCashIn(input: { purchaseId: number; amountBrl: string; idempotencyKey: string }): Promise<ProviderResult<{ amountBrl: string }>>;
   settleCashOut(input: { redemptionId: number; amountBrl: string; pixDestinationMasked: string; idempotencyKey: string }): Promise<ProviderResult<{ amountBrl: string; pixDestinationMasked: string }>>;
 }

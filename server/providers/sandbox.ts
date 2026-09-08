@@ -13,6 +13,23 @@ export const sandboxKycProvider: KycProvider = {
 };
 
 export const sandboxPixProvider: PixProvider = {
+  async createCashInCharge({ depositId, amountBrl, expiresAt }) {
+    const reference = sandboxId("pix-charge", depositId);
+    const pixCopyPaste = `00020101021226850014BR.GOV.BCB.PIX2563sandbox.rendebit.local/pix/${reference}520400005303986540${amountBrl.replace(".", "")}5802BR5917RENDEBIT SANDBOX6009SAO PAULO62070503***6304DEMO`;
+    return {
+      externalId: reference,
+      status: "active",
+      payload: { amountBrl, pixCopyPaste, qrCodeText: pixCopyPaste, expiresAt: expiresAt.toISOString() },
+    };
+  },
+  async confirmCashInCharge({ depositId, amountBrl }) {
+    const endToEndId = `E0000000020260908${String(depositId).padStart(14, "0")}`;
+    return {
+      externalId: sandboxId("pix-deposit", depositId),
+      status: "settled",
+      payload: { amountBrl, endToEndId },
+    };
+  },
   async settleCashIn({ purchaseId, amountBrl }) {
     return {
       externalId: sandboxId("pix", purchaseId),

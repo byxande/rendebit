@@ -4,6 +4,7 @@ import {
   customerProfiles,
   InsertUser,
   ledgerEntries,
+  pixDeposits,
   profitDistributions,
   providerEvents,
   purchaseQuotes,
@@ -139,6 +140,83 @@ export async function recordProviderEvent(input: {
 export async function getProviderEventByIdempotencyKey(idempotencyKey: string) {
   const db = await requireDb();
   return (await db.select().from(providerEvents).where(eq(providerEvents.idempotencyKey, idempotencyKey)).limit(1))[0];
+}
+
+export async function startPixDeposit(input: { userId: number; amountBrl: number; idempotencyKey: string; expiresAt: Date }) {
+  const db = await requireDb();
+  const existing = (await db.select().from(pixDeposits).where(eq(pixDeposits.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+  if (existing) {
+    if (existing.userId !== input.userId) throw new Error("Chave idempotente já pertence a outro usuário.");
+    return existing;
+  }
+  const profile = await getCustomerProfile(input.userId);
+  if (!profile || profile.verificationStatus !== "verified") throw new Error("Conclua a verificação sandbox antes de depositar via Pix.");
+  await db.insert(pixDeposits).values({
+    userId: input.userId,
+    amountBrl: input.amountBrl.toFixed(2),
+    idempotencyKey: input.idempotencyKey,
+    expiresAt: input.expiresAt,
+  });
+  return (await db.select().from(pixDeposits).where(eq(pixDeposits.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+}
+
+export async function attachPixDepositCharge(input: { userId: number; depositId: number; providerReference: string; pixCopyPaste: string; qrCodeText: string }) {
+  const db = await requireDb();
+  await db.update(pixDeposits).set({
+    providerReference: input.providerReference,
+    pixCopyPaste: input.pixCopyPaste,
+    qrCodeText: input.qrCodeText,
+    status: "awaiting_payment",
+  }).where(and(eq(pixDeposits.id, input.depositId), eq(pixDeposits.userId, input.userId), eq(pixDeposits.status, "created")));
+  return (await db.select().from(pixDeposits).where(and(eq(pixDeposits.id, input.depositId), eq(pixDeposits.userId, input.userId))).limit(1))[0];
+}
+
+export async function settlePixDeposit(input: { userId: number; depositId: number; endToEndId: string; idempotencyKey: string }) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await tx.execute(sql`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`);
+    const deposit = (await tx.select().from(pixDeposits).where(and(eq(pixDeposits.id, input.depositId), eq(pixDeposits.userId, input.userId))).limit(1))[0];
+    if (!deposit) throw new Error("Depósito Pix não encontrado.");
+    if (deposit.status === "paid") return deposit;
+    if (deposit.status !== "awaiting_payment") throw new Error("Depósito Pix não pode ser liquidado no estado atual.");
+    if (deposit.expiresAt.getTime() <= Date.now()) {
+      await tx.update(pixDeposits).set({ status: "expired" }).where(eq(pixDeposits.id, deposit.id));
+      throw new Error("A cobrança Pix expirou. Gere um novo QR Code.");
+    }
+    await tx.insert(ledgerEntries).values({
+      userId: input.userId,
+      pixDepositId: deposit.id,
+      entryType: "pix_deposit",
+      direction: "credit",
+      account: "customer_brl_available",
+      currency: "BRL",
+      amount: deposit.amountBrl,
+      idempotencyKey: `${input.idempotencyKey}:brl-credit`,
+      metadata: JSON.stringify({ endToEndId: input.endToEndId, mode: "sandbox" }),
+    }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.idempotencyKey}:brl-credit` } });
+    await tx.update(pixDeposits).set({ status: "paid", endToEndId: input.endToEndId, paidAt: new Date() }).where(eq(pixDeposits.id, deposit.id));
+    return (await tx.select().from(pixDeposits).where(eq(pixDeposits.id, deposit.id)).limit(1))[0];
+  });
+}
+
+export async function listPixDeposits(userId: number) {
+  const db = await requireDb();
+  return db.select().from(pixDeposits).where(eq(pixDeposits.userId, userId)).orderBy(desc(pixDeposits.createdAt));
+}
+
+export async function getPixDeposit(userId: number, depositId: number) {
+  const db = await requireDb();
+  return (await db.select().from(pixDeposits).where(and(eq(pixDeposits.id, depositId), eq(pixDeposits.userId, userId))).limit(1))[0] ?? null;
+}
+
+export async function listOperationalPixDeposits() {
+  const db = await requireDb();
+  return db.select().from(pixDeposits).orderBy(desc(pixDeposits.createdAt));
+}
+
+export async function getAvailableBrlBalance(userId: number) {
+  const deposits = await listPixDeposits(userId);
+  return deposits.filter(item => item.status === "paid").reduce((sum, item) => sum + Number(item.amountBrl), 0);
 }
 
 export async function createPurchaseQuote(input: {

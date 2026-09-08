@@ -110,7 +110,7 @@ export const providerEvents = mysqlTable("provider_events", {
 export const treasurySettings = mysqlTable("treasury_settings", {
   id: int("id").autoincrement().primaryKey(),
   ownerUserId: int("ownerUserId").notNull().unique().references(() => users.id),
-  organizationName: varchar("organizationName", { length: 160 }).default("Organização Nexo").notNull(),
+  organizationName: varchar("organizationName", { length: 160 }).default("Organização RendeBit").notNull(),
   stacksWalletAddress: varchar("stacksWalletAddress", { length: 80 }),
   distributionAsset: mysqlEnum("distributionAsset", ["STX", "sBTC", "stBTC"]).default("sBTC").notNull(),
   distributionShareBps: int("distributionShareBps").default(10000).notNull(),

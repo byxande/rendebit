@@ -328,7 +328,7 @@ function FiscalPage() {
       <section className="br-page-hero compact fiscal"><div><span className="br-eyebrow">ANO-CALENDÁRIO 2026</span><h1>Um relatório que fala a língua do seu contador.</h1><p>Posição patrimonial, custo por lote e eventos de realização organizados em reais.</p></div><div className="br-big-icon"><FileCheck2 /></div></section>
       <div className="br-fiscal-grid">
         <section className="br-panel br-report-preview">
-          <div className="br-report-top"><div className="br-report-mark"><Bitcoin /> <b>NEXO</b></div><span>RELATÓRIO FISCAL 2026</span></div>
+          <div className="br-report-top"><div className="br-report-mark"><Bitcoin /> <b>RENDEBIT</b></div><span>RELATÓRIO FISCAL 2026</span></div>
           <div className="br-report-person"><small>Titular</small><b>Alexandre B. • CPF •••.482.•••-••</b></div>
           <div className="br-report-values"><div><small>Posição em 31/12</small><b>R$ 122.314,00</b></div><div><small>Custo de aquisição</small><b>R$ 115.800,00</b></div><div><small>Ganhos realizados</small><b>R$ 0,00</b></div></div>
           <div className="br-report-lines"><i /><i /><i /><i /></div>
@@ -367,7 +367,7 @@ function ReservesPage() {
 function BusinessPage() {
   return (
     <div className="br-stack">
-      <section className="br-business-hero"><div><span className="br-eyebrow light">NEXO PARA EMPRESAS</span><h1>Leve rendimento em Bitcoin aos seus clientes.</h1><p>Uma camada white-label em português para fintechs, exchanges e tesourarias — da posição em stBTC ao resgate em reais.</p><div className="br-business-actions"><button className="br-primary light" type="button" onClick={() => toast.success("Solicitação de demonstração registrada")}>Solicitar demonstração <ArrowRight /></button><button className="br-secondary light" type="button" onClick={() => toast.info("Documentação da API disponível na próxima etapa")}>Ver documentação</button></div></div><div className="br-api-visual"><div className="br-code-head"><span /><span /><span /><b>POST /v1/quotes/pix</b></div><pre>{`{
+      <section className="br-business-hero"><div><span className="br-eyebrow light">RENDEBIT PARA EMPRESAS</span><h1>Leve rendimento em Bitcoin aos seus clientes.</h1><p>Uma camada white-label em português para fintechs, exchanges e tesourarias — da posição em stBTC ao resgate em reais.</p><div className="br-business-actions"><button className="br-primary light" type="button" onClick={() => toast.success("Solicitação de demonstração registrada")}>Solicitar demonstração <ArrowRight /></button><button className="br-secondary light" type="button" onClick={() => toast.info("Documentação da API disponível na próxima etapa")}>Ver documentação</button></div></div><div className="br-api-visual"><div className="br-code-head"><span /><span /><span /><b>POST /v1/quotes/pix</b></div><pre>{`{
   "asset": "stBTC",
   "amount": "0.025",
   "settlement": "BRL_PIX",
@@ -533,11 +533,11 @@ export default function BitcoinYield() {
     <div className="btcbr-app">
       <header className="br-mobile-header">
         <button className="br-mobile-menu" type="button" onClick={() => setMobileOpen((open) => !open)} aria-label="Abrir menu">{mobileOpen ? <X /> : <Menu />}</button>
-        <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>NEXO</b><small>BITCOIN EM REAIS</small></div></div>
+        <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>RENDEBIT</b><small>BITCOIN EM REAIS</small></div></div>
         <button className="br-avatar" type="button">AB</button>
       </header>
       <aside className={`br-sidebar ${mobileOpen ? "open" : ""}`}>
-        <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>NEXO</b><small>BITCOIN EM REAIS</small></div></div>
+        <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>RENDEBIT</b><small>BITCOIN EM REAIS</small></div></div>
         <div className="br-profile"><div className="br-avatar">{user?.name?.slice(0, 2).toUpperCase() || "AB"}</div><div><b>Olá, {user?.name?.split(" ")[0] || "Alexandre"}</b><span>{isAuthenticated ? "Conta autenticada" : "Modo de leitura"} <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
         <nav>{navItems.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => navigate(id)} type="button"><Icon size={19} /><span>{label}</span>{id === "empresas" && <em>B2B</em>}</button>)}</nav>
         <div className="br-sidebar-security"><ShieldCheck /><div><b>Ambiente protegido</b><span>Seus dados e posições são demonstrativos.</span></div></div>
@@ -602,18 +602,18 @@ function HelpPage() {
   const faqs = [
     {
       category: "Primeiros passos",
-      question: "O que é a Conta Nexo?",
+      question: "O que é a Conta RendeBit?",
       answer: "É uma conta simples para acompanhar uma posição em Bitcoin, entender quanto ela vale em reais e solicitar resgates via Pix. Você não precisa conhecer termos técnicos para começar.",
     },
     {
       category: "Primeiros passos",
       question: "Preciso entender de carteiras ou contratos?",
-      answer: "Não para usar a experiência principal. A Conta Nexo esconde a complexidade e mostra o que importa: seu saldo, seu ganho, os riscos e o valor líquido de um eventual resgate. A área Segurança permite consultar os detalhes quando você quiser.",
+      answer: "Não para usar a experiência principal. A Conta RendeBit esconde a complexidade e mostra o que importa: seu saldo, seu ganho, os riscos e o valor líquido de um eventual resgate. A área Segurança permite consultar os detalhes quando você quiser.",
     },
     {
       category: "Primeiros passos",
       question: "Posso começar sem ter Bitcoin?",
-      answer: "Sim. A proposta é permitir uma compra em reais (BRL) dentro da sua Conta Nexo e, depois da cotação, ativar o acompanhamento do rendimento. Antes de uma operação real, você deverá ver preço, taxas, prazo, riscos e as informações de custódia.",
+      answer: "Sim. A proposta é permitir uma compra em reais (BRL) dentro da sua Conta RendeBit e, depois da cotação, ativar o acompanhamento do rendimento. Antes de uma operação real, você deverá ver preço, taxas, prazo, riscos e as informações de custódia.",
     },
     {
       category: "Segurança",
@@ -652,7 +652,7 @@ function HelpPage() {
     },
     {
       category: "Impostos",
-      question: "A Nexo faz minha declaração de imposto?",
+      question: "A RendeBit faz minha declaração de imposto?",
       answer: "A proposta Premium gera um relatório auxiliar com posição, custo por aporte, resgates e taxas. Ele ajuda você e seu contador, mas não substitui orientação tributária nem garante a classificação fiscal correta.",
     },
     {

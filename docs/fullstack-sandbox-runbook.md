@@ -6,6 +6,10 @@ O projeto foi migrado de uma demonstração puramente frontend para uma aplicaç
 
 A jornada persiste o perfil com dados mascarados, simula a aprovação de KYC, cria uma cotação com validade e chave idempotente, registra a compra, produz lançamentos de ledger e salva eventos separados para Pix, custódia e ativação da estratégia. Os adaptadores de sandbox implementam contratos substituíveis por provedores reais.
 
+A confirmação agora é orquestrada em sequência: **Pix liquidado → BTC adquirido pelo custodiante → estratégia Stacks ativada → ledger e compra liquidados**. Se qualquer provedor falhar, a compra é marcada como falha e não aparece como posição ativa. Cada chamada de provedor recebe uma chave idempotente própria.
+
+A Xverse foi classificada como integração opcional de autocustódia. Sua API pode apoiar dados, RPC, portfólio, swaps e transmissão de transações Bitcoin já assinadas; o Sats Connect pode solicitar assinatura Stacks, mas exige aprovação visível do usuário. Ela não é tratada como custodiante nem como assinador server-side para o fluxo automático da RendeBit.
+
 ## Controles implementados
 
 | Controle | Implementação atual | Condição para produção |
@@ -44,7 +48,7 @@ A carteira organizacional recebe apenas o ativo configurado — STX, sBTC ou stB
 
 A próxima fase deve escolher e contratar os provedores. As credenciais devem entrar apenas em secrets do backend. Depois, cada adaptador em `server/providers` será substituído por um cliente real com autenticação, verificação de assinatura de webhook, retries seguros, circuit breaker e reconciliação. A passagem para produção deve ser bloqueada até existirem revisão jurídica brasileira, definição de VASP/custódia, contratos bancários, políticas LGPD/PLD-FT, runbooks de incidente e testes independentes.
 
-O nome provisório **Nexo** também deve ser substituído ou submetido a clearance formal de marca antes do lançamento, porque existe uma plataforma financeira global de criptoativos com esse nome.
+A marca do produto foi atualizada para **RendeBit**. A busca pública inicial não encontrou colisão evidente, mas ainda é obrigatório fazer busca de anterioridade e clearance formal no INPI antes do lançamento.
 
 ## Validação reproduzível
 

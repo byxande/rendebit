@@ -29,7 +29,7 @@ export default function OperationsSandbox() {
   const distributionsQuery = trpc.treasury.distributions.useQuery(undefined, { enabled: isAdmin });
   const ledgerQuery = trpc.treasury.ledger.useQuery(undefined, { enabled: isAdmin });
   const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated });
-  const [organizationName, setOrganizationName] = useState("Organização Nexo");
+  const [organizationName, setOrganizationName] = useState("Organização RendeBit");
   const [wallet, setWallet] = useState("");
   const [asset, setAsset] = useState<"STX" | "sBTC" | "stBTC">("sBTC");
   const [network, setNetwork] = useState<"testnet" | "mainnet">("testnet");

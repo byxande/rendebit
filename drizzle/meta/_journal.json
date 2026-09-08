@@ -15,6 +15,13 @@
       "when": 1788901105646,
       "tag": "0001_misty_typhoid_mary",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1788902522927,
+      "tag": "0002_mushy_sunset_bain",
+      "breakpoints": true
     }
   ]
 }

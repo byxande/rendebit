@@ -163,7 +163,7 @@ export async function createPurchaseQuote(input: {
   return (await db.select().from(purchaseQuotes).where(eq(purchaseQuotes.idempotencyKey, input.idempotencyKey)).limit(1))[0];
 }
 
-export async function confirmSandboxPurchase(input: {
+export async function startSandboxPurchase(input: {
   userId: number;
   quoteId: number;
   idempotencyKey: string;
@@ -185,51 +185,72 @@ export async function confirmSandboxPurchase(input: {
       serviceFeeBrl: quote.serviceFeeBrl,
       btcAmount: quote.btcAmount,
       executionBtcBrl: quote.executionBtcBrl,
-      status: "settled",
-      yieldStatus: "active",
-      settledAt: new Date(),
+      status: "processing",
+      yieldStatus: "pending",
     });
     const purchase = (await tx.select().from(purchases).where(eq(purchases.externalReference, input.idempotencyKey)).limit(1))[0];
     if (!purchase) throw new Error("Falha ao registrar a compra.");
 
     await tx.update(purchaseQuotes).set({ status: "confirmed" }).where(eq(purchaseQuotes.id, quote.id));
+    return purchase;
+  });
+}
+
+export async function settleSandboxPurchase(input: {
+  userId: number;
+  purchaseId: number;
+  idempotencyKey: string;
+}) {
+  const db = await requireDb();
+  const purchase = (await db.select().from(purchases).where(and(eq(purchases.id, input.purchaseId), eq(purchases.userId, input.userId))).limit(1))[0];
+  if (!purchase) throw new Error("Compra não encontrada.");
+  if (purchase.status === "settled" && purchase.yieldStatus === "active") return purchase;
+  if (purchase.status !== "processing") throw new Error("Compra não pode ser liquidada no estado atual.");
+
+  return db.transaction(async tx => {
     await tx.insert(ledgerEntries).values([
       {
         userId: input.userId,
-        purchaseId: purchase.id,
+        purchaseId: input.purchaseId,
         entryType: "customer_cash_in",
         direction: "credit",
         account: "customer_brl_clearing",
         currency: "BRL",
-        amount: quote.amountBrl,
+        amount: purchase.amountBrl,
         idempotencyKey: `${input.idempotencyKey}:cash-in`,
         metadata: JSON.stringify({ mode: "sandbox" }),
       },
       {
         userId: input.userId,
-        purchaseId: purchase.id,
+        purchaseId: input.purchaseId,
         entryType: "fee_revenue",
         direction: "credit",
         account: "organization_fee_revenue",
         currency: "BRL",
-        amount: quote.serviceFeeBrl,
+        amount: purchase.serviceFeeBrl,
         idempotencyKey: `${input.idempotencyKey}:fee`,
         metadata: JSON.stringify({ fee: "service", mode: "sandbox" }),
       },
       {
         userId: input.userId,
-        purchaseId: purchase.id,
+        purchaseId: input.purchaseId,
         entryType: "customer_position",
         direction: "credit",
         account: "customer_btc_position",
         currency: "BTC",
-        amount: quote.btcAmount,
+        amount: purchase.btcAmount,
         idempotencyKey: `${input.idempotencyKey}:position`,
         metadata: JSON.stringify({ yieldStatus: "active", mode: "sandbox" }),
       },
     ]);
-    return purchase;
+    await tx.update(purchases).set({ status: "settled", yieldStatus: "active", settledAt: new Date() }).where(eq(purchases.id, input.purchaseId));
+    return (await tx.select().from(purchases).where(eq(purchases.id, input.purchaseId)).limit(1))[0];
   });
+}
+
+export async function failSandboxPurchase(userId: number, purchaseId: number) {
+  const db = await requireDb();
+  await db.update(purchases).set({ status: "failed", yieldStatus: "pending" }).where(and(eq(purchases.id, purchaseId), eq(purchases.userId, userId), eq(purchases.status, "processing")));
 }
 
 export async function listPurchases(userId: number) {

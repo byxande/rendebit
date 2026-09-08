@@ -313,8 +313,8 @@ h1 em { color: #caff4a; font-style: normal; }
 
 
 /* --------------------------------------------------------------------------
-   NEXO — frontend-only stBTC / BRL concept
-   Scoped to .btcbr-app to preserve the original Stackfolio route.
+   RENDEBIT — stBTC / BRL product experience
+   Scoped to .btcbr-app to preserve the portfolio analytics route.
    -------------------------------------------------------------------------- */
 .btcbr-app {
   --br-navy: #071d2b;

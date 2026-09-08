@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import {
   customerProfiles,
   ledgerEntries,
@@ -10,7 +10,6 @@ import {
   users,
 } from "../drizzle/schema";
 import {
-  confirmSandboxPurchase,
   createProfitDistribution,
   createPurchaseQuote,
   getDb,
@@ -20,6 +19,7 @@ import {
   verifySandboxProfile,
 } from "../server/db";
 import { calculatePurchaseQuote } from "../server/finance";
+import { confirmPurchaseWorkflow } from "../server/services/purchaseOrchestrator";
 
 const db = await getDb();
 if (!db) throw new Error("DATABASE_URL não disponível.");
@@ -68,8 +68,8 @@ try {
   });
   if (!storedQuote) throw new Error("Cotação não foi persistida.");
 
-  const firstPurchase = await confirmSandboxPurchase({ userId, quoteId: storedQuote.id, idempotencyKey: `purchase-${suffix}` });
-  const duplicatePurchase = await confirmSandboxPurchase({ userId, quoteId: storedQuote.id, idempotencyKey: `purchase-${suffix}` });
+  const firstPurchase = await confirmPurchaseWorkflow({ userId, quoteId: storedQuote.id, idempotencyKey: `purchase-${suffix}` });
+  const duplicatePurchase = await confirmPurchaseWorkflow({ userId, quoteId: storedQuote.id, idempotencyKey: `purchase-${suffix}` });
   if (firstPurchase.id !== duplicatePurchase.id) throw new Error("Idempotência da compra falhou.");
 
   await updateTreasurySettings({
@@ -93,7 +93,7 @@ try {
     quotes: (await db.select().from(purchaseQuotes).where(eq(purchaseQuotes.userId, userId))).length,
     purchases: (await db.select().from(purchases).where(eq(purchases.userId, userId))).length,
     ledgerEntries: (await db.select().from(ledgerEntries).where(eq(ledgerEntries.userId, userId))).length,
-    providerEvents: (await db.select().from(providerEvents).where(eq(providerEvents.idempotencyKey, `event-${suffix}`))).length,
+    providerEvents: (await db.select().from(providerEvents).where(like(providerEvents.idempotencyKey, `%${suffix}%`))).length,
     closings: (await db.select().from(profitDistributions).where(eq(profitDistributions.ownerUserId, userId))).length,
   };
   console.log(JSON.stringify({ ok: true, counts, status: firstClosing?.status }, null, 2));
@@ -109,7 +109,7 @@ try {
     await db.delete(purchases).where(eq(purchases.userId, userId));
     await db.delete(purchaseQuotes).where(eq(purchaseQuotes.userId, userId));
     await db.delete(customerProfiles).where(eq(customerProfiles.userId, userId));
-    await db.delete(providerEvents).where(eq(providerEvents.idempotencyKey, `event-${suffix}`));
+    await db.delete(providerEvents).where(like(providerEvents.idempotencyKey, `%${suffix}%`));
     await db.delete(users).where(eq(users.id, userId));
   }
 }

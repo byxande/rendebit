@@ -3,6 +3,10 @@ import { notifyOwner } from "./notification";
 import { adminProcedure, publicProcedure, router } from "./trpc";
 
 export const systemRouter = router({
+  branding: publicProcedure.query(() => ({
+    title: process.env.VITE_APP_TITLE ?? "RendeBit — Bitcoin em reais",
+  })),
+
   health: publicProcedure
     .input(
       z.object({

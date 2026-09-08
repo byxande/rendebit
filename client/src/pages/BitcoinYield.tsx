@@ -145,7 +145,7 @@ function DemoPill() {
   return <span className="br-demo-pill"><Sparkles size={13} /> Ambiente demonstrativo</span>;
 }
 
-function YieldSummary({ onRedeem }: { onRedeem: () => void }) {
+function YieldSummary({ onRedeem, onAddMoney }: { onRedeem: () => void; onAddMoney: () => void }) {
   return (
     <>
       <section className="br-hero-grid">
@@ -154,27 +154,28 @@ function YieldSummary({ onRedeem }: { onRedeem: () => void }) {
             <div>
               <span className="br-eyebrow light">SEU SALDO EM BITCOIN</span>
               <div className="br-btc-value"><span>₿</span> 0,28421500</div>
-              <p>Bitcoin trabalhando por você</p>
+              <p>Seu rendimento é acompanhado em reais (BRL)</p>
             </div>
             <div className="br-orbit"><Bitcoin size={28} /><i /><i /></div>
           </div>
+          <div className="br-brl-badge"><Banknote size={15} /> Rendimento calculado e exibido em reais (BRL)</div>
           <div className="br-balance-brl">
-            <div><small>Valor estimado hoje</small><strong>R$ 122.314,00</strong></div>
+            <div><small>Valor em reais hoje (BRL)</small><strong>R$ 122.314,00</strong></div>
             <span className="br-positive">+5,63%</span>
           </div>
           <div className="br-balance-actions">
-            <button type="button" className="br-primary light" onClick={() => toast.info("Fluxo de aporte demonstrativo")}>Adicionar dinheiro <ArrowRight size={17} /></button>
+            <button type="button" className="br-primary light" onClick={onAddMoney}>Adicionar dinheiro <ArrowRight size={17} /></button>
             <button type="button" className="br-secondary light" onClick={onRedeem}>Resgatar via Pix</button>
           </div>
         </div>
 
         <div className="br-yield-card br-panel">
-          <div className="br-card-headline"><span>Seu ganho até agora</span><span className="br-live"><i /> ATUALIZADO</span></div>
+          <div className="br-card-headline"><span>Seu rendimento em reais (BRL)</span><span className="br-live"><i /> ATUALIZADO</span></div>
           <strong className="br-yield-number">+R$ 6.514,00</strong>
-          <span className="br-yield-btc">+5,63% no período</span>
+          <span className="br-yield-btc">+R$ 6.514,00 estimados no período</span>
           <div className="br-divider" />
-          <div className="br-kv"><span>Rendimento do Bitcoin</span><b>+2,68%</b></div>
-          <div className="br-kv"><span>Preço BTC/BRL</span><b>R$ 421.930,00</b></div>
+          <div className="br-kv"><span>Parcela gerada pelo protocolo</span><b>+2,68%</b></div>
+          <div className="br-kv"><span>Referência de conversão BTC/BRL</span><b>R$ 421.930,00</b></div>
           <div className="br-kv"><span>Desde o seu primeiro aporte</span><b>90 dias</b></div>
           <button type="button" className="br-text-action" onClick={() => toast.info("Aqui você verá o detalhamento do seu ganho, sem precisar entender a tecnologia por trás.")}>Como esse valor é calculado <ArrowRight size={15} /></button>
         </div>
@@ -231,7 +232,7 @@ function InnovationGrid({ setSection }: { setSection: (section: SectionId) => vo
 function YieldPage() {
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact"><div><span className="br-eyebrow">MEU RENDIMENTO</span><h1>Rendimento que cresce em Bitcoin.</h1><p>Veja de onde vem a evolução da sua posição, sem confundir valorização do BTC com rendimento do protocolo.</p></div><div className="br-big-icon"><TrendingUp /></div></section>
+      <section className="br-page-hero compact"><div><span className="br-eyebrow">MEU RENDIMENTO EM BRL</span><h1>Rendimento em reais, com origem em Bitcoin.</h1><p>Veja quanto o seu saldo pode representar em reais e separe o que veio do protocolo do que veio da variação do Bitcoin.</p></div><div className="br-big-icon"><TrendingUp /></div></section>
       <div className="br-metric-grid">
         <div className="br-panel br-metric"><small>Crescimento do saldo</small><strong>+2,684%</strong><span>gerado pelo protocolo</span></div>
         <div className="br-panel br-metric"><small>Variação do Bitcoin</small><strong>+2,87%</strong><span>desde o primeiro aporte</span></div>
@@ -271,7 +272,7 @@ function RedeemPage({ amount, setAmount, onConfirm }: { amount: string; setAmoun
   const net = Math.max(0, gross - protocolFee - fxFee);
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact pix"><div><span className="br-eyebrow">RESGATE EM REAIS</span><h1>Do Bitcoin para o Pix, com total transparência.</h1><p>Você confere a cotação, todas as taxas e o valor líquido antes de assinar qualquer transação.</p></div><div className="br-big-icon"><QrCode /></div></section>
+      <section className="br-page-hero compact pix"><div><span className="br-eyebrow">RENDIMENTO REALIZADO EM BRL</span><h1>Do seu rendimento em reais para o Pix.</h1><p>Quando você realiza o rendimento, ele é convertido para BRL. Você confere a cotação, todas as taxas e o valor líquido antes de confirmar.</p></div><div className="br-big-icon"><QrCode /></div></section>
       <div className="br-redeem-grid">
         <section className="br-panel br-quote-form">
           <span className="br-eyebrow">QUANTO DESEJA RESGATAR?</span>
@@ -360,7 +361,9 @@ export default function BitcoinYield() {
   const [section, setSection] = useState<SectionId>("inicio");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [redeemOpen, setRedeemOpen] = useState(false);
+  const [addMoneyOpen, setAddMoneyOpen] = useState(false);
   const [amount, setAmount] = useState("0,01500000");
+  const [addAmount, setAddAmount] = useState("1.000,00");
   const activeLabel = useMemo(() => navItems.find((item) => item.id === section)?.label ?? "Visão geral", [section]);
 
   function navigate(next: SectionId) {
@@ -392,7 +395,7 @@ export default function BitcoinYield() {
       <main className="br-main">
         <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => toast.info("Sua conta está sincronizada. Os detalhes técnicos ficam disponíveis em Segurança e transparência.")}><span className="br-account-status"><i /></span> Conta Nexo <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seus reais disponíveis.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver seu ganho em reais e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Adicione dinheiro</h3><p>Você escolhe quanto quer colocar, com tudo explicado em reais.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe seu ganho</h3><p>O saldo evolui e você vê o resultado sem fazer operações.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} onAddMoney={() => setAddMoneyOpen(true)} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Adicione dinheiro</h3><p>Você escolhe quanto quer colocar, com tudo explicado em reais.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe seu rendimento em BRL</h3><p>O saldo evolui e você vê o resultado em reais, sem fazer operações.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
           {section === "rendimento" && <YieldPage />}
           {section === "lotes" && <LotsPage />}
           {section === "resgate" && <RedeemPage amount={amount} setAmount={setAmount} onConfirm={() => setRedeemOpen(true)} />}
@@ -409,6 +412,17 @@ export default function BitcoinYield() {
           <div className="br-confirm-summary"><div><span>Quantidade</span><b>{amount} stBTC</b></div><div><span>Conta de destino</span><b>Banco Inter •••• 4821</b></div><div><span>Valor líquido estimado</span><b>{currency.format((Number(amount.replace(",", ".")) || 0) * stbtcRate * btcBrl * 0.994)}</b></div></div>
           <button className="br-primary full" type="button" onClick={confirmRedeem}>Concluir demonstração <Check size={17} /></button>
           <button className="br-dialog-cancel" type="button" onClick={() => setRedeemOpen(false)}>Voltar</button>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={addMoneyOpen} onOpenChange={setAddMoneyOpen}>
+        <DialogContent className="br-confirm-dialog br-add-money-dialog">
+          <DialogHeader><DialogTitle>Adicionar dinheiro</DialogTitle><DialogDescription>Escolha um valor em reais para simular seu primeiro aporte. Nesta versão, nada será movimentado.</DialogDescription></DialogHeader>
+          <div className="br-add-money-intro"><Banknote size={18} /><div><b>Você acompanha o rendimento em BRL</b><span>O resultado pode variar. Não é juro fixo nem promessa de retorno.</span></div></div>
+          <label className="br-amount-label" htmlFor="add-money-amount">Quanto você quer adicionar?</label>
+          <div className="br-amount-field"><span>R$</span><input id="add-money-amount" inputMode="decimal" value={addAmount} onChange={(event) => setAddAmount(event.target.value)} aria-label="Valor do primeiro aporte em reais" /></div>
+          <div className="br-add-money-steps"><span><i>1</i> Escolha em BRL</span><span><i>2</i> Veja a cotação</span><span><i>3</i> Acompanhe o resultado</span></div>
+          <button className="br-primary full" type="button" onClick={() => { setAddMoneyOpen(false); toast.success("Aporte demonstrativo preparado", { description: `Valor escolhido: R$ ${addAmount}. Nenhuma transação real foi realizada.` }); }}>Continuar <ArrowRight size={17} /></button>
+          <button className="br-dialog-cancel" type="button" onClick={() => setAddMoneyOpen(false)}>Voltar</button>
         </DialogContent>
       </Dialog>
     </div>
@@ -451,6 +465,11 @@ function HelpPage() {
       category: "Rendimento",
       question: "Meu rendimento é garantido?",
       answer: "Não. O rendimento é variável e pode mudar conforme o protocolo, a liquidez e as condições do mercado. Além disso, a valorização do Bitcoin em reais é diferente do rendimento gerado pelo protocolo. Nunca use um cenário demonstrativo como promessa de resultado.",
+    },
+    {
+      category: "Rendimento",
+      question: "Vocês oferecem juros reais em BRL?",
+      answer: "A proposta é que o rendimento realizado seja convertido e pago em reais (BRL), com a cotação e as taxas mostradas antes do resgate. Isso não é juro fixo nem rendimento garantido: o valor pode mudar conforme o Bitcoin, o protocolo, a liquidez e as condições do mercado.",
     },
     {
       category: "Rendimento",

@@ -1,0 +1,1 @@
+ALTER TABLE `profit_distributions` ADD CONSTRAINT `profit_distribution_owner_period_unique` UNIQUE(`ownerUserId`,`periodKey`);

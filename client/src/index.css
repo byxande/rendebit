@@ -828,3 +828,57 @@ h1 em { color: #caff4a; font-style: normal; }
 }
 
 .btcbr-app .loss { color: #c25a42 !important; }
+
+/* Fullstack financial sandbox */
+.br-ops-page { max-width: 1360px; margin: 0 auto; padding: 28px; min-height: 100vh; background: #f3f7f5; color: #102a38; }
+.br-ops-hero { background: radial-gradient(circle at 82% 20%, rgba(47, 231, 170, .22), transparent 28%), linear-gradient(135deg, #0d2d37, #123e43); color: white; }
+.br-sandbox-warning { display: flex; align-items: flex-start; gap: 12px; padding: 15px 17px; border: 1px solid #f1d6a8; border-radius: 14px; background: #fff8e9; color: #78501a; }
+.br-sandbox-warning div { display: grid; gap: 3px; }
+.br-sandbox-warning span { font-size: 12px; line-height: 1.55; }
+.br-ops-status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.br-ops-status-grid article { display: grid; gap: 6px; min-height: 145px; }
+.br-ops-status-grid svg { color: #0aaa7e; }
+.br-ops-status-grid small { color: #6e827d; text-transform: uppercase; letter-spacing: .08em; font-size: 9px; }
+.br-ops-status-grid b { font-size: 18px; }
+.br-ops-status-grid span { color: #72837f; font-size: 11px; }
+.br-ops-layout { display: grid; grid-template-columns: 1.45fr .8fr; gap: 16px; align-items: start; }
+.br-ops-form-card, .br-profit-card { padding: 24px; }
+.br-ops-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 22px 0 18px; }
+.br-ops-form label { display: grid; gap: 7px; }
+.br-ops-form label.wide { grid-column: 1 / -1; }
+.br-ops-form label > span { color: #55716a; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+.br-ops-form input, .br-ops-form select { min-height: 45px; border: 1px solid #d7e4e0; border-radius: 10px; background: #fbfdfc; padding: 0 12px; color: #102a38; outline: none; }
+.br-ops-form input:focus, .br-ops-form select:focus { border-color: #0aaa7e; box-shadow: 0 0 0 3px rgba(10, 170, 126, .1); }
+.br-ops-state { display: inline-flex; width: max-content; padding: 5px 9px; border-radius: 999px; background: #fff2dc; color: #9a6420; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.br-ops-state.ready { background: #e4f8f0; color: #087b5d; }
+.br-profit-card h2 { margin: 8px 0 20px; }
+.br-profit-formula { display: grid; gap: 11px; }
+.br-profit-formula > div { display: flex; justify-content: space-between; gap: 15px; padding-bottom: 10px; border-bottom: 1px solid #e6eeec; color: #627972; font-size: 12px; }
+.br-profit-formula > div b { color: #193c42; }
+.br-profit-formula .total { margin-top: 5px; padding: 15px; border: 0; border-radius: 12px; background: #e7f8f2; align-items: center; color: #0b7358; }
+.br-profit-formula .total strong { font-size: 22px; color: #08684f; }
+.br-safety-note { display: flex; gap: 10px; margin: 17px 0; padding: 13px; border-radius: 12px; background: #f0f6f4; color: #46635b; }
+.br-safety-note svg { flex: 0 0 auto; color: #0aaa7e; }
+.br-safety-note p { margin: 0; font-size: 11px; line-height: 1.55; }
+.br-ops-empty { padding: 32px 10px; text-align: center; color: #72837f; font-size: 12px; }
+.br-small-action { border: 0; border-radius: 8px; padding: 8px 10px; background: #0aaa7e; color: white; font-size: 10px; font-weight: 800; }
+.br-asset-estimate { display: block; margin-top: 3px; color: #718680; }
+.br-ops-footer { display: flex; justify-content: center; align-items: center; gap: 9px; padding: 17px; border-radius: 14px; background: #102f38; color: #d8eee7; font-size: 11px; }
+.br-ops-gate { display: grid; place-items: center; align-content: center; gap: 13px; min-height: 100vh; padding: 30px; background: #f2f7f5; color: #183a40; text-align: center; }
+.br-ops-gate > svg { width: 42px; height: 42px; color: #0aaa7e; }
+.br-ops-gate h2, .br-ops-gate p { margin: 0; }
+.br-ops-gate p { color: #6a807a; }
+.br-sidebar-footer { display: flex; flex-wrap: wrap; gap: 6px; }
+.br-sidebar-footer span { flex-basis: 100%; }
+
+@media (max-width: 980px) {
+  .br-ops-page { padding: 18px; }
+  .br-ops-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .br-ops-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .br-ops-page { padding: 12px; }
+  .br-ops-status-grid, .br-ops-form { grid-template-columns: 1fr; }
+  .br-ops-form label.wide { grid-column: auto; }
+  .br-ops-footer { align-items: flex-start; text-align: left; }
+}

@@ -36,6 +36,9 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { startLogin } from "@/const";
 import {
   Dialog,
   DialogContent,
@@ -86,11 +89,7 @@ const wealthPoints = [
   { label: "02 set", value: 122314 },
 ];
 
-const initialPurchases: PurchaseRecord[] = [
-  { id: "compra-1", date: "10/06/2026", invested: 48240, btc: 0.12, quote: 402000, currentValue: 51648, gain: 3408, status: "Rendimento ativo" },
-  { id: "compra-2", date: "02/07/2026", invested: 34611.73, btc: 0.084215, quote: 411000, currentValue: 36234.82, gain: 1623.09, status: "Rendimento ativo" },
-  { id: "compra-3", date: "18/08/2026", invested: 32948.27, btc: 0.08, quote: 411853.38, currentValue: 34431.18, gain: 1482.91, status: "Rendimento ativo" },
-];
+const initialPurchases: PurchaseRecord[] = [];
 
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const btcBrl = 421930;
@@ -385,6 +384,10 @@ function BusinessPage() {
 }
 
 export default function BitcoinYield() {
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const utils = trpc.useUtils();
+  const profileQuery = trpc.onboarding.get.useQuery(undefined, { enabled: isAuthenticated });
+  const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated });
   const [section, setSection] = useState<SectionId>("inicio");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [redeemOpen, setRedeemOpen] = useState(false);
@@ -397,15 +400,50 @@ export default function BitcoinYield() {
   const [eligibility, setEligibility] = useState({ resident: false, cpf: false, pix: false });
   const [riskAccepted, setRiskAccepted] = useState(false);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>(initialPurchases);
+  const [legalName, setLegalName] = useState("Alexandre Bastos");
+  const [cpfMasked, setCpfMasked] = useState("•••.482.•••-••");
+  const [pixAccount, setPixAccount] = useState("Banco Inter •••• 4821");
+  const [serverQuote, setServerQuote] = useState<Awaited<ReturnType<typeof createQuoteMutation.mutateAsync>> | null>(null);
   const activeLabel = useMemo(() => navItems.find((item) => item.id === section)?.label ?? "Visão geral", [section]);
-  const purchaseQuote = useMemo(() => {
+  const localPurchaseQuote = useMemo(() => {
     const amountInBrl = parseBrl(addAmount);
     const serviceFee = amountInBrl * 0.005;
     const executionPrice = btcBrl * 1.0065;
     const applied = Math.max(0, amountInBrl - serviceFee);
     return { amountInBrl, serviceFee, executionPrice, applied, btc: executionPrice > 0 ? applied / executionPrice : 0 };
   }, [addAmount, quoteNonce]);
+  const purchaseQuote = serverQuote ? {
+    amountInBrl: Number(serverQuote.amountBrl),
+    serviceFee: Number(serverQuote.serviceFeeBrl),
+    executionPrice: Number(serverQuote.executionBtcBrl),
+    applied: Number(serverQuote.amountBrl) - Number(serverQuote.serviceFeeBrl),
+    btc: Number(serverQuote.btcAmount),
+  } : localPurchaseQuote;
   const isEligible = eligibility.resident && eligibility.cpf && eligibility.pix;
+
+  const saveProfileMutation = trpc.onboarding.save.useMutation();
+  const verifyKycMutation = trpc.onboarding.simulateKycApproval.useMutation();
+  const createQuoteMutation = trpc.purchases.createQuote.useMutation();
+  const confirmPurchaseMutation = trpc.purchases.confirm.useMutation();
+
+  useEffect(() => {
+    const livePurchases = purchasesQuery.data;
+    if (!livePurchases) return;
+    setPurchases(livePurchases.map(item => {
+      const invested = Number(item.amountBrl);
+      const currentValue = Number(item.btcAmount) * btcBrl;
+      return {
+        id: String(item.id),
+        date: new Date(item.createdAt).toLocaleDateString("pt-BR"),
+        invested,
+        btc: Number(item.btcAmount),
+        quote: Number(item.executionBtcBrl),
+        currentValue,
+        gain: currentValue - invested,
+        status: item.yieldStatus === "active" ? "Rendimento ativo" : item.status,
+      };
+    }));
+  }, [purchasesQuery.data]);
 
   useEffect(() => {
     if (!addMoneyOpen || purchaseStep !== "quote" || quoteSeconds <= 0) return;
@@ -425,31 +463,70 @@ export default function BitcoinYield() {
   }
 
   function openPurchase() {
+    if (!isAuthenticated) {
+      toast.info("Entre na sua conta para registrar compras no sandbox.");
+      startLogin();
+      return;
+    }
     setPurchaseStep("eligibility");
     setQuoteSeconds(59);
     setEligibility({ resident: false, cpf: false, pix: false });
     setRiskAccepted(false);
+    setServerQuote(null);
     setAddMoneyOpen(true);
   }
 
   function refreshQuote() {
     setQuoteNonce((value) => value + 1);
     setQuoteSeconds(59);
+    setServerQuote(null);
     toast.success("Cotação atualizada", { description: "Novo prazo de 59 segundos iniciado." });
   }
 
-  function confirmPurchase() {
-    setPurchases((current) => [{
-      id: `compra-${Date.now()}`,
-      date: "08/09/2026",
-      invested: purchaseQuote.amountInBrl,
-      btc: purchaseQuote.btc,
-      quote: purchaseQuote.executionPrice,
-      currentValue: purchaseQuote.applied,
-      gain: purchaseQuote.applied - purchaseQuote.amountInBrl,
-      status: "Rendimento ativado",
-    }, ...current]);
-    setPurchaseStep("success");
+  async function continueToQuote() {
+    if (!isEligible) return;
+    try {
+      await saveProfileMutation.mutateAsync({
+        legalName,
+        cpfMasked,
+        pixBank: pixAccount.split(" •")[0] || "Banco informado",
+        pixAccountMasked: pixAccount,
+        residentBrazil: true,
+        cpfConfirmed: true,
+        pixOwnershipConfirmed: true,
+      });
+      if (profileQuery.data?.verificationStatus !== "verified") {
+        await verifyKycMutation.mutateAsync({ idempotencyKey: `kyc-${user?.id}-${crypto.randomUUID()}` });
+      }
+      const quote = await createQuoteMutation.mutateAsync({ amountBrl: parseBrl(addAmount), idempotencyKey: `quote-${crypto.randomUUID()}` });
+      setServerQuote(quote);
+      setPurchaseStep("quote");
+      setQuoteSeconds(Math.max(0, Math.floor((new Date(quote.expiresAt).getTime() - Date.now()) / 1000)));
+      await utils.onboarding.get.invalidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível preparar a cotação.");
+    }
+  }
+
+  async function regenerateServerQuote() {
+    try {
+      const quote = await createQuoteMutation.mutateAsync({ amountBrl: parseBrl(addAmount), idempotencyKey: `quote-${crypto.randomUUID()}` });
+      setServerQuote(quote);
+      setQuoteSeconds(Math.max(0, Math.floor((new Date(quote.expiresAt).getTime() - Date.now()) / 1000)));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao atualizar cotação.");
+    }
+  }
+
+  async function confirmPurchase() {
+    if (!serverQuote) return;
+    try {
+      await confirmPurchaseMutation.mutateAsync({ quoteId: serverQuote.id, idempotencyKey: `purchase-${crypto.randomUUID()}` });
+      await Promise.all([utils.purchases.list.invalidate(), utils.purchases.ledger.invalidate()]);
+      setPurchaseStep("success");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível confirmar a compra sandbox.");
+    }
   }
 
   return (
@@ -461,14 +538,14 @@ export default function BitcoinYield() {
       </header>
       <aside className={`br-sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>NEXO</b><small>BITCOIN EM REAIS</small></div></div>
-        <div className="br-profile"><div className="br-avatar">AB</div><div><b>Olá, Alexandre</b><span>Conta protegida <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
+        <div className="br-profile"><div className="br-avatar">{user?.name?.slice(0, 2).toUpperCase() || "AB"}</div><div><b>Olá, {user?.name?.split(" ")[0] || "Alexandre"}</b><span>{isAuthenticated ? "Conta autenticada" : "Modo de leitura"} <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
         <nav>{navItems.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => navigate(id)} type="button"><Icon size={19} /><span>{label}</span>{id === "empresas" && <em>B2B</em>}</button>)}</nav>
         <div className="br-sidebar-security"><ShieldCheck /><div><b>Ambiente protegido</b><span>Seus dados e posições são demonstrativos.</span></div></div>
-        <div className="br-sidebar-footer"><button type="button" onClick={() => toast.success("Atendimento demonstrativo iniciado")}>Atendimento</button><span>v0.1 MVP</span></div>
+        <div className="br-sidebar-footer"><button type="button" onClick={() => toast.success("Atendimento demonstrativo iniciado")}>Atendimento</button>{user?.role === "admin" && <button type="button" onClick={() => { window.location.href = "/operacao"; }}>Operação</button>}<span>v0.2 sandbox</span></div>
       </aside>
 
       <main className="br-main">
-        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => toast.info("Sua conta está sincronizada. Os detalhes técnicos ficam disponíveis em Segurança e transparência.")}><span className="br-account-status"><i /></span> Conta Nexo <ChevronDown size={14} /></button></div></div>
+        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => isAuthenticated ? toast.success("Conta e dados sincronizados com o sandbox.") : startLogin()}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? "Conta conectada" : "Entrar"} <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
           {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} onAddMoney={openPurchase} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Compre com reais</h3><p>Você escolhe quanto quer colocar e vê tudo explicado em BRL.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Ative o rendimento</h3><p>A estratégia é aplicada nos bastidores e o resultado aparece em reais.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
           {section === "rendimento" && <YieldPage />}
@@ -495,22 +572,22 @@ export default function BitcoinYield() {
 
           {purchaseStep === "eligibility" && <>
             <DialogHeader><DialogTitle>Vamos preparar sua compra</DialogTitle><DialogDescription>Confirme seus dados básicos para comprar Bitcoin com reais. Tudo abaixo é demonstrativo.</DialogDescription></DialogHeader>
-            <div className="br-eligibility-grid"><label><span>Nome completo</span><input defaultValue="Alexandre Bastos" /></label><label><span>CPF</span><input defaultValue="•••.482.•••-••" /></label><label><span>Residência</span><select defaultValue="BR"><option value="BR">Brasil</option></select></label><label><span>Conta Pix</span><input defaultValue="Banco Inter •••• 4821" /></label></div>
+            <div className="br-eligibility-grid"><label><span>Nome completo</span><input value={legalName} onChange={(event) => setLegalName(event.target.value)} /></label><label><span>CPF mascarado</span><input value={cpfMasked} onChange={(event) => setCpfMasked(event.target.value)} /></label><label><span>Residência</span><select defaultValue="BR"><option value="BR">Brasil</option></select></label><label><span>Conta Pix mascarada</span><input value={pixAccount} onChange={(event) => setPixAccount(event.target.value)} /></label></div>
             <div className="br-check-stack"><label><input type="checkbox" checked={eligibility.resident} onChange={(event) => setEligibility((value) => ({ ...value, resident: event.target.checked }))} /><span><b>Sou residente no Brasil</b><small>Produto demonstrado apenas para residentes no país.</small></span></label><label><input type="checkbox" checked={eligibility.cpf} onChange={(event) => setEligibility((value) => ({ ...value, cpf: event.target.checked }))} /><span><b>Meu CPF está regular e verificado</b><small>Identificação necessária antes de movimentar valores reais.</small></span></label><label><input type="checkbox" checked={eligibility.pix} onChange={(event) => setEligibility((value) => ({ ...value, pix: event.target.checked }))} /><span><b>A conta Pix é da minha titularidade</b><small>Compras e resgates usam uma conta com o mesmo titular.</small></span></label></div>
-            <button className="br-primary full" type="button" disabled={!isEligible} onClick={() => { setPurchaseStep("quote"); setQuoteSeconds(59); }}>Continuar para cotação <ArrowRight size={17} /></button>
-            <p className="br-dialog-footnote"><ShieldCheck size={13} /> No produto real, estes dados exigem validação de identidade e prevenção a fraudes.</p>
+            <button className="br-primary full" type="button" disabled={!isEligible || saveProfileMutation.isPending || verifyKycMutation.isPending || createQuoteMutation.isPending} onClick={() => void continueToQuote()}>{saveProfileMutation.isPending || verifyKycMutation.isPending || createQuoteMutation.isPending ? <RefreshCw className="animate-spin" size={17} /> : <ArrowRight size={17} />} Verificar e gerar cotação</button>
+            <p className="br-dialog-footnote"><ShieldCheck size={13} /> O sandbox persiste apenas dados mascarados e simula a aprovação do provedor KYC.</p>
           </>}
 
           {purchaseStep === "quote" && <>
             <DialogHeader><DialogTitle>Sua cotação para comprar Bitcoin</DialogTitle><DialogDescription>Veja preço, spread, taxa, prazo e quantidade antes de ativar o rendimento.</DialogDescription></DialogHeader>
             <label className="br-amount-label" htmlFor="add-money-amount">Quanto você quer investir?</label>
-            <div className="br-amount-field"><span>R$</span><input id="add-money-amount" inputMode="decimal" value={addAmount} onChange={(event) => { setAddAmount(event.target.value); setQuoteSeconds(59); }} aria-label="Valor da compra em reais" /></div>
-            <div className="br-buy-chips"><button type="button" onClick={() => setAddAmount("500,00")}>R$ 500</button><button type="button" onClick={() => setAddAmount("1.000,00")}>R$ 1.000</button><button type="button" onClick={() => setAddAmount("5.000,00")}>R$ 5.000</button></div>
-            <section className="br-buy-quote"><div className="br-buy-quote-head"><span><i /> Cotação demonstrativa</span><b className={quoteSeconds === 0 ? "expired" : ""}>{quoteSeconds === 0 ? "Expirada" : `00:${String(quoteSeconds).padStart(2, "0")}`}</b></div><div className="br-kv"><span>Referência BTC/BRL</span><b>{currency.format(btcBrl)}</b></div><div className="br-kv"><span>Preço de execução (spread 0,65%)</span><b>{currency.format(purchaseQuote.executionPrice)}</b></div><div className="br-kv"><span>Taxa de serviço (0,50%)</span><b>-{currency.format(purchaseQuote.serviceFee)}</b></div><div className="br-kv"><span>Valor aplicado</span><b>{currency.format(purchaseQuote.applied)}</b></div><div className="br-buy-total"><span>Você compra aproximadamente</span><strong>₿ {formatBtc(purchaseQuote.btc)}</strong><small>Liquidação estimada: até 2 minutos</small></div></section>
-            {quoteSeconds === 0 && <button className="br-outline full" type="button" onClick={refreshQuote}><RefreshCw size={15} /> Atualizar cotação</button>}
+            <div className="br-amount-field"><span>R$</span><input id="add-money-amount" inputMode="decimal" value={addAmount} onChange={(event) => { setAddAmount(event.target.value); setQuoteSeconds(0); setServerQuote(null); }} aria-label="Valor da compra em reais" /></div>
+            <div className="br-buy-chips"><button type="button" onClick={() => { setAddAmount("500,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 500</button><button type="button" onClick={() => { setAddAmount("1.000,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 1.000</button><button type="button" onClick={() => { setAddAmount("5.000,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 5.000</button></div>
+            <section className="br-buy-quote"><div className="br-buy-quote-head"><span><i /> Cotação persistida</span><b className={quoteSeconds === 0 ? "expired" : ""}>{quoteSeconds === 0 ? "Atualize" : `00:${String(quoteSeconds).padStart(2, "0")}`}</b></div><div className="br-kv"><span>Referência BTC/BRL</span><b>{currency.format(serverQuote ? Number(serverQuote.referenceBtcBrl) : btcBrl)}</b></div><div className="br-kv"><span>Preço de execução (spread 0,65%)</span><b>{currency.format(purchaseQuote.executionPrice)}</b></div><div className="br-kv"><span>Taxa de serviço (0,50%)</span><b>-{currency.format(purchaseQuote.serviceFee)}</b></div><div className="br-kv"><span>Valor aplicado</span><b>{currency.format(purchaseQuote.applied)}</b></div><div className="br-buy-total"><span>Você compra aproximadamente</span><strong>₿ {formatBtc(purchaseQuote.btc)}</strong><small>Liquidação sandbox persistida no ledger</small></div></section>
+            {(!serverQuote || quoteSeconds === 0) && <button className="br-outline full" type="button" onClick={() => void regenerateServerQuote()} disabled={createQuoteMutation.isPending}><RefreshCw className={createQuoteMutation.isPending ? "animate-spin" : ""} size={15} /> Atualizar cotação</button>}
             <label className="br-risk-check"><input type="checkbox" checked={riskAccepted} onChange={(event) => setRiskAccepted(event.target.checked)} /><span>Entendi que o preço do Bitcoin e o rendimento variam, e que este MVP não realiza uma compra real.</span></label>
             <details className="br-how-it-works"><summary>Como funciona por trás?</summary><p>Após a compra, a posição pode passar por conversões técnicas para os ativos de liquidez do protocolo e ser aplicada na estratégia de rendimento. Isso envolve riscos de mercado, protocolo, liquidez e contraparte. Os registros verificáveis ficam em Segurança.</p></details>
-            <button className="br-primary full" type="button" disabled={!riskAccepted || quoteSeconds === 0 || purchaseQuote.amountInBrl <= 0} onClick={confirmPurchase}>Comprar e ativar rendimento <ArrowRight size={17} /></button>
+            <button className="br-primary full" type="button" disabled={!riskAccepted || !serverQuote || quoteSeconds === 0 || confirmPurchaseMutation.isPending} onClick={() => void confirmPurchase()}>{confirmPurchaseMutation.isPending ? <RefreshCw className="animate-spin" size={17} /> : <ArrowRight size={17} />} Confirmar no sandbox</button>
             <button className="br-dialog-cancel" type="button" onClick={() => setPurchaseStep("eligibility")}>Voltar</button>
           </>}
 

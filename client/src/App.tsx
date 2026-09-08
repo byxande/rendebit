@@ -6,12 +6,14 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import BitcoinYield from "./pages/BitcoinYield";
 import Home from "./pages/Home";
-
+import OperationsSandbox from "./pages/OperationsSandbox";
 function Router() {
+  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path="/" component={BitcoinYield} />
       <Route path="/portfolio" component={Home} />
+      <Route path="/operacao" component={OperationsSandbox} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

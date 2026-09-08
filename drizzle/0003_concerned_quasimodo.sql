@@ -1,0 +1,1 @@
+ALTER TABLE `provider_events` MODIFY COLUMN `provider` enum('sandbox_kyc','sandbox_pix','sandbox_custody','sandbox_stacks','stacks_testnet') NOT NULL;

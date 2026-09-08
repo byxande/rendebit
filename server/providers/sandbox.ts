@@ -33,6 +33,8 @@ export const sandboxCustodyProvider: CustodyProvider = {
 };
 
 export const sandboxYieldProvider: YieldProvider = {
+  provider: "sandbox_stacks",
+  network: "sandbox",
   async activatePosition({ purchaseId, btcAmount }) {
     return {
       externalId: sandboxId("stacks", purchaseId),

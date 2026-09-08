@@ -5,6 +5,7 @@ import {
   startSandboxPurchase,
 } from "../db";
 import { sandboxCustodyProvider, sandboxPixProvider, sandboxYieldProvider } from "../providers/sandbox";
+import { createStacksTestnetYieldProvider } from "../providers/stacksTestnet";
 import type { CustodyProvider, PixProvider, YieldProvider } from "../providers/types";
 
 type WorkflowInput = {
@@ -23,10 +24,14 @@ type WorkflowDependencies = {
   recordEvent: typeof recordProviderEvent;
 };
 
+const defaultYieldProvider = process.env.STACKS_YIELD_MODE === "testnet"
+  ? createStacksTestnetYieldProvider()
+  : sandboxYieldProvider;
+
 const defaultDependencies: WorkflowDependencies = {
   pix: sandboxPixProvider,
   custody: sandboxCustodyProvider,
-  yieldProvider: sandboxYieldProvider,
+  yieldProvider: defaultYieldProvider,
   startPurchase: startSandboxPurchase,
   settlePurchase: settleSandboxPurchase,
   failPurchase: failSandboxPurchase,
@@ -39,6 +44,12 @@ export async function confirmPurchaseWorkflow(input: WorkflowInput, dependencies
   if (purchase.status !== "processing") throw new Error("A compra já foi encerrada e precisa de reconciliação manual.");
 
   try {
+    await dependencies.yieldProvider.preflight?.({
+      purchaseId: purchase.id,
+      btcAmount: purchase.btcAmount,
+      idempotencyKey: `${input.idempotencyKey}:yield-preflight`,
+    });
+
     const pix = await dependencies.pix.settleCashIn({
       purchaseId: purchase.id,
       amountBrl: purchase.amountBrl,
@@ -71,11 +82,11 @@ export async function confirmPurchaseWorkflow(input: WorkflowInput, dependencies
       idempotencyKey: `${input.idempotencyKey}:yield`,
     });
     await dependencies.recordEvent({
-      provider: "sandbox_stacks",
+      provider: dependencies.yieldProvider.provider,
       eventType: "yield.position.activated",
       externalId: yieldPosition.externalId,
       idempotencyKey: `${input.idempotencyKey}:stacks-event`,
-      payload: { purchaseId: purchase.id, ...yieldPosition.payload, result: yieldPosition.status, mode: "sandbox" },
+      payload: { purchaseId: purchase.id, ...yieldPosition.payload, result: yieldPosition.status, mode: dependencies.yieldProvider.network },
     });
 
     return await dependencies.settlePurchase({

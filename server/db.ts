@@ -113,7 +113,7 @@ export async function verifySandboxProfile(userId: number, providerReference: st
 }
 
 export async function recordProviderEvent(input: {
-  provider: "sandbox_kyc" | "sandbox_pix" | "sandbox_custody" | "sandbox_stacks";
+  provider: "sandbox_kyc" | "sandbox_pix" | "sandbox_custody" | "sandbox_stacks" | "stacks_testnet";
   eventType: string;
   externalId: string;
   payload: unknown;
@@ -128,8 +128,15 @@ export async function recordProviderEvent(input: {
     status: "processed",
     payload: JSON.stringify(input.payload),
     processedAt: new Date(),
+  }).onDuplicateKeyUpdate({
+    set: { idempotencyKey: input.idempotencyKey },
   });
   return (await db.select().from(providerEvents).where(eq(providerEvents.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+}
+
+export async function getProviderEventByIdempotencyKey(idempotencyKey: string) {
+  const db = await requireDb();
+  return (await db.select().from(providerEvents).where(eq(providerEvents.idempotencyKey, idempotencyKey)).limit(1))[0];
 }
 
 export async function createPurchaseQuote(input: {

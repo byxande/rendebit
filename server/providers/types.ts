@@ -17,5 +17,16 @@ export interface CustodyProvider {
 }
 
 export interface YieldProvider {
-  activatePosition(input: { purchaseId: number; btcAmount: string; idempotencyKey: string }): Promise<ProviderResult<{ btcAmount: string; route: "BTC>sBTC>stBTC" }>>;
+  provider: "sandbox_stacks" | "stacks_testnet";
+  network: "sandbox" | "testnet";
+  preflight?(input: { purchaseId: number; btcAmount: string; idempotencyKey: string }): Promise<void>;
+  activatePosition(input: { purchaseId: number; btcAmount: string; idempotencyKey: string }): Promise<ProviderResult<{
+    btcAmount: string;
+    route: "BTC>sBTC>stBTC";
+    network?: "sandbox" | "testnet";
+    txid?: string;
+    amountSats?: string;
+    minSharesOut?: string;
+    ratio?: string;
+  }>>;
 }

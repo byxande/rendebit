@@ -96,7 +96,7 @@ export const ledgerEntries = mysqlTable("ledger_entries", {
 
 export const providerEvents = mysqlTable("provider_events", {
   id: int("id").autoincrement().primaryKey(),
-  provider: mysqlEnum("provider", ["sandbox_kyc", "sandbox_pix", "sandbox_custody", "sandbox_stacks"]).notNull(),
+  provider: mysqlEnum("provider", ["sandbox_kyc", "sandbox_pix", "sandbox_custody", "sandbox_stacks", "stacks_testnet"]).notNull(),
   eventType: varchar("eventType", { length: 100 }).notNull(),
   externalId: varchar("externalId", { length: 140 }).notNull(),
   status: mysqlEnum("status", ["received", "processed", "ignored", "failed"]).default("received").notNull(),

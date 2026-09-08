@@ -12,10 +12,16 @@ describe("provedores sandbox", () => {
     const pix = await sandboxPixProvider.settleCashIn({ purchaseId: 9, amountBrl: "1000.00", idempotencyKey: "pix-9" });
     const custody = await sandboxCustodyProvider.buyBitcoin({ purchaseId: 9, btcAmount: "0.00240000", idempotencyKey: "custody-9" });
     const yieldPosition = await sandboxYieldProvider.activatePosition({ purchaseId: 9, btcAmount: "0.00240000", idempotencyKey: "yield-9" });
+    const yieldExit = await sandboxYieldProvider.exitPosition?.({ redemptionId: 12, btcAmount: "0.00100000", idempotencyKey: "yield-exit-12" });
+    const conversion = await sandboxCustodyProvider.sellBitcoin({ redemptionId: 12, btcAmount: "0.00100000", grossBrl: "421.93", idempotencyKey: "sell-12" });
+    const pixOut = await sandboxPixProvider.settleCashOut({ redemptionId: 12, amountBrl: "419.40", pixDestinationMasked: "Banco Sandbox •••• 0000", idempotencyKey: "pix-out-12" });
 
     expect(kyc).toMatchObject({ externalId: "kyc-sandbox-7", status: "approved" });
     expect(pix).toMatchObject({ externalId: "pix-sandbox-9", status: "settled" });
     expect(custody).toMatchObject({ externalId: "custody-sandbox-9", status: "settled" });
     expect(yieldPosition.payload.route).toBe("BTC>sBTC>stBTC");
+    expect(yieldExit).toMatchObject({ externalId: "stacks-exit-sandbox-12", status: "settled" });
+    expect(conversion).toMatchObject({ externalId: "sell-sandbox-12", status: "settled" });
+    expect(pixOut).toMatchObject({ externalId: "pix-out-sandbox-12", status: "settled" });
   });
 });

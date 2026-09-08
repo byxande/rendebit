@@ -20,6 +20,13 @@ export const sandboxPixProvider: PixProvider = {
       payload: { amountBrl },
     };
   },
+  async settleCashOut({ redemptionId, amountBrl, pixDestinationMasked }) {
+    return {
+      externalId: sandboxId("pix-out", redemptionId),
+      status: "settled",
+      payload: { amountBrl, pixDestinationMasked },
+    };
+  },
 };
 
 export const sandboxCustodyProvider: CustodyProvider = {
@@ -28,6 +35,13 @@ export const sandboxCustodyProvider: CustodyProvider = {
       externalId: sandboxId("custody", purchaseId),
       status: "settled",
       payload: { btcAmount },
+    };
+  },
+  async sellBitcoin({ redemptionId, btcAmount, grossBrl }) {
+    return {
+      externalId: sandboxId("sell", redemptionId),
+      status: "settled",
+      payload: { btcAmount, grossBrl },
     };
   },
 };
@@ -40,6 +54,13 @@ export const sandboxYieldProvider: YieldProvider = {
       externalId: sandboxId("stacks", purchaseId),
       status: "active",
       payload: { btcAmount, route: "BTC>sBTC>stBTC" },
+    };
+  },
+  async exitPosition({ redemptionId, btcAmount }) {
+    return {
+      externalId: sandboxId("stacks-exit", redemptionId),
+      status: "settled",
+      payload: { btcAmount, route: "stBTC>sBTC>BTC", network: "sandbox" },
     };
   },
 };

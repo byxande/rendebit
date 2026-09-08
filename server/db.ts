@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   customerProfiles,
@@ -8,6 +8,8 @@ import {
   providerEvents,
   purchaseQuotes,
   purchases,
+  redemptionQuotes,
+  redemptions,
   treasurySettings,
   users,
 } from "../drizzle/schema";
@@ -273,6 +275,162 @@ export async function listLedger(userId: number) {
 export async function listOperationalLedger() {
   const db = await requireDb();
   return db.select().from(ledgerEntries).orderBy(desc(ledgerEntries.createdAt));
+}
+
+export async function getAvailableBtcBalance(userId: number) {
+  const db = await requireDb();
+  const [purchaseRows, redemptionRows] = await Promise.all([
+    db.select({ btcAmount: purchases.btcAmount, status: purchases.status }).from(purchases).where(eq(purchases.userId, userId)),
+    db.select({ btcAmount: redemptions.btcAmount, status: redemptions.status }).from(redemptions).where(eq(redemptions.userId, userId)),
+  ]);
+  const acquiredBtc = purchaseRows.filter(item => item.status === "settled").reduce((sum, item) => sum + Number(item.btcAmount), 0);
+  const unavailableBtc = redemptionRows.filter(item => !["failed", "cancelled"].includes(item.status)).reduce((sum, item) => sum + Number(item.btcAmount), 0);
+  return Math.max(0, Math.round((acquiredBtc - unavailableBtc) * 100_000_000) / 100_000_000);
+}
+
+export async function createRedemptionQuote(input: {
+  userId: number;
+  quote: {
+    btcAmount: number;
+    referenceBtcBrl: number;
+    grossBrl: number;
+    protocolFeeBps: number;
+    protocolFeeBrl: number;
+    conversionPixFeeBps: number;
+    conversionPixFeeBrl: number;
+    netBrl: number;
+  };
+  idempotencyKey: string;
+  expiresAt: Date;
+}) {
+  const db = await requireDb();
+  const existing = (await db.select().from(redemptionQuotes).where(eq(redemptionQuotes.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+  if (existing) {
+    if (existing.userId !== input.userId) throw new Error("Chave idempotente já pertence a outro usuário.");
+    return existing;
+  }
+  const availableBtc = await getAvailableBtcBalance(input.userId);
+  if (input.quote.btcAmount > availableBtc) throw new Error("Saldo disponível insuficiente para este resgate.");
+
+  await db.insert(redemptionQuotes).values({
+    userId: input.userId,
+    btcAmount: input.quote.btcAmount.toFixed(8),
+    referenceBtcBrl: input.quote.referenceBtcBrl.toFixed(2),
+    grossBrl: input.quote.grossBrl.toFixed(2),
+    protocolFeeBps: input.quote.protocolFeeBps,
+    protocolFeeBrl: input.quote.protocolFeeBrl.toFixed(2),
+    conversionPixFeeBps: input.quote.conversionPixFeeBps,
+    conversionPixFeeBrl: input.quote.conversionPixFeeBrl.toFixed(2),
+    netBrl: input.quote.netBrl.toFixed(2),
+    idempotencyKey: input.idempotencyKey,
+    expiresAt: input.expiresAt,
+  });
+  return (await db.select().from(redemptionQuotes).where(eq(redemptionQuotes.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+}
+
+export async function startSandboxRedemption(input: { userId: number; quoteId: number; idempotencyKey: string }) {
+  const db = await requireDb();
+  const existing = (await db.select().from(redemptions).where(eq(redemptions.externalReference, input.idempotencyKey)).limit(1))[0];
+  if (existing) {
+    if (existing.userId !== input.userId || existing.quoteId !== input.quoteId) throw new Error("Chave idempotente não corresponde a este resgate.");
+    return existing;
+  }
+
+  return db.transaction(async tx => {
+    await tx.execute(sql`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`);
+    const concurrentExisting = (await tx.select().from(redemptions).where(eq(redemptions.externalReference, input.idempotencyKey)).limit(1))[0];
+    if (concurrentExisting) {
+      if (concurrentExisting.userId !== input.userId || concurrentExisting.quoteId !== input.quoteId) throw new Error("Chave idempotente não corresponde a este resgate.");
+      return concurrentExisting;
+    }
+    const quote = (await tx.select().from(redemptionQuotes).where(and(eq(redemptionQuotes.id, input.quoteId), eq(redemptionQuotes.userId, input.userId))).limit(1))[0];
+    if (!quote) throw new Error("Cotação de resgate não encontrada.");
+    if (quote.status !== "active" || quote.expiresAt.getTime() <= Date.now()) throw new Error("Cotação expirada. Gere uma nova cotação.");
+    const profile = (await tx.select().from(customerProfiles).where(eq(customerProfiles.userId, input.userId)).limit(1))[0];
+    if (!profile || profile.verificationStatus !== "verified" || !profile.pixOwnershipConfirmed || !profile.pixAccountMasked) {
+      throw new Error("Conta Pix de mesma titularidade não verificada.");
+    }
+
+    const purchaseRows = await tx.select({ btcAmount: purchases.btcAmount, status: purchases.status }).from(purchases).where(eq(purchases.userId, input.userId));
+    const redemptionRows = await tx.select({ btcAmount: redemptions.btcAmount, status: redemptions.status }).from(redemptions).where(eq(redemptions.userId, input.userId));
+    const acquiredBtc = purchaseRows.filter(item => item.status === "settled").reduce((sum, item) => sum + Number(item.btcAmount), 0);
+    const unavailableBtc = redemptionRows.filter(item => !["failed", "cancelled"].includes(item.status)).reduce((sum, item) => sum + Number(item.btcAmount), 0);
+    const availableBtc = Math.max(0, Math.round((acquiredBtc - unavailableBtc) * 100_000_000) / 100_000_000);
+    if (Number(quote.btcAmount) > availableBtc) throw new Error("Saldo disponível mudou. Gere uma nova cotação.");
+
+    await tx.insert(redemptions).values({
+      userId: input.userId,
+      quoteId: quote.id,
+      externalReference: input.idempotencyKey,
+      btcAmount: quote.btcAmount,
+      grossBrl: quote.grossBrl,
+      protocolFeeBrl: quote.protocolFeeBrl,
+      conversionPixFeeBrl: quote.conversionPixFeeBrl,
+      netBrl: quote.netBrl,
+      pixDestinationMasked: profile.pixAccountMasked,
+      status: "processing",
+      stage: "reserved",
+    });
+    await tx.update(redemptionQuotes).set({ status: "confirmed" }).where(eq(redemptionQuotes.id, quote.id));
+    return (await tx.select().from(redemptions).where(eq(redemptions.externalReference, input.idempotencyKey)).limit(1))[0];
+  });
+}
+
+export async function advanceSandboxRedemption(input: {
+  userId: number;
+  redemptionId: number;
+  stage: "protocol_exit" | "conversion" | "pix";
+  externalReference: string;
+}) {
+  const db = await requireDb();
+  const condition = and(eq(redemptions.id, input.redemptionId), eq(redemptions.userId, input.userId), eq(redemptions.status, "processing"));
+  if (input.stage === "protocol_exit") {
+    await db.update(redemptions).set({ stage: "protocol_exit", protocolExitReference: input.externalReference }).where(condition);
+  } else if (input.stage === "conversion") {
+    await db.update(redemptions).set({ stage: "conversion", conversionReference: input.externalReference }).where(condition);
+  } else {
+    await db.update(redemptions).set({ stage: "pix", pixEndToEndId: input.externalReference }).where(condition);
+  }
+  return (await db.select().from(redemptions).where(and(eq(redemptions.id, input.redemptionId), eq(redemptions.userId, input.userId))).limit(1))[0];
+}
+
+export async function settleSandboxRedemption(input: { userId: number; redemptionId: number; idempotencyKey: string }) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await tx.execute(sql`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`);
+    const redemption = (await tx.select().from(redemptions).where(and(eq(redemptions.id, input.redemptionId), eq(redemptions.userId, input.userId))).limit(1))[0];
+    if (!redemption) throw new Error("Resgate não encontrado.");
+    if (redemption.status === "settled") return redemption;
+    if (redemption.status !== "processing" || redemption.stage !== "pix") throw new Error("Resgate não pode ser liquidado no estado atual.");
+
+    await tx.insert(ledgerEntries).values([
+      { userId: input.userId, redemptionId: redemption.id, entryType: "yield_exit", direction: "debit", account: "customer_btc_position", currency: "BTC", amount: redemption.btcAmount, idempotencyKey: `${input.idempotencyKey}:position-exit`, metadata: JSON.stringify({ mode: "sandbox" }) },
+      { userId: input.userId, redemptionId: redemption.id, entryType: "sell_btc", direction: "credit", account: "customer_brl_redemption", currency: "BRL", amount: redemption.grossBrl, idempotencyKey: `${input.idempotencyKey}:conversion`, metadata: JSON.stringify({ mode: "sandbox" }) },
+      { userId: input.userId, redemptionId: redemption.id, entryType: "provider_cost", direction: "debit", account: "protocol_redemption_cost", currency: "BRL", amount: redemption.protocolFeeBrl, idempotencyKey: `${input.idempotencyKey}:protocol-fee`, metadata: JSON.stringify({ mode: "sandbox" }) },
+      { userId: input.userId, redemptionId: redemption.id, entryType: "fee_revenue", direction: "credit", account: "organization_redemption_fee", currency: "BRL", amount: redemption.conversionPixFeeBrl, idempotencyKey: `${input.idempotencyKey}:service-fee`, metadata: JSON.stringify({ mode: "sandbox" }) },
+      { userId: input.userId, redemptionId: redemption.id, entryType: "pix_out", direction: "debit", account: "customer_brl_redemption", currency: "BRL", amount: redemption.netBrl, idempotencyKey: `${input.idempotencyKey}:pix-out`, metadata: JSON.stringify({ destination: redemption.pixDestinationMasked, endToEndId: redemption.pixEndToEndId, mode: "sandbox" }) },
+    ]);
+    await tx.update(redemptions).set({ status: "settled", stage: "completed", settledAt: new Date() }).where(eq(redemptions.id, redemption.id));
+    return (await tx.select().from(redemptions).where(eq(redemptions.id, redemption.id)).limit(1))[0];
+  });
+}
+
+export async function failSandboxRedemption(userId: number, redemptionId: number, reason: string, manualReview: boolean) {
+  const db = await requireDb();
+  await db.update(redemptions).set({
+    status: manualReview ? "manual_review" : "failed",
+    failureReason: reason.slice(0, 2_000),
+  }).where(and(eq(redemptions.id, redemptionId), eq(redemptions.userId, userId), eq(redemptions.status, "processing")));
+}
+
+export async function listRedemptions(userId: number) {
+  const db = await requireDb();
+  return db.select().from(redemptions).where(eq(redemptions.userId, userId)).orderBy(desc(redemptions.createdAt));
+}
+
+export async function listOperationalRedemptions() {
+  const db = await requireDb();
+  return db.select().from(redemptions).orderBy(desc(redemptions.createdAt));
 }
 
 export async function getTreasurySettings(ownerUserId: number) {

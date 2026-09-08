@@ -69,16 +69,58 @@ export const purchases = mysqlTable("purchases", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const redemptionQuotes = mysqlTable("redemption_quotes", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  btcAmount: decimal("btcAmount", { precision: 30, scale: 8 }).notNull(),
+  referenceBtcBrl: decimal("referenceBtcBrl", { precision: 18, scale: 2 }).notNull(),
+  grossBrl: decimal("grossBrl", { precision: 18, scale: 2 }).notNull(),
+  protocolFeeBps: int("protocolFeeBps").default(15).notNull(),
+  protocolFeeBrl: decimal("protocolFeeBrl", { precision: 18, scale: 2 }).notNull(),
+  conversionPixFeeBps: int("conversionPixFeeBps").default(45).notNull(),
+  conversionPixFeeBrl: decimal("conversionPixFeeBrl", { precision: 18, scale: 2 }).notNull(),
+  netBrl: decimal("netBrl", { precision: 18, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["active", "expired", "confirmed", "cancelled"]).default("active").notNull(),
+  idempotencyKey: varchar("idempotencyKey", { length: 120 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const redemptions = mysqlTable("redemptions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  quoteId: int("quoteId").notNull().unique().references(() => redemptionQuotes.id),
+  externalReference: varchar("externalReference", { length: 120 }).notNull().unique(),
+  btcAmount: decimal("btcAmount", { precision: 30, scale: 8 }).notNull(),
+  grossBrl: decimal("grossBrl", { precision: 18, scale: 2 }).notNull(),
+  protocolFeeBrl: decimal("protocolFeeBrl", { precision: 18, scale: 2 }).notNull(),
+  conversionPixFeeBrl: decimal("conversionPixFeeBrl", { precision: 18, scale: 2 }).notNull(),
+  netBrl: decimal("netBrl", { precision: 18, scale: 2 }).notNull(),
+  pixDestinationMasked: varchar("pixDestinationMasked", { length: 120 }).notNull(),
+  status: mysqlEnum("status", ["processing", "settled", "failed", "manual_review", "cancelled"]).default("processing").notNull(),
+  stage: mysqlEnum("stage", ["reserved", "protocol_exit", "conversion", "pix", "completed"]).default("reserved").notNull(),
+  protocolExitReference: varchar("protocolExitReference", { length: 140 }),
+  conversionReference: varchar("conversionReference", { length: 140 }),
+  pixEndToEndId: varchar("pixEndToEndId", { length: 140 }),
+  failureReason: text("failureReason"),
+  requestedAt: timestamp("requestedAt").defaultNow().notNull(),
+  settledAt: timestamp("settledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const ledgerEntries = mysqlTable("ledger_entries", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").references(() => users.id),
   purchaseId: int("purchaseId").references(() => purchases.id),
+  redemptionId: int("redemptionId").references(() => redemptions.id),
   entryType: mysqlEnum("entryType", [
     "customer_cash_in",
     "buy_btc",
     "fee_revenue",
     "customer_position",
     "yield_accrual",
+    "yield_exit",
+    "sell_btc",
     "pix_out",
     "provider_cost",
     "tax_reserve",
@@ -149,5 +191,7 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type PurchaseQuote = typeof purchaseQuotes.$inferSelect;
 export type Purchase = typeof purchases.$inferSelect;
+export type RedemptionQuote = typeof redemptionQuotes.$inferSelect;
+export type Redemption = typeof redemptions.$inferSelect;
 export type TreasurySettings = typeof treasurySettings.$inferSelect;
 export type ProfitDistribution = typeof profitDistributions.$inferSelect;

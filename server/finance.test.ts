@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateDistributableProfit,
   calculatePurchaseQuote,
+  calculateRedemptionQuote,
   estimateDistributionAsset,
   isValidStacksAddress,
 } from "./finance";
@@ -17,6 +18,22 @@ describe("calculatePurchaseQuote", () => {
 
   it("rejeita valores inválidos", () => {
     expect(() => calculatePurchaseQuote(0)).toThrow();
+  });
+});
+
+describe("calculateRedemptionQuote", () => {
+  it("separa valor bruto, custos e valor líquido do Pix", () => {
+    const quote = calculateRedemptionQuote(0.01, 400_000, 15, 45);
+    expect(quote.grossBrl).toBe(4_000);
+    expect(quote.protocolFeeBrl).toBe(6);
+    expect(quote.conversionPixFeeBrl).toBe(18);
+    expect(quote.netBrl).toBe(3_976);
+  });
+
+  it("rejeita quantidade, preço ou taxas inválidas", () => {
+    expect(() => calculateRedemptionQuote(0)).toThrow("maior que zero");
+    expect(() => calculateRedemptionQuote(0.01, 0)).toThrow("indisponível");
+    expect(() => calculateRedemptionQuote(0.01, 400_000, 1_001)).toThrow("fora do intervalo");
   });
 });
 

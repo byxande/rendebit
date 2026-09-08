@@ -56,6 +56,19 @@ type NavItem = {
 };
 
 type PurchaseStep = "eligibility" | "quote" | "success";
+type RedemptionStep = "review" | "success";
+
+type RedemptionQuoteView = {
+  id: number;
+  btcAmount: string;
+  referenceBtcBrl: string;
+  grossBrl: string;
+  protocolFeeBrl: string;
+  conversionPixFeeBrl: string;
+  netBrl: string;
+  expiresAt: Date | string;
+  pixDestinationMasked: string;
+};
 
 type PurchaseRecord = {
   id: string;
@@ -290,34 +303,65 @@ function LotsPage({ purchases }: { purchases: PurchaseRecord[] }) {
   );
 }
 
-function RedeemPage({ amount, setAmount, onConfirm }: { amount: string; setAmount: (value: string) => void; onConfirm: () => void }) {
+function RedeemPage({
+  amount,
+  setAmount,
+  availableBtc,
+  pixDestination,
+  quote,
+  quoteSeconds,
+  redemptions,
+  authenticated,
+  loading,
+  onQuote,
+}: {
+  amount: string;
+  setAmount: (value: string) => void;
+  availableBtc: number;
+  pixDestination: string;
+  quote: RedemptionQuoteView | null;
+  quoteSeconds: number;
+  redemptions: Array<{ id: number; requestedAt: Date; btcAmount: string; netBrl: string; status: string; pixEndToEndId: string | null }>;
+  authenticated: boolean;
+  loading: boolean;
+  onQuote: () => void;
+}) {
   const numericAmount = Number(amount.replace(",", ".")) || 0;
-  const gross = numericAmount * btcBrl;
-  const protocolFee = gross * 0.0015;
-  const fxFee = gross * 0.0045;
-  const net = Math.max(0, gross - protocolFee - fxFee);
+  const gross = quote ? Number(quote.grossBrl) : numericAmount * btcBrl;
+  const protocolFee = quote ? Number(quote.protocolFeeBrl) : gross * 0.0015;
+  const fxFee = quote ? Number(quote.conversionPixFeeBrl) : gross * 0.0045;
+  const net = quote ? Number(quote.netBrl) : Math.max(0, gross - protocolFee - fxFee);
+  const formatInput = (value: number) => value.toLocaleString("pt-BR", { minimumFractionDigits: 8, maximumFractionDigits: 8, useGrouping: false });
+  const statusLabel = (status: string) => ({ settled: "Pix concluído", processing: "Em processamento", manual_review: "Em revisão", failed: "Não concluído", cancelled: "Cancelado" }[status] ?? status);
   return (
     <div className="br-stack">
       <section className="br-page-hero compact pix"><div><span className="br-eyebrow">RENDIMENTO REALIZADO EM BRL</span><h1>Do seu rendimento em reais para o Pix.</h1><p>Quando você realiza o rendimento, ele é convertido para BRL. Você confere a cotação, todas as taxas e o valor líquido antes de confirmar.</p></div><div className="br-big-icon"><QrCode /></div></section>
+      <div className="br-redemption-status"><ShieldCheck size={17} /><div><b>Resgate protegido por saldo reservado</b><span>O valor só fica indisponível após sua confirmação. Em sandbox, nenhuma transação ou Pix real é enviado.</span></div><strong>Disponível: ₿ {formatBtc(availableBtc)}</strong></div>
       <div className="br-redeem-grid">
         <section className="br-panel br-quote-form">
           <span className="br-eyebrow">QUANTO DESEJA RESGATAR?</span>
           <label className="br-amount-input"><input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" aria-label="Quantidade de Bitcoin" /><span>BTC</span></label>
-          <div className="br-chips"><button type="button" onClick={() => setAmount("0,07105375")}>25%</button><button type="button" onClick={() => setAmount("0,14210750")}>50%</button><button type="button" onClick={() => setAmount("0,28421500")}>Máximo</button></div>
-          <div className="br-pix-account"><div className="br-bank-icon"><Landmark size={20} /></div><div><small>Conta Pix de destino</small><b>Banco Inter •••• 4821</b><span>Alexandre Bastos — mesma titularidade</span></div><BadgeCheck size={21} /></div>
-          <button type="button" className="br-primary full" onClick={onConfirm}>Revisar e continuar <ArrowRight size={17} /></button>
+          <div className="br-chips"><button type="button" disabled={availableBtc <= 0} onClick={() => setAmount(formatInput(availableBtc * 0.25))}>25%</button><button type="button" disabled={availableBtc <= 0} onClick={() => setAmount(formatInput(availableBtc * 0.5))}>50%</button><button type="button" disabled={availableBtc <= 0} onClick={() => setAmount(formatInput(availableBtc))}>Máximo</button></div>
+          <div className="br-pix-account"><div className="br-bank-icon"><Landmark size={20} /></div><div><small>Conta Pix de destino</small><b>{pixDestination || "Conta Pix não verificada"}</b><span>{pixDestination ? "Mesma titularidade verificada no sandbox" : "Confirme seus dados antes de resgatar"}</span></div>{pixDestination ? <BadgeCheck size={21} /> : <ShieldCheck size={21} />}</div>
+          <button type="button" className="br-primary full" disabled={authenticated && (numericAmount <= 0 || numericAmount > availableBtc || loading)} onClick={onQuote}>{loading ? <RefreshCw className="animate-spin" size={17} /> : <ArrowRight size={17} />} {authenticated ? "Gerar cotação segura" : "Entrar para resgatar"}</button>
+          {authenticated && availableBtc <= 0 && <p className="br-inline-error">Faça uma compra sandbox antes de solicitar um resgate.</p>}
+          {authenticated && numericAmount > availableBtc && availableBtc > 0 && <p className="br-inline-error">A quantidade informada é maior que o saldo disponível.</p>}
         </section>
         <section className="br-panel br-live-quote">
-          <div className="br-card-headline"><h2>Cotação transparente</h2><span className="br-live"><i /> 58s</span></div>
+          <div className="br-card-headline"><h2>Cotação transparente</h2><span className="br-live"><i /> {quote ? `${quoteSeconds}s` : "prévia"}</span></div>
           <div className="br-quote-value"><small>Você receberá</small><strong>{currency.format(net)}</strong><span>via Pix após a liquidação</span></div>
           <div className="br-divider" />
           <div className="br-kv"><span>Valor bruto</span><b>{currency.format(gross)}</b></div>
           <div className="br-kv"><span>Resgate do protocolo (0,15%)</span><b>-{currency.format(protocolFee)}</b></div>
           <div className="br-kv"><span>Conversão e Pix (0,45%)</span><b>-{currency.format(fxFee)}</b></div>
           <div className="br-kv total"><span>Valor líquido</span><b>{currency.format(net)}</b></div>
-          <div className="br-warning"><ShieldCheck size={18} /><p><b>Sem taxa escondida.</b> O valor só é confirmado depois da sua revisão final.</p></div>
+          <div className="br-warning"><ShieldCheck size={18} /><p><b>{quote ? "Cotação persistida." : "Prévia indicativa."}</b> O valor só é confirmado depois da sua revisão final.</p></div>
         </section>
       </div>
+      <section className="br-panel br-table-card br-redemption-history">
+        <div className="br-section-head"><div><span className="br-eyebrow">HISTÓRICO DE RESGATES</span><h2>Do pedido à confirmação do Pix</h2></div><span className="br-help-honesty"><ReceiptText size={15} /> Trilha persistida</span></div>
+        {redemptions.length === 0 ? <div className="br-ops-empty">Nenhum resgate solicitado nesta conta.</div> : <div className="br-table-scroll"><table><thead><tr><th>Solicitado em</th><th>Quantidade</th><th>Valor líquido</th><th>Destino</th><th>Status</th><th>Referência</th></tr></thead><tbody>{redemptions.map(item => <tr key={item.id}><td>{new Date(item.requestedAt).toLocaleString("pt-BR")}</td><td className="mono">₿ {item.btcAmount}</td><td><b>{currency.format(Number(item.netBrl))}</b></td><td>{pixDestination || "Conta verificada"}</td><td><span className={`br-status ${item.status === "manual_review" || item.status === "failed" ? "warning" : ""}`}><i />{statusLabel(item.status)}</span></td><td className="mono">{item.pixEndToEndId || "Aguardando"}</td></tr>)}</tbody></table></div>}
+      </section>
     </div>
   );
 }
@@ -388,7 +432,11 @@ export default function BitcoinYield() {
   const utils = trpc.useUtils();
   const profileQuery = trpc.onboarding.get.useQuery(undefined, { enabled: isAuthenticated });
   const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated });
-  const [section, setSection] = useState<SectionId>("inicio");
+  const redemptionsQuery = trpc.redemptions.summary.useQuery(undefined, { enabled: isAuthenticated });
+  const [section, setSection] = useState<SectionId>(() => {
+    const requested = new URLSearchParams(window.location.search).get("view");
+    return navItems.some(item => item.id === requested) ? requested as SectionId : "inicio";
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [addMoneyOpen, setAddMoneyOpen] = useState(false);
@@ -399,6 +447,11 @@ export default function BitcoinYield() {
   const [quoteNonce, setQuoteNonce] = useState(0);
   const [eligibility, setEligibility] = useState({ resident: false, cpf: false, pix: false });
   const [riskAccepted, setRiskAccepted] = useState(false);
+  const [redemptionStep, setRedemptionStep] = useState<RedemptionStep>("review");
+  const [redemptionQuote, setRedemptionQuote] = useState<RedemptionQuoteView | null>(null);
+  const [redemptionQuoteSeconds, setRedemptionQuoteSeconds] = useState(0);
+  const [redemptionRiskAccepted, setRedemptionRiskAccepted] = useState(false);
+  const [completedRedemption, setCompletedRedemption] = useState<{ pixEndToEndId: string | null; netBrl: string } | null>(null);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>(initialPurchases);
   const [legalName, setLegalName] = useState("Alexandre Bastos");
   const [cpfMasked, setCpfMasked] = useState("•••.482.•••-••");
@@ -425,6 +478,8 @@ export default function BitcoinYield() {
   const verifyKycMutation = trpc.onboarding.simulateKycApproval.useMutation();
   const createQuoteMutation = trpc.purchases.createQuote.useMutation();
   const confirmPurchaseMutation = trpc.purchases.confirm.useMutation();
+  const createRedemptionQuoteMutation = trpc.redemptions.createQuote.useMutation();
+  const confirmRedemptionMutation = trpc.redemptions.confirm.useMutation();
 
   useEffect(() => {
     const livePurchases = purchasesQuery.data;
@@ -451,15 +506,63 @@ export default function BitcoinYield() {
     return () => window.clearInterval(timer);
   }, [addMoneyOpen, purchaseStep, quoteSeconds]);
 
+  useEffect(() => {
+    if (!redeemOpen || redemptionStep !== "review" || redemptionQuoteSeconds <= 0) return;
+    const timer = window.setInterval(() => setRedemptionQuoteSeconds(value => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [redeemOpen, redemptionStep, redemptionQuoteSeconds]);
+
   function navigate(next: SectionId) {
     setSection(next);
     setMobileOpen(false);
+    window.history.replaceState(null, "", next === "inicio" ? "/" : `/?view=${next}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function confirmRedeem() {
-    setRedeemOpen(false);
-    toast.success("Simulação concluída", { description: "Nenhuma transação real foi realizada neste MVP." });
+  async function prepareRedemption() {
+    if (!isAuthenticated) {
+      toast.info("Entre na sua conta para solicitar um resgate no sandbox.");
+      startLogin();
+      return;
+    }
+    const btcAmount = Number(amount.replace(",", "."));
+    if (!Number.isFinite(btcAmount) || btcAmount <= 0) {
+      toast.error("Informe uma quantidade de Bitcoin maior que zero.");
+      return;
+    }
+    try {
+      const quote = await createRedemptionQuoteMutation.mutateAsync({ btcAmount, idempotencyKey: `redemption-quote-${crypto.randomUUID()}` });
+      setRedemptionQuote(quote);
+      setRedemptionQuoteSeconds(Math.max(0, Math.floor((new Date(quote.expiresAt).getTime() - Date.now()) / 1000)));
+      setRedemptionRiskAccepted(false);
+      setCompletedRedemption(null);
+      setRedemptionStep("review");
+      setRedeemOpen(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar a cotação de resgate.");
+    }
+  }
+
+  async function confirmRedemption() {
+    if (!redemptionQuote || !redemptionRiskAccepted || redemptionQuoteSeconds <= 0) return;
+    try {
+      const result = await confirmRedemptionMutation.mutateAsync({
+        quoteId: redemptionQuote.id,
+        idempotencyKey: `redemption-${crypto.randomUUID()}`,
+        riskAccepted: true,
+      });
+      await Promise.all([
+        utils.redemptions.summary.invalidate(),
+        utils.purchases.ledger.invalidate(),
+        user?.role === "admin" ? utils.treasury.ledger.invalidate() : Promise.resolve(),
+      ]);
+      setCompletedRedemption({ pixEndToEndId: result.pixEndToEndId, netBrl: result.netBrl });
+      setRedemptionStep("success");
+      toast.success("Resgate sandbox concluído", { description: "A trilha completa foi persistida sem enviar um Pix real." });
+    } catch (error) {
+      await utils.redemptions.summary.invalidate();
+      toast.error(error instanceof Error ? error.message : "Não foi possível confirmar o resgate sandbox.");
+    }
   }
 
   function openPurchase() {
@@ -547,10 +650,10 @@ export default function BitcoinYield() {
       <main className="br-main">
         <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => isAuthenticated ? toast.success("Conta e dados sincronizados com o sandbox.") : startLogin()}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? "Conta conectada" : "Entrar"} <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} onAddMoney={openPurchase} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Compre com reais</h3><p>Você escolhe quanto quer colocar e vê tudo explicado em BRL.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Ative o rendimento</h3><p>A estratégia é aplicada nos bastidores e o resultado aparece em reais.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => navigate("resgate")} onAddMoney={openPurchase} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Compre com reais</h3><p>Você escolhe quanto quer colocar e vê tudo explicado em BRL.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Ative o rendimento</h3><p>A estratégia é aplicada nos bastidores e o resultado aparece em reais.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
           {section === "rendimento" && <YieldPage />}
           {section === "lotes" && <LotsPage purchases={purchases} />}
-          {section === "resgate" && <RedeemPage amount={amount} setAmount={setAmount} onConfirm={() => setRedeemOpen(true)} />}
+          {section === "resgate" && <RedeemPage amount={amount} setAmount={value => { setAmount(value); setRedemptionQuote(null); }} availableBtc={isAuthenticated ? redemptionsQuery.data?.availableBtc ?? 0 : 0.284215} pixDestination={profileQuery.data?.pixAccountMasked ?? ""} quote={redemptionQuote} quoteSeconds={redemptionQuoteSeconds} redemptions={redemptionsQuery.data?.redemptions ?? []} authenticated={isAuthenticated} loading={createRedemptionQuoteMutation.isPending || redemptionsQuery.isLoading} onQuote={() => void prepareRedemption()} />}
           {section === "fiscal" && <FiscalPage />}
           {section === "reservas" && <ReservesPage />}
           {section === "empresas" && <BusinessPage />}
@@ -558,12 +661,18 @@ export default function BitcoinYield() {
         </div>
       </main>
 
-      <Dialog open={redeemOpen} onOpenChange={setRedeemOpen}>
-        <DialogContent className="br-confirm-dialog">
-          <DialogHeader><DialogTitle>Confirmar simulação de resgate</DialogTitle><DialogDescription>Este é um MVP frontend. Nenhum ativo será movimentado e nenhum Pix será enviado.</DialogDescription></DialogHeader>
-          <div className="br-confirm-summary"><div><span>Quantidade</span><b>{amount} BTC</b></div><div><span>Conta de destino</span><b>Banco Inter •••• 4821</b></div><div><span>Valor líquido estimado</span><b>{currency.format((Number(amount.replace(",", ".")) || 0) * btcBrl * 0.994)}</b></div></div>
-          <button className="br-primary full" type="button" onClick={confirmRedeem}>Concluir demonstração <Check size={17} /></button>
-          <button className="br-dialog-cancel" type="button" onClick={() => setRedeemOpen(false)}>Voltar</button>
+      <Dialog open={redeemOpen} onOpenChange={open => { setRedeemOpen(open); if (!open && redemptionStep === "success") { setRedemptionQuote(null); setRedemptionQuoteSeconds(0); setCompletedRedemption(null); } }}>
+        <DialogContent className="br-confirm-dialog br-redemption-dialog">
+          {redemptionStep === "review" && redemptionQuote && <>
+            <div className="br-redemption-progress"><span className="done"><i><Check size={11} /></i> Saldo reservado</span><b /><span className="active"><i>2</i> Sua confirmação</span><b /><span><i>3</i> Pix sandbox</span></div>
+            <DialogHeader><DialogTitle>Revise seu resgate via Pix</DialogTitle><DialogDescription>A cotação e a conta de destino foram verificadas. Nenhum ativo ou Pix real será movimentado neste ambiente.</DialogDescription></DialogHeader>
+            <div className="br-confirm-summary"><div><span>Quantidade reservada</span><b>₿ {redemptionQuote.btcAmount}</b></div><div><span>Conta Pix verificada</span><b>{redemptionQuote.pixDestinationMasked}</b></div><div><span>Valor bruto</span><b>{currency.format(Number(redemptionQuote.grossBrl))}</b></div><div><span>Taxas totais</span><b>− {currency.format(Number(redemptionQuote.protocolFeeBrl) + Number(redemptionQuote.conversionPixFeeBrl))}</b></div><div className="total"><span>Valor líquido no Pix</span><b>{currency.format(Number(redemptionQuote.netBrl))}</b></div></div>
+            <div className={`br-quote-expiry ${redemptionQuoteSeconds === 0 ? "expired" : ""}`}><RefreshCw size={15} /><span>{redemptionQuoteSeconds > 0 ? `Cotação válida por ${redemptionQuoteSeconds} segundos` : "Esta cotação expirou. Gere uma nova para continuar."}</span></div>
+            <label className="br-risk-check"><input type="checkbox" checked={redemptionRiskAccepted} onChange={event => setRedemptionRiskAccepted(event.target.checked)} /><span>Confirmo a conta Pix de destino e entendo que preço, liquidez e prazo podem variar em uma operação real.</span></label>
+            {redemptionQuoteSeconds === 0 ? <button className="br-outline full" type="button" onClick={() => void prepareRedemption()} disabled={createRedemptionQuoteMutation.isPending}><RefreshCw className={createRedemptionQuoteMutation.isPending ? "animate-spin" : ""} size={15} /> Gerar nova cotação</button> : <button className="br-primary full" type="button" onClick={() => void confirmRedemption()} disabled={!redemptionRiskAccepted || confirmRedemptionMutation.isPending}>{confirmRedemptionMutation.isPending ? <RefreshCw className="animate-spin" size={17} /> : <Check size={17} />} Confirmar resgate sandbox</button>}
+            <button className="br-dialog-cancel" type="button" onClick={() => setRedeemOpen(false)}>Voltar sem confirmar</button>
+          </>}
+          {redemptionStep === "success" && completedRedemption && <div className="br-purchase-success"><div className="br-success-icon"><CircleCheckBig /></div><span className="br-eyebrow">RESGATE CONCLUÍDO NO SANDBOX</span><h2>Seu Pix foi simulado.</h2><p>A saída do rendimento, a conversão e o Pix foram registrados com referências independentes e chaves idempotentes.</p><div className="br-success-values"><div><span>Valor líquido</span><b>{currency.format(Number(completedRedemption.netBrl))}</b></div><div><span>Destino</span><b>{redemptionQuote?.pixDestinationMasked}</b></div><div><span>Referência Pix</span><b className="gain">{completedRedemption.pixEndToEndId || "Simulada"}</b></div></div><button className="br-primary full" type="button" onClick={() => { setRedeemOpen(false); setRedemptionQuote(null); setRedemptionQuoteSeconds(0); setCompletedRedemption(null); navigate("resgate"); }}>Ver histórico de resgates <ArrowRight size={17} /></button><button className="br-dialog-cancel" type="button" onClick={() => { setRedeemOpen(false); setRedemptionQuote(null); setRedemptionQuoteSeconds(0); setCompletedRedemption(null); }}>Voltar para a conta</button></div>}
         </DialogContent>
       </Dialog>
       <Dialog open={addMoneyOpen} onOpenChange={setAddMoneyOpen}>

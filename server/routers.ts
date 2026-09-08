@@ -5,6 +5,7 @@ import { publicProcedure, router } from "./_core/trpc";
 import { onboardingRouter } from "./routers/onboarding";
 import { integrationsRouter } from "./routers/integrations";
 import { purchasesRouter } from "./routers/purchases";
+import { redemptionsRouter } from "./routers/redemptions";
 import { treasuryRouter } from "./routers/treasury";
 
 export const appRouter = router({
@@ -20,6 +21,7 @@ export const appRouter = router({
   integrations: integrationsRouter,
   onboarding: onboardingRouter,
   purchases: purchasesRouter,
+  redemptions: redemptionsRouter,
   treasury: treasuryRouter,
 });
 

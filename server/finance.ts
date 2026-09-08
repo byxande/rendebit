@@ -32,6 +32,41 @@ export function calculatePurchaseQuote(
   };
 }
 
+export function calculateRedemptionQuote(
+  btcAmount: number,
+  referenceBtcBrl = SANDBOX_BTC_BRL,
+  protocolFeeBps = 15,
+  conversionPixFeeBps = 45,
+) {
+  if (!Number.isFinite(btcAmount) || btcAmount <= 0) {
+    throw new Error("A quantidade do resgate deve ser maior que zero.");
+  }
+  if (!Number.isFinite(referenceBtcBrl) || referenceBtcBrl <= 0) {
+    throw new Error("A cotação BTC/BRL está indisponível.");
+  }
+  for (const [label, value] of [["Taxa do protocolo", protocolFeeBps], ["Taxa de conversão e Pix", conversionPixFeeBps]] as const) {
+    if (!Number.isInteger(value) || value < 0 || value > 1_000) throw new Error(`${label} fora do intervalo permitido.`);
+  }
+
+  const normalizedBtcAmount = roundAsset(btcAmount);
+  const grossBrl = roundMoney(normalizedBtcAmount * referenceBtcBrl);
+  const protocolFeeBrl = roundMoney(grossBrl * (protocolFeeBps / 10_000));
+  const conversionPixFeeBrl = roundMoney(grossBrl * (conversionPixFeeBps / 10_000));
+  const netBrl = roundMoney(grossBrl - protocolFeeBrl - conversionPixFeeBrl);
+  if (netBrl <= 0) throw new Error("O valor líquido do resgate precisa ser maior que zero.");
+
+  return {
+    btcAmount: normalizedBtcAmount,
+    referenceBtcBrl: roundMoney(referenceBtcBrl),
+    grossBrl,
+    protocolFeeBps,
+    protocolFeeBrl,
+    conversionPixFeeBps,
+    conversionPixFeeBrl,
+    netBrl,
+  };
+}
+
 export function calculateDistributableProfit(input: {
   grossRevenueBrl: number;
   providerCostsBrl: number;

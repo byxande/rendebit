@@ -10,10 +10,12 @@ export interface KycProvider {
 
 export interface PixProvider {
   settleCashIn(input: { purchaseId: number; amountBrl: string; idempotencyKey: string }): Promise<ProviderResult<{ amountBrl: string }>>;
+  settleCashOut(input: { redemptionId: number; amountBrl: string; pixDestinationMasked: string; idempotencyKey: string }): Promise<ProviderResult<{ amountBrl: string; pixDestinationMasked: string }>>;
 }
 
 export interface CustodyProvider {
   buyBitcoin(input: { purchaseId: number; btcAmount: string; idempotencyKey: string }): Promise<ProviderResult<{ btcAmount: string }>>;
+  sellBitcoin(input: { redemptionId: number; btcAmount: string; grossBrl: string; idempotencyKey: string }): Promise<ProviderResult<{ btcAmount: string; grossBrl: string }>>;
 }
 
 export interface YieldProvider {
@@ -28,5 +30,11 @@ export interface YieldProvider {
     amountSats?: string;
     minSharesOut?: string;
     ratio?: string;
+  }>>;
+  exitPosition?(input: { redemptionId: number; btcAmount: string; idempotencyKey: string }): Promise<ProviderResult<{
+    btcAmount: string;
+    route: "stBTC>sBTC>BTC";
+    network?: "sandbox" | "testnet";
+    txid?: string;
   }>>;
 }

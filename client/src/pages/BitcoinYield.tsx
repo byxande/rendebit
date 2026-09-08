@@ -12,6 +12,7 @@ import {
   FileCheck2,
   FileText,
   Fingerprint,
+  HelpCircle,
   Gauge,
   Home,
   Landmark,
@@ -23,6 +24,7 @@ import {
   QrCode,
   ReceiptText,
   RefreshCw,
+  Search,
   ShieldCheck,
   Sparkles,
   TrendingUp,
@@ -41,7 +43,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-type SectionId = "inicio" | "rendimento" | "lotes" | "resgate" | "fiscal" | "reservas" | "empresas";
+type SectionId = "inicio" | "rendimento" | "lotes" | "resgate" | "fiscal" | "reservas" | "empresas" | "ajuda";
 
 type NavItem = {
   id: SectionId;
@@ -57,6 +59,7 @@ const navItems: NavItem[] = [
   { id: "fiscal", label: "Relatório fiscal", icon: FileText },
   { id: "reservas", label: "Segurança", icon: ShieldCheck },
   { id: "empresas", label: "Para empresas", icon: Building2 },
+  { id: "ajuda", label: "Central de ajuda", icon: HelpCircle },
 ];
 
 const wealthPoints = [
@@ -383,7 +386,7 @@ export default function BitcoinYield() {
         <div className="br-profile"><div className="br-avatar">AB</div><div><b>Olá, Alexandre</b><span>Conta protegida <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
         <nav>{navItems.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => navigate(id)} type="button"><Icon size={19} /><span>{label}</span>{id === "empresas" && <em>B2B</em>}</button>)}</nav>
         <div className="br-sidebar-security"><ShieldCheck /><div><b>Ambiente protegido</b><span>Seus dados e posições são demonstrativos.</span></div></div>
-        <div className="br-sidebar-footer"><button type="button" onClick={() => toast.info("Central de ajuda demonstrativa")}>Central de ajuda</button><span>v0.1 MVP</span></div>
+        <div className="br-sidebar-footer"><button type="button" onClick={() => toast.success("Atendimento demonstrativo iniciado")}>Atendimento</button><span>v0.1 MVP</span></div>
       </aside>
 
       <main className="br-main">
@@ -396,6 +399,7 @@ export default function BitcoinYield() {
           {section === "fiscal" && <FiscalPage />}
           {section === "reservas" && <ReservesPage />}
           {section === "empresas" && <BusinessPage />}
+          {section === "ajuda" && <HelpPage />}
         </div>
       </main>
 
@@ -409,4 +413,92 @@ export default function BitcoinYield() {
       </Dialog>
     </div>
   );
+}
+
+function HelpPage() {
+  const faqs = [
+    {
+      category: "Primeiros passos",
+      question: "O que é a Conta Nexo?",
+      answer: "É uma conta simples para acompanhar uma posição em Bitcoin, entender quanto ela vale em reais e solicitar resgates via Pix. Você não precisa conhecer termos técnicos para começar.",
+    },
+    {
+      category: "Primeiros passos",
+      question: "Preciso entender de carteiras ou contratos?",
+      answer: "Não para usar a experiência principal. A Conta Nexo esconde a complexidade e mostra o que importa: seu saldo, seu ganho, os riscos e o valor líquido de um eventual resgate. A área Segurança permite consultar os detalhes quando você quiser.",
+    },
+    {
+      category: "Segurança",
+      question: "Meu dinheiro está seguro?",
+      answer: "Segurança não significa ausência de risco. O plano do produto é manter o patrimônio dos clientes separado do dinheiro da operação, apresentar o lastro de forma verificável e usar parceiros especializados. Mesmo assim, o valor do Bitcoin pode subir ou cair, e a estrutura precisa ser validada antes de operar com dinheiro real.",
+    },
+    {
+      category: "Segurança",
+      question: "O meu dinheiro fica misturado com o dinheiro da empresa?",
+      answer: "Não deveria. A proposta é usar custódia segregada: o patrimônio dos clientes fica separado das despesas e da liquidez operacional da empresa. No produto real, essa separação precisa estar documentada em contratos, controles e endereços verificáveis.",
+    },
+    {
+      category: "Resgates",
+      question: "Posso resgatar quando quiser?",
+      answer: "Você pode solicitar um resgate quando quiser, mas a conclusão depende de liquidez, cotação, parceiro de conversão, rede e controles de segurança. Por isso, o produto não deve prometer Pix instantâneo em qualquer situação. Antes da confirmação, você verá o valor líquido estimado e as taxas.",
+    },
+    {
+      category: "Resgates",
+      question: "Quanto vou receber no Pix?",
+      answer: "O valor depende da quantidade resgatada, do preço do Bitcoin no momento, das taxas do protocolo, da conversão e do parceiro de pagamento. A tela de resgate mostra o valor bruto, cada desconto e o valor líquido antes da confirmação.",
+    },
+    {
+      category: "Rendimento",
+      question: "Meu rendimento é garantido?",
+      answer: "Não. O rendimento é variável e pode mudar conforme o protocolo, a liquidez e as condições do mercado. Além disso, a valorização do Bitcoin em reais é diferente do rendimento gerado pelo protocolo. Nunca use um cenário demonstrativo como promessa de resultado.",
+    },
+    {
+      category: "Rendimento",
+      question: "Por que meu saldo pode cair mesmo com rendimento?",
+      answer: "Porque o rendimento do protocolo e o preço do Bitcoin são coisas diferentes. O protocolo pode gerar uma evolução positiva enquanto o Bitcoin perde valor em reais. O painel separa esses efeitos para tornar a leitura mais honesta.",
+    },
+    {
+      category: "Impostos",
+      question: "A Nexo faz minha declaração de imposto?",
+      answer: "A proposta Premium gera um relatório auxiliar com posição, custo por aporte, resgates e taxas. Ele ajuda você e seu contador, mas não substitui orientação tributária nem garante a classificação fiscal correta.",
+    },
+    {
+      category: "Impostos",
+      question: "Por que vocês pedem meus dados?",
+      answer: "Uma operação real pode exigir identificação, residência, conta de mesma titularidade e controles contra fraude e lavagem de dinheiro. O MVP usa dados demonstrativos e não realiza movimentações reais.",
+    },
+  ];
+  const categories = ["Todas", ...Array.from(new Set(faqs.map((faq) => faq.category)))];
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("Todas");
+  const [open, setOpen] = useState<string | null>(faqs[2].question);
+  const normalized = query.trim().toLowerCase();
+  const filtered = faqs.filter((faq) => {
+    const matchesCategory = category === "Todas" || faq.category === category;
+    const matchesQuery = !normalized || `${faq.question} ${faq.answer} ${faq.category}`.toLowerCase().includes(normalized);
+    return matchesCategory && matchesQuery;
+  });
+
+  return (
+    <div className="br-stack">
+      <section className="br-help-hero">
+        <div className="br-help-hero-copy">
+          <span className="br-eyebrow light">CENTRAL DE AJUDA</span>
+          <h1>Respostas claras para decisões tranquilas.</h1>
+          <p>Não encontrou o que procura? Comece por uma pergunta simples. A gente explica o produto sem esconder riscos ou usar palavras difíceis.</p>
+          <label className="br-help-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Busque uma dúvida, como “resgate”" aria-label="Buscar na central de ajuda" />{query && <button type="button" onClick={() => setQuery("")} aria-label="Limpar busca"><X size={15} /></button>}</label>
+        </div>
+        <div className="br-help-orbit"><HelpCircle size={45} /><span>Estamos aqui<br />para explicar.</span></div>
+      </section>
+      <div className="br-help-layout">
+        <aside className="br-help-categories"><span className="br-eyebrow">NAVEGAR POR TEMA</span>{categories.map((item) => <button className={category === item ? "active" : ""} type="button" key={item} onClick={() => setCategory(item)}>{item}<span>{item === "Todas" ? faqs.length : faqs.filter((faq) => faq.category === item).length}</span></button>)}</aside>
+        <section className="br-help-list"><div className="br-help-list-head"><div><span className="br-eyebrow">PERGUNTAS FREQUENTES</span><h2>{filtered.length} {filtered.length === 1 ? "resposta encontrada" : "respostas encontradas"}</h2></div><span className="br-help-honesty"><ShieldCheck size={15} /> Sem promessa escondida</span></div>{filtered.length === 0 ? <div className="br-panel br-help-empty"><HelpCircle /><h3>Não encontramos essa resposta ainda.</h3><p>Tente usar palavras como Pix, segurança, rendimento ou impostos.</p><button type="button" className="br-outline" onClick={() => { setQuery(""); setCategory("Todas"); }}>Ver todas as perguntas</button></div> : <div className="br-faq-stack">{filtered.map((faq) => { const isOpen = open === faq.question; return <article className={`br-faq ${isOpen ? "open" : ""}`} key={faq.question}><button type="button" className="br-faq-trigger" onClick={() => setOpen(isOpen ? null : faq.question)}><span><small>{faq.category}</small><b>{faq.question}</b></span><span className="br-faq-plus">{isOpen ? "−" : "+"}</span></button>{isOpen && <div className="br-faq-answer"><p>{faq.answer}</p>{faq.question === "Meu dinheiro está seguro?" && <button type="button" className="br-text-action" onClick={() => toast.info("A área Segurança mostra o fluxo de custódia e a prova pública das reservas.")}>Ver como a segurança funciona <ArrowRight size={15} /></button>}</div>}</article>; })}</div>}</section>
+      </div>
+      <section className="br-panel br-help-contact"><div className="br-help-contact-icon"><MessageCircleIcon /></div><div><span className="br-eyebrow">AINDA COM DÚVIDA?</span><h2>Fale com uma pessoa, não com um robô.</h2><p>O atendimento pode orientar sobre o produto, mas nunca vai prometer retorno ou pedir sua senha.</p></div><button className="br-primary" type="button" onClick={() => toast.success("Atendimento demonstrativo iniciado")}>Iniciar atendimento <ArrowRight size={16} /></button></section>
+    </div>
+  );
+}
+
+function MessageCircleIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 0 1 4 11.5 8.5 8.5 0 1 1 21 11.5Z" /><path d="M8 12h.01M12 12h.01M16 12h.01" /></svg>;
 }

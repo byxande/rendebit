@@ -754,3 +754,10 @@ h1 em { color: #caff4a; font-style: normal; }
 .br-add-money-steps span { display: flex; align-items: center; gap: 5px; color: #7b8c92; font-size: 8px; line-height: 1.35; }
 .br-add-money-steps i { width: 18px; height: 18px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; color: #087756; background: #dff8ee; font-size: 8px; font-style: normal; font-weight: 700; }
 @media (max-width: 460px) { .br-add-money-steps { grid-template-columns: 1fr; gap: 7px; } }
+
+.br-how-it-works { margin: 0 0 17px; border-top: 1px solid #e4eeeb; color: #668079; font-size: 9px; }
+.br-how-it-works summary { padding: 11px 0 5px; color: #087756; cursor: pointer; font-weight: 700; list-style: none; }
+.br-how-it-works summary::-webkit-details-marker { display: none; }
+.br-how-it-works summary::after { content: "+"; float: right; font-size: 14px; font-weight: 400; }
+.br-how-it-works[open] summary::after { content: "−"; }
+.br-how-it-works p { margin: 3px 0 4px; line-height: 1.55; }

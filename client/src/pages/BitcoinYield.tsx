@@ -164,7 +164,7 @@ function YieldSummary({ onRedeem, onAddMoney }: { onRedeem: () => void; onAddMon
             <span className="br-positive">+5,63%</span>
           </div>
           <div className="br-balance-actions">
-            <button type="button" className="br-primary light" onClick={onAddMoney}>Adicionar dinheiro <ArrowRight size={17} /></button>
+            <button type="button" className="br-primary light" onClick={onAddMoney}>Comprar com reais <ArrowRight size={17} /></button>
             <button type="button" className="br-secondary light" onClick={onRedeem}>Resgatar via Pix</button>
           </div>
         </div>
@@ -395,7 +395,7 @@ export default function BitcoinYield() {
       <main className="br-main">
         <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => toast.info("Sua conta está sincronizada. Os detalhes técnicos ficam disponíveis em Segurança e transparência.")}><span className="br-account-status"><i /></span> Conta Nexo <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} onAddMoney={() => setAddMoneyOpen(true)} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Adicione dinheiro</h3><p>Você escolhe quanto quer colocar, com tudo explicado em reais.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe seu rendimento em BRL</h3><p>O saldo evolui e você vê o resultado em reais, sem fazer operações.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} onAddMoney={() => setAddMoneyOpen(true)} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Compre com reais</h3><p>Você escolhe quanto quer colocar e vê tudo explicado em BRL.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Ative o rendimento</h3><p>A estratégia é aplicada nos bastidores e o resultado aparece em reais.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
           {section === "rendimento" && <YieldPage />}
           {section === "lotes" && <LotsPage />}
           {section === "resgate" && <RedeemPage amount={amount} setAmount={setAmount} onConfirm={() => setRedeemOpen(true)} />}
@@ -416,12 +416,13 @@ export default function BitcoinYield() {
       </Dialog>
       <Dialog open={addMoneyOpen} onOpenChange={setAddMoneyOpen}>
         <DialogContent className="br-confirm-dialog br-add-money-dialog">
-          <DialogHeader><DialogTitle>Adicionar dinheiro</DialogTitle><DialogDescription>Escolha um valor em reais para simular seu primeiro aporte. Nesta versão, nada será movimentado.</DialogDescription></DialogHeader>
-          <div className="br-add-money-intro"><Banknote size={18} /><div><b>Você acompanha o rendimento em BRL</b><span>O resultado pode variar. Não é juro fixo nem promessa de retorno.</span></div></div>
-          <label className="br-amount-label" htmlFor="add-money-amount">Quanto você quer adicionar?</label>
+          <DialogHeader><DialogTitle>Comprar Bitcoin com reais</DialogTitle><DialogDescription>Escolha um valor para simular a compra e ativar o rendimento. Nesta versão, nada será movimentado.</DialogDescription></DialogHeader>
+          <div className="br-add-money-intro"><Banknote size={18} /><div><b>Você não precisa ter Bitcoin para começar</b><span>Compre em reais e ative o acompanhamento do rendimento em BRL. O resultado pode variar; não é juro fixo nem promessa de retorno.</span></div></div>
+          <label className="br-amount-label" htmlFor="add-money-amount">Quanto você quer investir em Bitcoin?</label>
           <div className="br-amount-field"><span>R$</span><input id="add-money-amount" inputMode="decimal" value={addAmount} onChange={(event) => setAddAmount(event.target.value)} aria-label="Valor do primeiro aporte em reais" /></div>
-          <div className="br-add-money-steps"><span><i>1</i> Escolha em BRL</span><span><i>2</i> Veja a cotação</span><span><i>3</i> Acompanhe o resultado</span></div>
-          <button className="br-primary full" type="button" onClick={() => { setAddMoneyOpen(false); toast.success("Aporte demonstrativo preparado", { description: `Valor escolhido: R$ ${addAmount}. Nenhuma transação real foi realizada.` }); }}>Continuar <ArrowRight size={17} /></button>
+          <div className="br-add-money-steps"><span><i>1</i> Compre em BRL</span><span><i>2</i> Ative o rendimento</span><span><i>3</i> Acompanhe em reais</span></div>
+          <details className="br-how-it-works"><summary>Como funciona por trás?</summary><p>Nos bastidores, a posição pode passar por uma conversão para os ativos de liquidez do protocolo e então ser aplicada na estratégia de rendimento. Você acompanha cotação, taxas e saldo; os detalhes verificáveis ficam em Segurança.</p></details>
+          <button className="br-primary full" type="button" onClick={() => { setAddMoneyOpen(false); toast.success("Compra e rendimento demonstrativos preparados", { description: `Valor escolhido: R$ ${addAmount}. Nenhuma transação real foi realizada.` }); }}>Comprar e ativar rendimento <ArrowRight size={17} /></button>
           <button className="br-dialog-cancel" type="button" onClick={() => setAddMoneyOpen(false)}>Voltar</button>
         </DialogContent>
       </Dialog>
@@ -440,6 +441,11 @@ function HelpPage() {
       category: "Primeiros passos",
       question: "Preciso entender de carteiras ou contratos?",
       answer: "Não para usar a experiência principal. A Conta Nexo esconde a complexidade e mostra o que importa: seu saldo, seu ganho, os riscos e o valor líquido de um eventual resgate. A área Segurança permite consultar os detalhes quando você quiser.",
+    },
+    {
+      category: "Primeiros passos",
+      question: "Posso começar sem ter Bitcoin?",
+      answer: "Sim. A proposta é permitir uma compra em reais (BRL) dentro da sua Conta Nexo e, depois da cotação, ativar o acompanhamento do rendimento. Antes de uma operação real, você deverá ver preço, taxas, prazo, riscos e as informações de custódia.",
     },
     {
       category: "Segurança",

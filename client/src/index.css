@@ -382,8 +382,6 @@ h1 em { color: #caff4a; font-style: normal; }
 .br-top-actions { display: flex; align-items: center; gap: 10px; }
 .br-demo-pill { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #d4e0dc; border-radius: 999px; color: #71848d; background: rgba(255,255,255,.7); font-size: 9px; }
 .br-demo-pill svg { color: var(--br-mint); }
-.br-wallet-button { display: flex; align-items: center; gap: 8px; padding: 8px 11px; border: 1px solid #d6e2df; border-radius: 10px; color: #314a55; background: #fff; font-family: "IBM Plex Mono", monospace; font-size: 9px; box-shadow: 0 4px 14px rgba(7,29,43,.04); }
-.br-wallet-button i { width: 6px; height: 6px; border-radius: 50%; background: var(--br-mint); box-shadow: 0 0 0 3px rgba(18,200,144,.12); }
 .br-content { max-width: 1340px; margin: 0 auto; padding: 40px 4.2vw 74px; }
 .br-stack { display: flex; flex-direction: column; gap: 24px; }
 .br-welcome { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 8px 0 2px; }
@@ -652,7 +650,6 @@ h1 em { color: #caff4a; font-style: normal; }
   .br-business-hero { padding: 25px 21px; }
   .br-business-actions { flex-direction: column; }
   .br-partner-types { flex-wrap: wrap; }
-  .br-wallet-button { max-width: 164px; overflow: hidden; white-space: nowrap; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .br-balance-card, .br-yield-card, .br-wealth-card, .br-feature-card, .br-page-hero { animation: br-rise 420ms cubic-bezier(.23,1,.32,1) both; }
@@ -666,3 +663,9 @@ h1 em { color: #caff4a; font-style: normal; }
 .br-confirm-dialog [data-slot="dialog-title"] { color: #071d2b !important; opacity: 1 !important; }
 .dark .br-confirm-dialog [data-slot="dialog-description"],
 .br-confirm-dialog [data-slot="dialog-description"] { color: #61747e !important; }
+
+.br-account-button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 11px; border: 1px solid #d6e2df; border-radius: 10px; color: #314a55; background: #fff; font-size: 9px; box-shadow: 0 4px 14px rgba(7,29,43,.04); }
+.br-account-button:hover { border-color: #9bcfbe; color: #087756; }
+.br-account-status { width: 7px; height: 7px; display: inline-grid; place-items: center; border-radius: 50%; background: #dff8ee; }
+.br-account-status i { width: 4px; height: 4px; border-radius: 50%; background: var(--br-mint); }
+@media (max-width: 570px) { .br-account-button { padding: 8px; } .br-account-button svg { display: none; } }

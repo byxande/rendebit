@@ -52,10 +52,10 @@ type NavItem = {
 const navItems: NavItem[] = [
   { id: "inicio", label: "Visão geral", icon: Home },
   { id: "rendimento", label: "Meu rendimento", icon: TrendingUp },
-  { id: "lotes", label: "Meus lotes", icon: Layers3 },
+  { id: "lotes", label: "Meus aportes", icon: Layers3 },
   { id: "resgate", label: "Resgatar via Pix", icon: QrCode },
   { id: "fiscal", label: "Relatório fiscal", icon: FileText },
-  { id: "reservas", label: "Reservas on-chain", icon: ShieldCheck },
+  { id: "reservas", label: "Segurança", icon: ShieldCheck },
   { id: "empresas", label: "Para empresas", icon: Building2 },
 ];
 
@@ -151,7 +151,7 @@ function YieldSummary({ onRedeem }: { onRedeem: () => void }) {
             <div>
               <span className="br-eyebrow light">SEU SALDO EM BITCOIN</span>
               <div className="br-btc-value"><span>₿</span> 0,28421500</div>
-              <p>stBTC em rendimento automático</p>
+              <p>Bitcoin trabalhando por você</p>
             </div>
             <div className="br-orbit"><Bitcoin size={28} /><i /><i /></div>
           </div>
@@ -160,20 +160,20 @@ function YieldSummary({ onRedeem }: { onRedeem: () => void }) {
             <span className="br-positive">+5,63%</span>
           </div>
           <div className="br-balance-actions">
-            <button type="button" className="br-primary light" onClick={() => toast.info("Fluxo de aporte demonstrativo")}>Aumentar posição <ArrowRight size={17} /></button>
+            <button type="button" className="br-primary light" onClick={() => toast.info("Fluxo de aporte demonstrativo")}>Adicionar dinheiro <ArrowRight size={17} /></button>
             <button type="button" className="br-secondary light" onClick={onRedeem}>Resgatar via Pix</button>
           </div>
         </div>
 
         <div className="br-yield-card br-panel">
-          <div className="br-card-headline"><span>Rendimento acumulado</span><span className="br-live"><i /> ATUALIZADO</span></div>
+          <div className="br-card-headline"><span>Seu ganho até agora</span><span className="br-live"><i /> ATUALIZADO</span></div>
           <strong className="br-yield-number">+R$ 6.514,00</strong>
-          <span className="br-yield-btc">+0,015438 sBTC</span>
+          <span className="br-yield-btc">+5,63% no período</span>
           <div className="br-divider" />
-          <div className="br-kv"><span>Taxa stBTC/sBTC</span><b>1,026840</b></div>
+          <div className="br-kv"><span>Rendimento do Bitcoin</span><b>+2,68%</b></div>
           <div className="br-kv"><span>Preço BTC/BRL</span><b>R$ 421.930,00</b></div>
-          <div className="br-kv"><span>Desde o primeiro lote</span><b>90 dias</b></div>
-          <button type="button" className="br-text-action" onClick={() => toast.info("Detalhamento disponível na aba Meu rendimento")}>Entender o cálculo <ArrowRight size={15} /></button>
+          <div className="br-kv"><span>Desde o seu primeiro aporte</span><b>90 dias</b></div>
+          <button type="button" className="br-text-action" onClick={() => toast.info("Aqui você verá o detalhamento do seu ganho, sem precisar entender a tecnologia por trás.")}>Como esse valor é calculado <ArrowRight size={15} /></button>
         </div>
       </section>
 
@@ -200,12 +200,12 @@ function YieldSummary({ onRedeem }: { onRedeem: () => void }) {
 
 function InnovationGrid({ setSection }: { setSection: (section: SectionId) => void }) {
   const items = [
-    { icon: Bitcoin, title: "Rendimento em Bitcoin", text: "O valor cresce pela taxa stBTC/sBTC, sem pagamentos artificiais em tokens de incentivo.", tone: "lime" },
+    { icon: Bitcoin, title: "Rendimento em Bitcoin", text: "O valor do seu Bitcoin evolui dentro do protocolo, sem você precisar operar nada.", tone: "lime" },
     { icon: QrCode, title: "Liquidação via Pix", text: "Cotação transparente antes da confirmação, com destino para conta de mesma titularidade.", tone: "cyan" },
-    { icon: ReceiptText, title: "Contabilidade por lote", text: "Cada entrada preserva custo, taxa inicial, rendimento realizado e histórico auditável.", tone: "violet" },
-    { icon: FileCheck2, title: "Relatório fiscal brasileiro", text: "Resumo em reais, eventos tributáveis e arquivo pronto para compartilhar com o contador.", tone: "orange" },
-    { icon: Network, title: "Prova on-chain", text: "Endereços, contratos e lastro apresentados em uma camada de transparência verificável.", tone: "green" },
-    { icon: LockKeyhole, title: "Custódia segregada", text: "Arquitetura visual que separa patrimônio do cliente, liquidez operacional e parceiro BRL.", tone: "blue" },
+    { icon: ReceiptText, title: "Histórico de aportes", text: "Veja quanto colocou, quando colocou e como cada aporte evoluiu em reais.", tone: "violet" },
+    { icon: FileCheck2, title: "Relatório fiscal brasileiro", text: "Resumo em reais pronto para compartilhar com o seu contador.", tone: "orange" },
+    { icon: Network, title: "Prova pública das reservas", text: "Uma forma simples de conferir que existe lastro por trás da operação.", tone: "green" },
+    { icon: LockKeyhole, title: "Seu patrimônio separado", text: "O dinheiro dos clientes fica separado da operação da empresa.", tone: "blue" },
   ];
   return (
     <section className="br-innovation">
@@ -230,12 +230,12 @@ function YieldPage() {
     <div className="br-stack">
       <section className="br-page-hero compact"><div><span className="br-eyebrow">MEU RENDIMENTO</span><h1>Rendimento que cresce em Bitcoin.</h1><p>Veja de onde vem a evolução da sua posição, sem confundir valorização do BTC com rendimento do protocolo.</p></div><div className="br-big-icon"><TrendingUp /></div></section>
       <div className="br-metric-grid">
-        <div className="br-panel br-metric"><small>Rendimento stBTC</small><strong>+2,684%</strong><span>pela taxa stBTC/sBTC</span></div>
-        <div className="br-panel br-metric"><small>Variação do BTC/BRL</small><strong>+2,87%</strong><span>desde o primeiro lote</span></div>
+        <div className="br-panel br-metric"><small>Crescimento do saldo</small><strong>+2,684%</strong><span>gerado pelo protocolo</span></div>
+        <div className="br-panel br-metric"><small>Variação do Bitcoin</small><strong>+2,87%</strong><span>desde o primeiro aporte</span></div>
         <div className="br-panel br-metric"><small>Retorno combinado</small><strong>+5,63%</strong><span>R$ 6.514,00</span></div>
       </div>
       <section className="br-panel br-formula-card">
-        <div><span className="br-eyebrow">FÓRMULA TRANSPARENTE</span><h2>Como seu saldo é calculado</h2></div>
+        <div><span className="br-eyebrow">TRANSPARÊNCIA SEM COMPLICAÇÃO</span><h2>Como chegamos ao seu valor</h2></div>
         <div className="br-formula"><span>0,284215 stBTC</span><i>×</i><span>1,026840 sBTC</span><i>×</i><span>R$ 421.930</span><i>=</i><b>R$ 122.314</b></div>
         <p>Saldo stBTC × taxa de conversão do protocolo × preço de execução BTC/BRL. Taxas e slippage são exibidos separadamente no resgate.</p>
       </section>
@@ -380,16 +380,16 @@ export default function BitcoinYield() {
       </header>
       <aside className={`br-sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>NEXO</b><small>BITCOIN EM REAIS</small></div></div>
-        <div className="br-profile"><div className="br-avatar">AB</div><div><b>Olá, Alexandre</b><span>Conta verificada <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
+        <div className="br-profile"><div className="br-avatar">AB</div><div><b>Olá, Alexandre</b><span>Conta protegida <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
         <nav>{navItems.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => navigate(id)} type="button"><Icon size={19} /><span>{label}</span>{id === "empresas" && <em>B2B</em>}</button>)}</nav>
         <div className="br-sidebar-security"><ShieldCheck /><div><b>Ambiente protegido</b><span>Seus dados e posições são demonstrativos.</span></div></div>
         <div className="br-sidebar-footer"><button type="button" onClick={() => toast.info("Central de ajuda demonstrativa")}>Central de ajuda</button><span>v0.1 MVP</span></div>
       </aside>
 
       <main className="br-main">
-        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-wallet-button" type="button" onClick={() => toast.success("Carteira demo conectada")}><WalletCards size={17} /> SP7CD8...EPAPR <i /></button></div></div>
+        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => toast.info("Sua conta está sincronizada. Os detalhes técnicos ficam disponíveis em Segurança e transparência.")}><span className="br-account-status"><i /></span> Conta Nexo <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seus reais disponíveis.</em></h1><p>Rendimento nativo em Bitcoin, transparência on-chain e resgate em BRL — em uma experiência feita para o Brasil.</p></div><div className="br-trust-row"><span><BadgeCheck /> Residência verificada</span><span><ShieldCheck /> Custódia segregada</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Da sua carteira ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Deposite BTC ou sBTC</h3><p>A posição é convertida em stBTC na taxa vigente.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acumule em Bitcoin</h3><p>As recompensas aumentam a taxa de conversão do token.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Veja a cotação líquida e confirme somente se concordar.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seus reais disponíveis.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver seu ganho em reais e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Adicione dinheiro</h3><p>Você escolhe quanto quer colocar, com tudo explicado em reais.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe seu ganho</h3><p>O saldo evolui e você vê o resultado sem fazer operações.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
           {section === "rendimento" && <YieldPage />}
           {section === "lotes" && <LotsPage />}
           {section === "resgate" && <RedeemPage amount={amount} setAmount={setAmount} onConfirm={() => setRedeemOpen(true)} />}

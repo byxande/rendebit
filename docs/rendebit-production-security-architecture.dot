@@ -1,0 +1,71 @@
+digraph RendeBitSecurity {
+  graph [rankdir=LR, bgcolor="#ffffff", pad="0.25", nodesep="0.32", ranksep="0.60", fontname="DejaVu Sans", label="Arquitetura de segurança de produção — RendeBit", labelloc="t", fontsize=22, fontcolor="#153F35"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=10, margin="0.16,0.10", color="#4C7467", fillcolor="#FFFFFF", fontcolor="#153F35"];
+  edge [fontname="DejaVu Sans", fontsize=8, color="#708D84", fontcolor="#4C7467", arrowsize=0.7];
+
+  subgraph cluster_customer {
+    label="Cliente"; color="#A9BEB6"; fillcolor="#F4F8F6"; style="rounded,filled"; fontcolor="#153F35";
+    auth [label="Passkey / MFA\nSessão curta + step-up"];
+  }
+
+  subgraph cluster_edge {
+    label="Borda protegida"; color="#A9BEB6"; fillcolor="#F4F8F6"; style="rounded,filled"; fontcolor="#153F35";
+    waf [label="WAF + rate limits\nTLS 1.3 + HSTS"];
+    api [label="API tRPC\nDeny-by-default + ABAC", fillcolor="#153F35", color="#153F35", fontcolor="#FFFFFF"];
+  }
+
+  subgraph cluster_core {
+    label="Núcleo RendeBit"; color="#A9BEB6"; fillcolor="#F4F8F6"; style="rounded,filled"; fontcolor="#153F35";
+    risk [label="KYC / PLD-FT / fraude\nlimites + revisão manual"];
+    saga [label="Orquestrador financeiro\nstate machine + idempotência", fillcolor="#153F35", color="#153F35", fontcolor="#FFFFFF"];
+    ledger [label="Ledger de dupla entrada\nappend-only + journal batches", fillcolor="#153F35", color="#153F35", fontcolor="#FFFFFF"];
+    recon [label="Reconciliação contínua\nPix ↔ custódia ↔ chain ↔ ledger", fillcolor="#153F35", color="#153F35", fontcolor="#FFFFFF"];
+  }
+
+  subgraph cluster_providers {
+    label="Parceiros regulados"; color="#D6AE63"; fillcolor="#FFF7E8"; style="rounded,filled"; fontcolor="#735019";
+    pix [label="PSP / Pix\nmTLS + webhook verificado", fillcolor="#FFF7E8", color="#C98A26"];
+    custody [label="Compra e custódia BTC\ncontas segregadas", fillcolor="#FFF7E8", color="#C98A26"];
+    kyc [label="KYC + titularidade\nCPF / PEP / sanções", fillcolor="#FFF7E8", color="#C98A26"];
+  }
+
+  subgraph cluster_chain {
+    label="Bitcoin e Stacks"; color="#D6AE63"; fillcolor="#FFF7E8"; style="rounded,filled"; fontcolor="#735019";
+    signer [label="HSM / MPC\npolítica + dupla aprovação", fillcolor="#153F35", color="#153F35", fontcolor="#FFFFFF"];
+    sbtc [label="sBTC bridge\nfinalidade + reconciliação", fillcolor="#FFF7E8", color="#C98A26"];
+    stbtc [label="stBTC contracts\nallowlist + bytecode hash\npostconditions deny", fillcolor="#FFF7E8", color="#C98A26"];
+  }
+
+  subgraph cluster_ops {
+    label="Controles transversais"; color="#A9BEB6"; fillcolor="#F4F8F6"; style="rounded,filled"; fontcolor="#153F35";
+    secrets [label="KMS / secrets\nrotação + menor privilégio"];
+    logs [label="SIEM + logs imutáveis\ncorrelation IDs"];
+    dr [label="Backup/PITR + DR\nRTO/RPO testados"];
+    kill [label="Kill switches\npor fluxo, provedor e rede", fillcolor="#153F35", color="#153F35", fontcolor="#FFFFFF"];
+  }
+
+  auth -> waf [label="OAuth/OIDC + PKCE"];
+  waf -> api;
+  api -> risk;
+  risk -> saga [label="aprovado"];
+  kyc -> risk [style=dashed];
+  saga -> pix [label="1. liquidar BRL"];
+  pix -> saga [label="SETTLED autoritativo"];
+  saga -> custody [label="2. comprar BTC"];
+  custody -> saga [label="BTC confirmado"];
+  saga -> signer [label="3. política de assinatura"];
+  signer -> sbtc [label="BTC → sBTC"];
+  sbtc -> stbtc [label="sBTC → stBTC"];
+  stbtc -> ledger [label="4. recibo + finalidade"];
+  ledger -> recon;
+  pix -> recon [style=dashed];
+  custody -> recon [style=dashed];
+  sbtc -> recon [style=dashed];
+  stbtc -> recon [style=dashed];
+  secrets -> api [style=dashed];
+  secrets -> signer [style=dashed];
+  logs -> saga [style=dashed];
+  logs -> recon [style=dashed];
+  dr -> ledger [style=dashed];
+  kill -> saga [label="fail closed", color="#A33D32", fontcolor="#A33D32"];
+}

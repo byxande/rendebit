@@ -761,3 +761,70 @@ h1 em { color: #caff4a; font-style: normal; }
 .br-how-it-works summary::after { content: "+"; float: right; font-size: 14px; font-weight: 400; }
 .br-how-it-works[open] summary::after { content: "−"; }
 .br-how-it-works p { margin: 3px 0 4px; line-height: 1.55; }
+
+/* Guided BRL purchase flow */
+.br-add-money-dialog { max-width: 600px; max-height: min(92vh, 820px); overflow-y: auto; }
+.br-purchase-progress { display: grid; grid-template-columns: auto 1fr auto 1fr auto; align-items: center; gap: 7px; margin: 1px 0 19px; }
+.br-purchase-progress > span { display: inline-flex; align-items: center; gap: 5px; color: #91a19f; font-size: 8px; font-weight: 700; }
+.br-purchase-progress > span i { width: 21px; height: 21px; display: grid; place-items: center; border-radius: 50%; color: #849691; background: #edf3f1; font-style: normal; }
+.br-purchase-progress > span.active { color: #087756; }
+.br-purchase-progress > span.active i { color: #062b2b; background: var(--br-lime); box-shadow: 0 0 0 4px rgba(202,255,61,.16); }
+.br-purchase-progress > span.done { color: #0a9871; }
+.br-purchase-progress > span.done i { color: #fff; background: #0aaf7e; }
+.br-purchase-progress > b { height: 1px; background: #dfe9e6; }
+.br-eligibility-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin: 17px 0 15px; }
+.br-eligibility-grid label { display: flex; flex-direction: column; gap: 6px; color: #627780; font-size: 8px; font-weight: 700; }
+.br-eligibility-grid input,.br-eligibility-grid select { min-width: 0; height: 41px; padding: 0 11px; border: 1px solid #d4e3de; border-radius: 9px; outline: 0; color: #203b45; background: #fbfefd; font-size: 10px; }
+.br-eligibility-grid input:focus,.br-eligibility-grid select:focus { border-color: #0aaf7e; box-shadow: 0 0 0 3px rgba(10,175,126,.08); }
+.br-check-stack { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+.br-check-stack label,.br-risk-check { display: flex; align-items: flex-start; gap: 9px; padding: 10px; border: 1px solid #dce8e4; border-radius: 10px; color: #5f747d; background: #fbfdfc; cursor: pointer; }
+.br-check-stack input,.br-risk-check input { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; accent-color: #0aaf7e; }
+.br-check-stack span { display: flex; flex-direction: column; gap: 2px; }
+.br-check-stack b { color: #29434c; font-size: 9px; }
+.br-check-stack small { color: #84969c; font-size: 8px; line-height: 1.4; }
+.br-dialog-footnote { display: flex; align-items: center; justify-content: center; gap: 5px; margin: 10px 0 0; color: #8a9b9f; font-size: 8px; line-height: 1.4; text-align: center; }
+.br-buy-chips { display: flex; gap: 6px; margin: 8px 0 13px; }
+.br-buy-chips button { padding: 6px 9px; border: 1px solid #d6e5e0; border-radius: 7px; color: #557079; background: #fff; font-size: 8px; }
+.br-buy-chips button:hover { border-color: #88cbb5; color: #087756; background: #f2fbf7; }
+.br-buy-quote { padding: 13px; border: 1px solid #d8e7e2; border-radius: 12px; background: #f9fcfb; }
+.br-buy-quote-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 9px; border-bottom: 1px solid #e5eeeb; }
+.br-buy-quote-head span { display: inline-flex; align-items: center; gap: 6px; color: #557079; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
+.br-buy-quote-head span i { width: 6px; height: 6px; border-radius: 50%; background: #0fd49b; box-shadow: 0 0 0 3px rgba(15,212,155,.12); }
+.br-buy-quote-head > b { color: #087756; font-family: "IBM Plex Mono", monospace; font-size: 9px; }
+.br-buy-quote-head > b.expired { color: #c5553c; }
+.br-buy-quote .br-kv { padding: 7px 0; }
+.br-buy-total { display: flex; flex-direction: column; gap: 3px; margin-top: 7px; padding: 12px; border-radius: 9px; color: #0d7860; background: #e7f9f2; }
+.br-buy-total span { font-size: 8px; }
+.br-buy-total strong { color: #073f36; font-family: "Space Grotesk", sans-serif; font-size: 22px; letter-spacing: -.03em; }
+.br-buy-total small { color: #6c8e85; font-size: 8px; }
+.br-risk-check { margin: 12px 0 4px; font-size: 8px; line-height: 1.5; }
+.br-primary:disabled { cursor: not-allowed; opacity: .42; transform: none; }
+.br-purchase-success { padding: 10px 0 2px; text-align: center; }
+.br-success-icon { width: 66px; height: 66px; display: grid; place-items: center; margin: 2px auto 14px; border-radius: 50%; color: #087756; background: #dff8ee; box-shadow: 0 0 0 10px rgba(10,175,126,.06); }
+.br-success-icon svg { width: 34px; height: 34px; }
+.br-purchase-success h2 { margin: 7px 0; color: #102a38; font-family: "Space Grotesk", sans-serif; font-size: 25px; letter-spacing: -.035em; }
+.br-purchase-success > p { max-width: 400px; margin: 0 auto 17px; color: #72868e; font-size: 10px; line-height: 1.55; }
+.br-success-values { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-bottom: 18px; text-align: left; }
+.br-success-values > div { display: flex; flex-direction: column; gap: 4px; padding: 11px; border: 1px solid #dfebe7; border-radius: 9px; background: #fbfdfc; }
+.br-success-values span { color: #819399; font-size: 7px; text-transform: uppercase; letter-spacing: .06em; }
+.br-success-values b { color: #243e48; font-size: 10px; }
+.br-purchase-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.br-purchase-summary > div { display: flex; flex-direction: column; gap: 5px; padding: 17px 19px; }
+.br-purchase-summary small { color: #85979e; font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
+.br-purchase-summary b { color: #17343f; font-family: "Space Grotesk", sans-serif; font-size: 20px; }
+.br-purchase-summary span { color: #84969d; font-size: 8px; }
+.br-history-disclosure { display: flex; align-items: flex-start; gap: 9px; margin-top: 15px; padding: 11px 12px; border-radius: 9px; color: #087756; background: #ebf9f4; }
+.br-history-disclosure svg { flex: 0 0 auto; }
+.br-history-disclosure div { display: flex; flex-direction: column; gap: 2px; }
+.br-history-disclosure b { font-size: 9px; }
+.br-history-disclosure span { color: #6d8881; font-size: 8px; line-height: 1.45; }
+@media (max-width: 650px) {
+  .br-add-money-dialog { max-height: 94vh; }
+  .br-purchase-progress > span { flex-direction: column; text-align: center; }
+  .br-eligibility-grid,.br-success-values,.br-purchase-summary { grid-template-columns: 1fr; }
+  .br-purchase-summary { gap: 8px; }
+  .br-buy-chips { display: grid; grid-template-columns: repeat(3,1fr); }
+  .br-buy-chips button { padding-inline: 4px; }
+}
+
+.btcbr-app .loss { color: #c25a42 !important; }

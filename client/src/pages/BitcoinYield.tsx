@@ -6,6 +6,7 @@ import {
   Bitcoin,
   Building2,
   Check,
+  CircleCheckBig,
   ChevronDown,
   CircleDollarSign,
   Copy,
@@ -33,7 +34,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -49,6 +50,19 @@ type NavItem = {
   id: SectionId;
   label: string;
   icon: LucideIcon;
+};
+
+type PurchaseStep = "eligibility" | "quote" | "success";
+
+type PurchaseRecord = {
+  id: string;
+  date: string;
+  invested: number;
+  btc: number;
+  quote: number;
+  currentValue: number;
+  gain: number;
+  status: string;
 };
 
 const navItems: NavItem[] = [
@@ -72,15 +86,26 @@ const wealthPoints = [
   { label: "02 set", value: 122314 },
 ];
 
-const lots = [
-  { date: "10/06/2026", amount: "0,12000000", rate: "1,000000", cost: "R$ 48.240,00", value: "R$ 51.648,00", gain: "+R$ 3.408,00", status: "Em rendimento" },
-  { date: "02/07/2026", amount: "0,08421500", rate: "1,008400", cost: "R$ 34.611,73", value: "R$ 36.234,82", gain: "+R$ 1.623,09", status: "Em rendimento" },
-  { date: "18/08/2026", amount: "0,08000000", rate: "1,019200", cost: "R$ 32.948,27", value: "R$ 34.431,18", gain: "+R$ 1.482,91", status: "Em rendimento" },
+const initialPurchases: PurchaseRecord[] = [
+  { id: "compra-1", date: "10/06/2026", invested: 48240, btc: 0.12, quote: 402000, currentValue: 51648, gain: 3408, status: "Rendimento ativo" },
+  { id: "compra-2", date: "02/07/2026", invested: 34611.73, btc: 0.084215, quote: 411000, currentValue: 36234.82, gain: 1623.09, status: "Rendimento ativo" },
+  { id: "compra-3", date: "18/08/2026", invested: 32948.27, btc: 0.08, quote: 411853.38, currentValue: 34431.18, gain: 1482.91, status: "Rendimento ativo" },
 ];
 
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const btcBrl = 421930;
-const stbtcRate = 1.02684;
+
+function parseBrl(value: string) {
+  return Number(value.replace(/\./g, "").replace(",", ".")) || 0;
+}
+
+function formatBtc(value: number) {
+  return value.toLocaleString("pt-BR", { minimumFractionDigits: 8, maximumFractionDigits: 8 });
+}
+
+function formatSignedCurrency(value: number) {
+  return `${value >= 0 ? "+" : "−"}${currency.format(Math.abs(value))}`;
+}
 
 function CopyButton({ value, label = "Copiar" }: { value: string; label?: string }) {
   return (
@@ -240,25 +265,27 @@ function YieldPage() {
       </div>
       <section className="br-panel br-formula-card">
         <div><span className="br-eyebrow">TRANSPARÊNCIA SEM COMPLICAÇÃO</span><h2>Como chegamos ao seu valor</h2></div>
-        <div className="br-formula"><span>0,284215 stBTC</span><i>×</i><span>1,026840 sBTC</span><i>×</i><span>R$ 421.930</span><i>=</i><b>R$ 122.314</b></div>
-        <p>Saldo stBTC × taxa de conversão do protocolo × preço de execução BTC/BRL. Taxas e slippage são exibidos separadamente no resgate.</p>
+        <div className="br-formula"><span>Bitcoin comprado</span><i>+</i><span>rendimento acumulado</span><i>×</i><span>cotação em reais</span><i>=</i><b>R$ 122.314</b></div>
+        <p>O painel combina seu saldo em Bitcoin, o rendimento acumulado e a cotação em BRL. Custos e diferenças de execução aparecem separadamente antes da compra ou do resgate.</p>
       </section>
       <section className="br-panel br-breakdown">
-        <div className="br-section-head"><div><span className="br-eyebrow">HISTÓRICO</span><h2>Evolução da taxa stBTC/sBTC</h2></div><span className="br-positive">+2,684%</span></div>
+        <div className="br-section-head"><div><span className="br-eyebrow">HISTÓRICO</span><h2>Evolução do rendimento acumulado</h2></div><span className="br-positive">+2,684%</span></div>
         <MiniChart />
       </section>
     </div>
   );
 }
 
-function LotsPage() {
+function LotsPage({ purchases }: { purchases: PurchaseRecord[] }) {
+  const totals = purchases.reduce((acc, purchase) => ({ invested: acc.invested + purchase.invested, current: acc.current + purchase.currentValue, gain: acc.gain + purchase.gain }), { invested: 0, current: 0, gain: 0 });
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact"><div><span className="br-eyebrow">CONTABILIDADE POR LOTE</span><h1>Cada entrada tem sua própria história.</h1><p>Custo de aquisição, taxa inicial, resultado e eventos de cada lote em um único lugar.</p></div><div className="br-big-icon"><Layers3 /></div></section>
+      <section className="br-page-hero compact"><div><span className="br-eyebrow">HISTÓRICO DE COMPRAS</span><h1>Cada aporte, do Pix ao rendimento.</h1><p>Acompanhe quanto você investiu em reais, quanto Bitcoin foi comprado e quando o rendimento foi ativado.</p></div><div className="br-big-icon"><Layers3 /></div></section>
+      <div className="br-purchase-summary"><div className="br-panel"><small>Total investido</small><b>{currency.format(totals.invested)}</b><span>{purchases.length} compras</span></div><div className="br-panel"><small>Valor atual</small><b>{currency.format(totals.current)}</b><span>estimado em BRL</span></div><div className="br-panel"><small>Resultado estimado</small><b className={totals.gain >= 0 ? "gain" : "loss"}>{formatSignedCurrency(totals.gain)}</b><span>não garantido</span></div></div>
       <section className="br-panel br-table-card">
-        <div className="br-section-head"><div><h2>Seus lotes de stBTC</h2><p>Valores demonstrativos atualizados em 08/09/2026.</p></div><button className="br-outline" type="button" onClick={() => toast.success("CSV demonstrativo preparado")}>Exportar CSV <ArrowDownToLine size={16} /></button></div>
-        <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Quantidade stBTC</th><th>Taxa de entrada</th><th>Custo em BRL</th><th>Valor atual</th><th>Resultado</th><th>Status</th></tr></thead><tbody>{lots.map((lot) => <tr key={lot.date}><td><b>{lot.date}</b></td><td className="mono">{lot.amount}</td><td className="mono">{lot.rate}</td><td>{lot.cost}</td><td>{lot.value}</td><td className="gain">{lot.gain}</td><td><span className="br-status"><i />{lot.status}</span></td></tr>)}</tbody></table></div>
-        <div className="br-table-total"><span>Total investido <b>R$ 115.800,00</b></span><span>Valor atual <b>R$ 122.314,00</b></span><span>Ganho não realizado <b className="gain">+R$ 6.514,00</b></span></div>
+        <div className="br-section-head"><div><h2>Compras e ativações</h2><p>Valores demonstrativos atualizados em 08/09/2026.</p></div><button className="br-outline" type="button" onClick={() => toast.success("CSV demonstrativo preparado")}>Exportar CSV <ArrowDownToLine size={16} /></button></div>
+        <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Aporte em BRL</th><th>Bitcoin comprado</th><th>Cotação BTC/BRL</th><th>Valor atual</th><th>Resultado</th><th>Status</th></tr></thead><tbody>{purchases.map((purchase) => <tr key={purchase.id}><td><b>{purchase.date}</b></td><td>{currency.format(purchase.invested)}</td><td className="mono">₿ {formatBtc(purchase.btc)}</td><td>{currency.format(purchase.quote)}</td><td>{currency.format(purchase.currentValue)}</td><td className={purchase.gain >= 0 ? "gain" : "loss"}>{formatSignedCurrency(purchase.gain)}</td><td><span className="br-status"><i />{purchase.status}</span></td></tr>)}</tbody></table></div>
+        <div className="br-history-disclosure"><ShieldCheck size={17} /><div><b>Rendimento ativado nos bastidores</b><span>A tela mostra a experiência em reais e Bitcoin. A trilha técnica de conversão e aplicação permanece verificável na área Segurança.</span></div></div>
       </section>
     </div>
   );
@@ -266,7 +293,7 @@ function LotsPage() {
 
 function RedeemPage({ amount, setAmount, onConfirm }: { amount: string; setAmount: (value: string) => void; onConfirm: () => void }) {
   const numericAmount = Number(amount.replace(",", ".")) || 0;
-  const gross = numericAmount * stbtcRate * btcBrl;
+  const gross = numericAmount * btcBrl;
   const protocolFee = gross * 0.0015;
   const fxFee = gross * 0.0045;
   const net = Math.max(0, gross - protocolFee - fxFee);
@@ -276,7 +303,7 @@ function RedeemPage({ amount, setAmount, onConfirm }: { amount: string; setAmoun
       <div className="br-redeem-grid">
         <section className="br-panel br-quote-form">
           <span className="br-eyebrow">QUANTO DESEJA RESGATAR?</span>
-          <label className="br-amount-input"><input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" aria-label="Quantidade de stBTC" /><span>stBTC</span></label>
+          <label className="br-amount-input"><input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" aria-label="Quantidade de Bitcoin" /><span>BTC</span></label>
           <div className="br-chips"><button type="button" onClick={() => setAmount("0,07105375")}>25%</button><button type="button" onClick={() => setAmount("0,14210750")}>50%</button><button type="button" onClick={() => setAmount("0,28421500")}>Máximo</button></div>
           <div className="br-pix-account"><div className="br-bank-icon"><Landmark size={20} /></div><div><small>Conta Pix de destino</small><b>Banco Inter •••• 4821</b><span>Alexandre Bastos — mesma titularidade</span></div><BadgeCheck size={21} /></div>
           <button type="button" className="br-primary full" onClick={onConfirm}>Revisar e continuar <ArrowRight size={17} /></button>
@@ -289,7 +316,7 @@ function RedeemPage({ amount, setAmount, onConfirm }: { amount: string; setAmoun
           <div className="br-kv"><span>Resgate do protocolo (0,15%)</span><b>-{currency.format(protocolFee)}</b></div>
           <div className="br-kv"><span>Conversão e Pix (0,45%)</span><b>-{currency.format(fxFee)}</b></div>
           <div className="br-kv total"><span>Valor líquido</span><b>{currency.format(net)}</b></div>
-          <div className="br-warning"><ShieldCheck size={18} /><p><b>Sem taxa escondida.</b> O valor só é confirmado após sua assinatura na carteira.</p></div>
+          <div className="br-warning"><ShieldCheck size={18} /><p><b>Sem taxa escondida.</b> O valor só é confirmado depois da sua revisão final.</p></div>
         </section>
       </div>
     </div>
@@ -364,7 +391,27 @@ export default function BitcoinYield() {
   const [addMoneyOpen, setAddMoneyOpen] = useState(false);
   const [amount, setAmount] = useState("0,01500000");
   const [addAmount, setAddAmount] = useState("1.000,00");
+  const [purchaseStep, setPurchaseStep] = useState<PurchaseStep>("eligibility");
+  const [quoteSeconds, setQuoteSeconds] = useState(59);
+  const [quoteNonce, setQuoteNonce] = useState(0);
+  const [eligibility, setEligibility] = useState({ resident: false, cpf: false, pix: false });
+  const [riskAccepted, setRiskAccepted] = useState(false);
+  const [purchases, setPurchases] = useState<PurchaseRecord[]>(initialPurchases);
   const activeLabel = useMemo(() => navItems.find((item) => item.id === section)?.label ?? "Visão geral", [section]);
+  const purchaseQuote = useMemo(() => {
+    const amountInBrl = parseBrl(addAmount);
+    const serviceFee = amountInBrl * 0.005;
+    const executionPrice = btcBrl * 1.0065;
+    const applied = Math.max(0, amountInBrl - serviceFee);
+    return { amountInBrl, serviceFee, executionPrice, applied, btc: executionPrice > 0 ? applied / executionPrice : 0 };
+  }, [addAmount, quoteNonce]);
+  const isEligible = eligibility.resident && eligibility.cpf && eligibility.pix;
+
+  useEffect(() => {
+    if (!addMoneyOpen || purchaseStep !== "quote" || quoteSeconds <= 0) return;
+    const timer = window.setInterval(() => setQuoteSeconds((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [addMoneyOpen, purchaseStep, quoteSeconds]);
 
   function navigate(next: SectionId) {
     setSection(next);
@@ -375,6 +422,34 @@ export default function BitcoinYield() {
   function confirmRedeem() {
     setRedeemOpen(false);
     toast.success("Simulação concluída", { description: "Nenhuma transação real foi realizada neste MVP." });
+  }
+
+  function openPurchase() {
+    setPurchaseStep("eligibility");
+    setQuoteSeconds(59);
+    setEligibility({ resident: false, cpf: false, pix: false });
+    setRiskAccepted(false);
+    setAddMoneyOpen(true);
+  }
+
+  function refreshQuote() {
+    setQuoteNonce((value) => value + 1);
+    setQuoteSeconds(59);
+    toast.success("Cotação atualizada", { description: "Novo prazo de 59 segundos iniciado." });
+  }
+
+  function confirmPurchase() {
+    setPurchases((current) => [{
+      id: `compra-${Date.now()}`,
+      date: "08/09/2026",
+      invested: purchaseQuote.amountInBrl,
+      btc: purchaseQuote.btc,
+      quote: purchaseQuote.executionPrice,
+      currentValue: purchaseQuote.applied,
+      gain: purchaseQuote.applied - purchaseQuote.amountInBrl,
+      status: "Rendimento ativado",
+    }, ...current]);
+    setPurchaseStep("success");
   }
 
   return (
@@ -395,9 +470,9 @@ export default function BitcoinYield() {
       <main className="br-main">
         <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => toast.info("Sua conta está sincronizada. Os detalhes técnicos ficam disponíveis em Segurança e transparência.")}><span className="br-account-status"><i /></span> Conta Nexo <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} onAddMoney={() => setAddMoneyOpen(true)} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Compre com reais</h3><p>Você escolhe quanto quer colocar e vê tudo explicado em BRL.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Ative o rendimento</h3><p>A estratégia é aplicada nos bastidores e o resultado aparece em reais.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar via Pix — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} onAddMoney={openPurchase} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Compre com reais</h3><p>Você escolhe quanto quer colocar e vê tudo explicado em BRL.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Ative o rendimento</h3><p>A estratégia é aplicada nos bastidores e o resultado aparece em reais.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
           {section === "rendimento" && <YieldPage />}
-          {section === "lotes" && <LotsPage />}
+          {section === "lotes" && <LotsPage purchases={purchases} />}
           {section === "resgate" && <RedeemPage amount={amount} setAmount={setAmount} onConfirm={() => setRedeemOpen(true)} />}
           {section === "fiscal" && <FiscalPage />}
           {section === "reservas" && <ReservesPage />}
@@ -409,21 +484,37 @@ export default function BitcoinYield() {
       <Dialog open={redeemOpen} onOpenChange={setRedeemOpen}>
         <DialogContent className="br-confirm-dialog">
           <DialogHeader><DialogTitle>Confirmar simulação de resgate</DialogTitle><DialogDescription>Este é um MVP frontend. Nenhum ativo será movimentado e nenhum Pix será enviado.</DialogDescription></DialogHeader>
-          <div className="br-confirm-summary"><div><span>Quantidade</span><b>{amount} stBTC</b></div><div><span>Conta de destino</span><b>Banco Inter •••• 4821</b></div><div><span>Valor líquido estimado</span><b>{currency.format((Number(amount.replace(",", ".")) || 0) * stbtcRate * btcBrl * 0.994)}</b></div></div>
+          <div className="br-confirm-summary"><div><span>Quantidade</span><b>{amount} BTC</b></div><div><span>Conta de destino</span><b>Banco Inter •••• 4821</b></div><div><span>Valor líquido estimado</span><b>{currency.format((Number(amount.replace(",", ".")) || 0) * btcBrl * 0.994)}</b></div></div>
           <button className="br-primary full" type="button" onClick={confirmRedeem}>Concluir demonstração <Check size={17} /></button>
           <button className="br-dialog-cancel" type="button" onClick={() => setRedeemOpen(false)}>Voltar</button>
         </DialogContent>
       </Dialog>
       <Dialog open={addMoneyOpen} onOpenChange={setAddMoneyOpen}>
         <DialogContent className="br-confirm-dialog br-add-money-dialog">
-          <DialogHeader><DialogTitle>Comprar Bitcoin com reais</DialogTitle><DialogDescription>Escolha um valor para simular a compra e ativar o rendimento. Nesta versão, nada será movimentado.</DialogDescription></DialogHeader>
-          <div className="br-add-money-intro"><Banknote size={18} /><div><b>Você não precisa ter Bitcoin para começar</b><span>Compre em reais e ative o acompanhamento do rendimento em BRL. O resultado pode variar; não é juro fixo nem promessa de retorno.</span></div></div>
-          <label className="br-amount-label" htmlFor="add-money-amount">Quanto você quer investir em Bitcoin?</label>
-          <div className="br-amount-field"><span>R$</span><input id="add-money-amount" inputMode="decimal" value={addAmount} onChange={(event) => setAddAmount(event.target.value)} aria-label="Valor do primeiro aporte em reais" /></div>
-          <div className="br-add-money-steps"><span><i>1</i> Compre em BRL</span><span><i>2</i> Ative o rendimento</span><span><i>3</i> Acompanhe em reais</span></div>
-          <details className="br-how-it-works"><summary>Como funciona por trás?</summary><p>Nos bastidores, a posição pode passar por uma conversão para os ativos de liquidez do protocolo e então ser aplicada na estratégia de rendimento. Você acompanha cotação, taxas e saldo; os detalhes verificáveis ficam em Segurança.</p></details>
-          <button className="br-primary full" type="button" onClick={() => { setAddMoneyOpen(false); toast.success("Compra e rendimento demonstrativos preparados", { description: `Valor escolhido: R$ ${addAmount}. Nenhuma transação real foi realizada.` }); }}>Comprar e ativar rendimento <ArrowRight size={17} /></button>
-          <button className="br-dialog-cancel" type="button" onClick={() => setAddMoneyOpen(false)}>Voltar</button>
+          <div className="br-purchase-progress" aria-label={`Etapa ${purchaseStep === "eligibility" ? 1 : purchaseStep === "quote" ? 2 : 3} de 3`}><span className={purchaseStep !== "success" ? "active" : "done"}><i>{purchaseStep === "success" ? <Check size={11} /> : "1"}</i> Cadastro</span><b /><span className={purchaseStep === "quote" ? "active" : purchaseStep === "success" ? "done" : ""}><i>{purchaseStep === "success" ? <Check size={11} /> : "2"}</i> Cotação</span><b /><span className={purchaseStep === "success" ? "active" : ""}><i>3</i> Conclusão</span></div>
+
+          {purchaseStep === "eligibility" && <>
+            <DialogHeader><DialogTitle>Vamos preparar sua compra</DialogTitle><DialogDescription>Confirme seus dados básicos para comprar Bitcoin com reais. Tudo abaixo é demonstrativo.</DialogDescription></DialogHeader>
+            <div className="br-eligibility-grid"><label><span>Nome completo</span><input defaultValue="Alexandre Bastos" /></label><label><span>CPF</span><input defaultValue="•••.482.•••-••" /></label><label><span>Residência</span><select defaultValue="BR"><option value="BR">Brasil</option></select></label><label><span>Conta Pix</span><input defaultValue="Banco Inter •••• 4821" /></label></div>
+            <div className="br-check-stack"><label><input type="checkbox" checked={eligibility.resident} onChange={(event) => setEligibility((value) => ({ ...value, resident: event.target.checked }))} /><span><b>Sou residente no Brasil</b><small>Produto demonstrado apenas para residentes no país.</small></span></label><label><input type="checkbox" checked={eligibility.cpf} onChange={(event) => setEligibility((value) => ({ ...value, cpf: event.target.checked }))} /><span><b>Meu CPF está regular e verificado</b><small>Identificação necessária antes de movimentar valores reais.</small></span></label><label><input type="checkbox" checked={eligibility.pix} onChange={(event) => setEligibility((value) => ({ ...value, pix: event.target.checked }))} /><span><b>A conta Pix é da minha titularidade</b><small>Compras e resgates usam uma conta com o mesmo titular.</small></span></label></div>
+            <button className="br-primary full" type="button" disabled={!isEligible} onClick={() => { setPurchaseStep("quote"); setQuoteSeconds(59); }}>Continuar para cotação <ArrowRight size={17} /></button>
+            <p className="br-dialog-footnote"><ShieldCheck size={13} /> No produto real, estes dados exigem validação de identidade e prevenção a fraudes.</p>
+          </>}
+
+          {purchaseStep === "quote" && <>
+            <DialogHeader><DialogTitle>Sua cotação para comprar Bitcoin</DialogTitle><DialogDescription>Veja preço, spread, taxa, prazo e quantidade antes de ativar o rendimento.</DialogDescription></DialogHeader>
+            <label className="br-amount-label" htmlFor="add-money-amount">Quanto você quer investir?</label>
+            <div className="br-amount-field"><span>R$</span><input id="add-money-amount" inputMode="decimal" value={addAmount} onChange={(event) => { setAddAmount(event.target.value); setQuoteSeconds(59); }} aria-label="Valor da compra em reais" /></div>
+            <div className="br-buy-chips"><button type="button" onClick={() => setAddAmount("500,00")}>R$ 500</button><button type="button" onClick={() => setAddAmount("1.000,00")}>R$ 1.000</button><button type="button" onClick={() => setAddAmount("5.000,00")}>R$ 5.000</button></div>
+            <section className="br-buy-quote"><div className="br-buy-quote-head"><span><i /> Cotação demonstrativa</span><b className={quoteSeconds === 0 ? "expired" : ""}>{quoteSeconds === 0 ? "Expirada" : `00:${String(quoteSeconds).padStart(2, "0")}`}</b></div><div className="br-kv"><span>Referência BTC/BRL</span><b>{currency.format(btcBrl)}</b></div><div className="br-kv"><span>Preço de execução (spread 0,65%)</span><b>{currency.format(purchaseQuote.executionPrice)}</b></div><div className="br-kv"><span>Taxa de serviço (0,50%)</span><b>-{currency.format(purchaseQuote.serviceFee)}</b></div><div className="br-kv"><span>Valor aplicado</span><b>{currency.format(purchaseQuote.applied)}</b></div><div className="br-buy-total"><span>Você compra aproximadamente</span><strong>₿ {formatBtc(purchaseQuote.btc)}</strong><small>Liquidação estimada: até 2 minutos</small></div></section>
+            {quoteSeconds === 0 && <button className="br-outline full" type="button" onClick={refreshQuote}><RefreshCw size={15} /> Atualizar cotação</button>}
+            <label className="br-risk-check"><input type="checkbox" checked={riskAccepted} onChange={(event) => setRiskAccepted(event.target.checked)} /><span>Entendi que o preço do Bitcoin e o rendimento variam, e que este MVP não realiza uma compra real.</span></label>
+            <details className="br-how-it-works"><summary>Como funciona por trás?</summary><p>Após a compra, a posição pode passar por conversões técnicas para os ativos de liquidez do protocolo e ser aplicada na estratégia de rendimento. Isso envolve riscos de mercado, protocolo, liquidez e contraparte. Os registros verificáveis ficam em Segurança.</p></details>
+            <button className="br-primary full" type="button" disabled={!riskAccepted || quoteSeconds === 0 || purchaseQuote.amountInBrl <= 0} onClick={confirmPurchase}>Comprar e ativar rendimento <ArrowRight size={17} /></button>
+            <button className="br-dialog-cancel" type="button" onClick={() => setPurchaseStep("eligibility")}>Voltar</button>
+          </>}
+
+          {purchaseStep === "success" && <div className="br-purchase-success"><div className="br-success-icon"><CircleCheckBig /></div><span className="br-eyebrow">SIMULAÇÃO CONCLUÍDA</span><h2>Bitcoin comprado. Rendimento ativado.</h2><p>Sua compra demonstrativa foi registrada e já aparece em Meus aportes.</p><div className="br-success-values"><div><span>Investido</span><b>{currency.format(purchaseQuote.amountInBrl)}</b></div><div><span>Bitcoin comprado</span><b>₿ {formatBtc(purchaseQuote.btc)}</b></div><div><span>Status</span><b className="gain">Rendimento ativo</b></div></div><button className="br-primary full" type="button" onClick={() => { setAddMoneyOpen(false); navigate("lotes"); }}>Ver meus aportes <ArrowRight size={17} /></button><button className="br-dialog-cancel" type="button" onClick={() => setAddMoneyOpen(false)}>Voltar para o início</button></div>}
         </DialogContent>
       </Dialog>
     </div>

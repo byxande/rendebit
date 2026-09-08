@@ -26,9 +26,12 @@ import {
   X,
 } from "lucide-react";
 import { connect, disconnect, getLocalStorage, isConnected } from "@stacks/connect";
+import { cvToJSON, deserializeCV } from "@stacks/transactions";
 import { toast } from "sonner";
 
 type Network = "mainnet" | "testnet";
+type HistoricalPriceKey = "stx" | "btc" | "alex" | "ststx" | "stable";
+type HistoryPart = { key: HistoricalPriceKey; units: number; fallbackPrice?: number };
 type Asset = {
   id: string;
   symbol: string;
@@ -40,6 +43,8 @@ type Asset = {
   icon: string;
   tone: string;
   contract?: string;
+  priceSource?: string;
+  historyParts?: HistoryPart[];
 };
 
 type WalletRecord = {
@@ -73,6 +78,11 @@ const STSTX_CONTRACT = "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststx-token";
 const STSTX_DATA_CONTRACT = "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stx-v2";
 const ZEST_RECEIPT_CONTRACT = "SP2VCQJGH7PHP2DJK7Z0V48AGBHQAW3R3ZW1QF4N.zststx-token";
 const STSTX_LP_CONTRACT = "SM1793C4R5PZ4NS4VQ4WMP7SKKYVH8JZEWSZ9HCCR.stableswap-pool-stx-ststx-v-1-4";
+const ZEST_STSTX_VAULT = "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-ststx";
+const VLIALEX_CONTRACT = "SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.auto-alex-v3-wrapped";
+const STX_STSTX_POOL = "SM1793C4R5PZ4NS4VQ4WMP7SKKYVH8JZEWSZ9HCCR.stableswap-pool-stx-ststx-v-1-4";
+const STX_AEUSDC_POOL = "SM1793C4R5PZ4NS4VQ4WMP7SKKYVH8JZEWSZ9HCCR.xyk-pool-stx-aeusdc-v-1-1";
+const STX_AEUSDC_CONTRACT = "SM1793C4R5PZ4NS4VQ4WMP7SKKYVH8JZEWSZ9HCCR.xyk-pool-stx-aeusdc-v-1-1";
 const HISTORY_DAYS = [30, 25, 20, 15, 10, 5, 0];
 
 type StstxActivity = {
@@ -145,10 +155,133 @@ async function fetchSafe(input: string, init?: RequestInit) {
 }
 
 async function fetchMarketPrices() {
-  const response = await fetchSafe("https://api.coingecko.com/api/v3/simple/price?ids=blockstack,bitcoin&vs_currencies=usd&include_24hr_change=true");
-  if (!response?.ok) return {} as Record<string, { usd?: number; usd_24h_change?: number }>;
-  return (await response.json()) as Record<string, { usd?: number; usd_24h_change?: number }>;
+  const cacheKey = "stackfolio:market-prices";
+  let cachedPrices: Record<string, { usd?: number; usd_24h_change?: number }> = {};
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) || "null") as { savedAt?: number; prices?: Record<string, { usd?: number; usd_24h_change?: number }> } | null;
+    if (cached?.prices && Date.now() - Number(cached.savedAt || 0) < 21_600_000) cachedPrices = cached.prices;
+  } catch {
+    // Storage is optional.
+  }
+  const response = await fetchSafe("https://api.coingecko.com/api/v3/simple/price?ids=blockstack,bitcoin,alexgo,stacking-dao,allbridge-bridged-usdc-stacks&vs_currencies=usd&include_24hr_change=true");
+  let prices = { ...cachedPrices, ...(response?.ok ? await response.json() as Record<string, { usd?: number; usd_24h_change?: number }> : {}) };
+  if (!prices.blockstack?.usd) {
+    const fallback = await fetchSafe("https://api.coinpaprika.com/v1/tickers/stx-stacks");
+    if (fallback?.ok) {
+      const payload = await fallback.json();
+      const quote = payload?.quotes?.USD;
+      if (quote?.price) prices = { ...prices, blockstack: { usd: Number(quote.price), usd_24h_change: Number(quote.percent_change_24h || 0) } };
+    }
+  }
+  try {
+    if (Object.keys(prices).length) localStorage.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), prices }));
+    if (Object.keys(prices).length) return prices;
+    if (Object.keys(cachedPrices).length) return cachedPrices;
+  } catch {
+    // Storage is optional; live data remains the source of truth.
+  }
+  return {} as Record<string, { usd?: number; usd_24h_change?: number }>;
 }
+
+type PriceQuote = { usd: number; source: string; historyParts?: HistoryPart[] };
+
+function toClarityUint(value: number) {
+  return `0x01${BigInt(Math.max(0, Math.round(value))).toString(16).padStart(32, "0")}`;
+}
+
+function decodeClarityResult(result?: string): unknown {
+  if (!result) return null;
+  try {
+    const hex = result.replace(/^0x/, "");
+    const bytes = new Uint8Array((hex.match(/.{1,2}/g) || []).map((byte) => Number.parseInt(byte, 16)));
+    const decoded = cvToJSON(deserializeCV(bytes)) as { value?: { value?: unknown } | unknown };
+    const responseValue = decoded?.value;
+    return responseValue && typeof responseValue === "object" && "value" in responseValue
+      ? (responseValue as { value?: unknown }).value
+      : responseValue ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function callReadOnly(contract: string, functionName: string, args: string[] = []) {
+  const separator = contract.indexOf(".");
+  if (separator < 1) return null;
+  const address = contract.slice(0, separator);
+  const name = contract.slice(separator + 1);
+  const response = await fetchSafe(`${API_BY_NETWORK.mainnet}/v2/contracts/call-read/${address}/${name}/${functionName}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sender: "SP000000000000000000002Q6VF78", arguments: args }),
+  });
+  if (!response?.ok) return null;
+  const payload = await response.json();
+  return payload?.okay ? decodeClarityResult(payload.result) : null;
+}
+
+async function fetchPoolReserveFallback(poolContract: string, tokenContract: string) {
+  const response = await fetchSafe(`${API_BY_NETWORK.mainnet}/extended/v1/address/${poolContract}/balances?proof=0`);
+  if (!response?.ok) return null;
+  const data = await response.json();
+  const tokenEntry = Object.entries(data?.fungible_tokens || {}).find(([asset]) => asset.startsWith(`${tokenContract}::`)) as [string, { balance?: string }] | undefined;
+  const totalSharesRaw = await callReadOnly(poolContract, "get-total-supply");
+  const totalShares = clarityNumber(totalSharesRaw) / 1_000_000;
+  return { x: Number(data?.stx?.balance || 0) / 1_000_000, y: Number(tokenEntry?.[1]?.balance || 0) / 1_000_000, shares: totalShares };
+}
+
+function clarityNumber(value: unknown) {
+  if (typeof value === "string" && /^\d+$/.test(value)) return Number(value);
+  if (value && typeof value === "object" && "value" in value) return clarityNumber((value as { value?: unknown }).value);
+  return 0;
+}
+
+function clarityTuple(value: unknown) {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+async function fetchDefiQuotes(marketPrices: Record<string, { usd?: number; usd_24h_change?: number }>) {
+  const stxUsd = Number(marketPrices.blockstack?.usd || 0);
+  const bitcoinUsd = Number(marketPrices.bitcoin?.usd || 0);
+  const alexUsd = Number(marketPrices.alexgo?.usd || 0);
+  const stableUsd = 1;
+  const ststxRatio = clarityNumber(await callReadOnly(STSTX_DATA_CONTRACT, "get-stx-per-ststx")) / 1_000_000;
+  const ststxUsd = ststxRatio * stxUsd;
+  const [zestAssetsRaw, zestSupplyRaw, vliAlexRaw, ststxPoolRaw, aeusdcPoolRaw, ststxReserveFallback, aeusdcReserveFallback] = await Promise.all([
+    callReadOnly(ZEST_STSTX_VAULT, "get-total-assets"),
+    callReadOnly(ZEST_STSTX_VAULT, "get-total-supply"),
+    callReadOnly(VLIALEX_CONTRACT, "get-shares-to-tokens", [toClarityUint(100_000_000)]),
+    callReadOnly(STX_STSTX_POOL, "get-pool"),
+    callReadOnly(STX_AEUSDC_POOL, "get-pool"),
+    fetchPoolReserveFallback(STX_STSTX_POOL, STSTX_CONTRACT),
+    fetchPoolReserveFallback(STX_AEUSDC_POOL, "SP3Y2ZSH8P7D50B0VBTSX11S7XSG24M1VB9YFQA4K.token-aeusdc"),
+  ]);
+  const zestAssets = clarityNumber(zestAssetsRaw) / 1_000_000;
+  const zestSupply = clarityNumber(zestSupplyRaw) / 1_000_000;
+  const zststxUnderlying = zestSupply ? zestAssets / zestSupply : 0;
+  const vliAlexUnderlying = clarityNumber(vliAlexRaw) / 100_000_000;
+  const ststxPool = clarityTuple(ststxPoolRaw);
+  const aeusdcPool = clarityTuple(aeusdcPoolRaw);
+  const ststxShares = clarityNumber(ststxPool["total-shares"]) / 1_000_000 || Number(ststxReserveFallback?.shares || 0);
+  const ststxX = clarityNumber(ststxPool["x-balance"]) / 1_000_000 || Number(ststxReserveFallback?.x || 0);
+  const ststxY = clarityNumber(ststxPool["y-balance"]) / 1_000_000 || Number(ststxReserveFallback?.y || 0);
+  const aeusdcShares = clarityNumber(aeusdcPool["total-shares"]) / 1_000_000 || Number(aeusdcReserveFallback?.shares || 0);
+  const aeusdcX = clarityNumber(aeusdcPool["x-balance"]) / 1_000_000 || Number(aeusdcReserveFallback?.x || 0);
+  const aeusdcY = clarityNumber(aeusdcPool["y-balance"]) / 1_000_000 || Number(aeusdcReserveFallback?.y || 0);
+  const ststxLpPrice = ststxShares ? ((ststxX * stxUsd) + (ststxY * ststxUsd)) / ststxShares : 0;
+  const aeusdcLpPrice = aeusdcShares ? ((aeusdcX * stxUsd) + (aeusdcY * stableUsd)) / aeusdcShares : 0;
+  return {
+    ststx: ststxUsd ? { usd: ststxUsd, source: "On-chain ratio", historyParts: [{ key: "stx" as const, units: ststxRatio, fallbackPrice: stxUsd }] } : undefined,
+    zststx: ststxUsd && zststxUnderlying ? { usd: ststxUsd * zststxUnderlying, source: "Zest vault NAV", historyParts: [{ key: "ststx" as const, units: zststxUnderlying, fallbackPrice: ststxUsd }] } : undefined,
+    listx: stxUsd ? { usd: stxUsd, source: "LISA 1:1 STX peg", historyParts: [{ key: "stx" as const, units: 1, fallbackPrice: stxUsd }] } : undefined,
+    vliAlex: alexUsd && vliAlexUnderlying ? { usd: alexUsd * vliAlexUnderlying, source: "Derived from ALEX ratio", historyParts: [{ key: "alex" as const, units: vliAlexUnderlying, fallbackPrice: alexUsd }] } : undefined,
+    ststxLp: ststxLpPrice ? { usd: ststxLpPrice, source: "Bitflow reserve NAV", historyParts: [{ key: "stx" as const, units: ststxShares ? ststxX / ststxShares : 0, fallbackPrice: stxUsd }, { key: "ststx" as const, units: ststxShares ? ststxY / ststxShares : 0, fallbackPrice: ststxUsd }] } : undefined,
+    aeusdcLp: aeusdcLpPrice ? { usd: aeusdcLpPrice, source: "Bitflow reserve NAV", historyParts: [{ key: "stx" as const, units: aeusdcShares ? aeusdcX / aeusdcShares : 0, fallbackPrice: stxUsd }, { key: "stable" as const, units: aeusdcShares ? aeusdcY / aeusdcShares : 0, fallbackPrice: stableUsd }] } : undefined,
+    stx: stxUsd ? { usd: stxUsd, source: "CoinGecko market", historyParts: [{ key: "stx" as const, units: 1, fallbackPrice: stxUsd }] } : undefined,
+    btc: bitcoinUsd ? { usd: bitcoinUsd, source: "CoinGecko market", historyParts: [{ key: "btc" as const, units: 1, fallbackPrice: bitcoinUsd }] } : undefined,
+    stable: { usd: stableUsd, source: "USD peg", historyParts: [{ key: "stable" as const, units: 1, fallbackPrice: stableUsd }] },
+  };
+}
+type DefiQuotes = Awaited<ReturnType<typeof fetchDefiQuotes>>;
 
 async function fetchHistoricalRates(address: string, network: Network): Promise<RateHistoryPoint[]> {
   if (network !== "mainnet") return [];
@@ -268,6 +401,10 @@ function formatRawTokenBalance(rawAmount: string, decimals: number) {
 }
 
 function tokenSymbolFromContract(contract: string) {
+  if (contract.includes("stableswap-pool-stx-ststx")) return "STX-stSTX LP";
+  if (contract.includes("xyk-pool-stx-aeusdc")) return "STX-aeUSDC LP";
+  if (contract.includes("xyk-pool-sbtc-dog")) return "sBTC-DOG LP";
+  if (contract.includes("xyk-pool-stx-bob")) return "STX-Bob LP";
   const last = contract.split("::").pop() || "TOKEN";
   return last.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -312,13 +449,21 @@ async function fetchPortfolio(address: string, network: Network) {
   }
 
   const marketPrices = await fetchMarketPrices();
-  const priceForSymbol = (symbol: string) => {
+  const defiQuotes: Partial<DefiQuotes> = network === "mainnet" ? await fetchDefiQuotes(marketPrices) : {};
+  const priceForSymbol = (symbol: string, contract = "") => {
     const normalized = symbol.toLowerCase();
-    if (normalized === "stx") return marketPrices.blockstack;
-    if (normalized === "sbtc" || normalized === "btc") return marketPrices.bitcoin;
-    if (["usda", "usdh", "susdh", "aeusdc", "zaeusdc", "usdc"].includes(normalized)) return { usd: 1, usd_24h_change: 0 };
+    if (normalized === "stx") return defiQuotes.stx;
+    if (normalized === "sbtc" || normalized === "btc") return marketPrices.bitcoin ? { usd: marketPrices.bitcoin.usd || 0, source: "CoinGecko market", historyParts: [{ key: "btc" as const, units: 1, fallbackPrice: marketPrices.bitcoin.usd || 0 }] } : undefined;
+    if (normalized === "ststx") return defiQuotes.ststx;
+    if (normalized === "zststx" || contract === ZEST_RECEIPT_CONTRACT) return defiQuotes.zststx;
+    if (normalized === "listx" || normalized === "lqstx") return defiQuotes.listx;
+    if (normalized === "vli alex" || normalized === "vlialex" || contract === VLIALEX_CONTRACT) return defiQuotes.vliAlex;
+    if (normalized === "aeusdc" || normalized === "usdc" || normalized === "usda" || normalized === "usdh" || normalized === "susdh" || normalized === "zaeusdc") return defiQuotes.stable;
+    if (contract === STX_STSTX_POOL) return defiQuotes.ststxLp;
+    if (contract === STX_AEUSDC_POOL || contract === STX_AEUSDC_CONTRACT) return defiQuotes.aeusdcLp;
     return undefined;
   };
+  const stxQuote = priceForSymbol("STX");
 
   const assets: Asset[] = [
     {
@@ -327,19 +472,22 @@ async function fetchPortfolio(address: string, network: Network) {
       name: "Stacks",
       balance: formatTokenBalance(stxBalance),
       rawBalance: stxBalance,
-      price: priceForSymbol("STX")?.usd ?? null,
-      change: priceForSymbol("STX")?.usd_24h_change ?? null,
+      price: stxQuote?.usd ?? null,
+      change: marketPrices.blockstack?.usd_24h_change ?? null,
       icon: "S",
       tone: "orange",
+      priceSource: stxQuote?.source,
+      historyParts: stxQuote?.historyParts?.map((part) => ({ ...part, units: part.units * stxBalance })),
     },
     ...selectedFungibleTokens.map(([contract, item]) => {
       const contractPrincipal = contract.split("::")[0];
       const metadata = metadataByContract.get(contractPrincipal);
       const decimals = metadata?.decimals ?? 0;
-      const symbol = metadata?.symbol || tokenSymbolFromContract(contract);
+      const derivedSymbol = tokenSymbolFromContract(contract);
+      const symbol = derivedSymbol.endsWith(" LP") ? derivedSymbol : metadata?.symbol || derivedSymbol;
       const rawAmount = item?.balance || "0";
       const rawBalance = Number(rawAmount) / 10 ** decimals;
-      const marketPrice = priceForSymbol(symbol);
+      const marketPrice = priceForSymbol(symbol, contractPrincipal);
       return {
         id: contract,
         symbol,
@@ -347,14 +495,55 @@ async function fetchPortfolio(address: string, network: Network) {
         balance: formatRawTokenBalance(rawAmount, decimals),
         rawBalance,
         price: marketPrice?.usd ?? null,
-        change: marketPrice?.usd_24h_change ?? null,
+        change: symbol.toLowerCase() === "stx" ? marketPrices.blockstack?.usd_24h_change ?? null : symbol.toLowerCase() === "sbtc" ? marketPrices.bitcoin?.usd_24h_change ?? null : null,
         icon: symbol.slice(0, 1),
         tone: tokenTone(symbol),
         contract,
+        priceSource: marketPrice?.source,
+        historyParts: marketPrice?.historyParts?.map((part) => ({ ...part, units: part.units * rawBalance })),
       };
     }),
   ];
   return assets.filter((asset) => asset.rawBalance > 0);
+}
+
+type WealthHistoryPoint = { date: string; label: string; value: number };
+const WEALTH_HISTORY_DAYS = [30, 27, 24, 21, 18, 15, 12, 9, 6, 3, 0];
+
+async function fetchWealthHistory(assets: Asset[], currentValue: number): Promise<WealthHistoryPoint[]> {
+  const parts = assets.flatMap((asset) => asset.historyParts || []);
+  if (!parts.length) return [];
+  const keys = Array.from(new Set(parts.map((part) => part.key)));
+  const coinIds: Record<HistoricalPriceKey, string> = { stx: "blockstack", btc: "bitcoin", alex: "alexgo", ststx: "stacking-dao", stable: "" };
+  const feeds = new Map<HistoricalPriceKey, Array<[number, number]>>();
+  await Promise.all(keys.map(async (key) => {
+    if (key === "stable") {
+      feeds.set(key, []);
+      return;
+    }
+    const response = await fetchSafe(`https://api.coingecko.com/api/v3/coins/${coinIds[key]}/market_chart?vs_currency=usd&days=32&interval=daily`);
+    if (!response?.ok) return;
+    const payload = await response.json();
+    feeds.set(key, Array.isArray(payload?.prices) ? payload.prices : []);
+  }));
+  const now = Date.now();
+  const rawPoints = WEALTH_HISTORY_DAYS.map((daysAgo) => {
+    const timestamp = now - daysAgo * 86_400_000;
+    const value = parts.reduce((total, part) => {
+      if (part.key === "stable") return total + part.units * (part.fallbackPrice ?? 1);
+      const prices = feeds.get(part.key) || [];
+      const closest = prices.reduce<[number, number] | null>((current, point) => {
+        if (point[0] > timestamp) return current;
+        return !current || point[0] > current[0] ? point : current;
+      }, null);
+      return total + part.units * (closest?.[1] ?? part.fallbackPrice ?? 0);
+    }, 0);
+    const date = new Date(timestamp);
+    return { date: date.toISOString(), label: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date), value };
+  }).filter((point) => point.value > 0);
+  const latestRawValue = rawPoints[rawPoints.length - 1]?.value || 0;
+  const reconciliation = latestRawValue > 0 && currentValue > 0 ? currentValue / latestRawValue : 1;
+  return rawPoints.map((point) => ({ ...point, value: point.value * reconciliation }));
 }
 
 function StacksMark({ small = false }: { small?: boolean }) {
@@ -466,6 +655,8 @@ export default function Home() {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [activeView, setActiveView] = useState<"overview" | "ststx">("overview");
   const [isPreview, setIsPreview] = useState(true);
+  const [wealthHistory, setWealthHistory] = useState<WealthHistoryPoint[]>([]);
+  const [isWealthHistoryLoading, setIsWealthHistoryLoading] = useState(false);
 
   const visibleAssets = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -479,10 +670,29 @@ export default function Home() {
   );
   const pricedAssets = assets.filter((asset) => asset.price !== null && asset.rawBalance > 0);
   const allocationTotal = pricedAssets.reduce((total, asset) => total + asset.rawBalance * (asset.price || 0), 0) || 1;
-  const topAssets = pricedAssets.slice(0, 4).map((asset) => ({ ...asset, share: ((asset.rawBalance * (asset.price || 0)) / allocationTotal) * 100 }));
+  const topAssets = pricedAssets.slice().sort((left, right) => (right.rawBalance * (right.price || 0)) - (left.rawBalance * (left.price || 0))).slice(0, 4).map((asset) => ({ ...asset, share: ((asset.rawBalance * (asset.price || 0)) / allocationTotal) * 100 }));
   const allocationColors = ["#ff8a3d", "#e3ba5d", "#a78bfa", "#69a7ff", "#89dd93"];
   let allocationCursor = 0;
   const allocationGradient = pricedAssets.length ? `conic-gradient(${pricedAssets.map((asset, index) => { const start = allocationCursor; allocationCursor += ((asset.rawBalance * (asset.price || 0)) / allocationTotal) * 100; return `${allocationColors[index % allocationColors.length]} ${start}% ${allocationCursor}%`; }).join(", ")})` : "conic-gradient(#1c2520 0 100%)";
+  const wealthChart = useMemo(() => {
+    if (!wealthHistory.length) return { points: [], line: "", area: "", min: 0, max: 0, delta: 0 };
+    const values = wealthHistory.map((point) => point.value);
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    const padding = Math.max((rawMax - rawMin) * 0.16, rawMax * 0.02, 0.01);
+    const min = Math.max(0, rawMin - padding);
+    const max = rawMax + padding;
+    const range = max - min || 1;
+    const points = wealthHistory.map((point, index) => ({
+      ...point,
+      x: 34 + (index / Math.max(1, wealthHistory.length - 1)) * 532,
+      y: 158 - ((point.value - min) / range) * 120,
+    }));
+    const line = points.map((point) => `${point.x},${point.y}`).join(" ");
+    const area = points.length ? `M ${points[0].x} ${points[0].y} L ${points.slice(1).map((point) => `${point.x} ${point.y}`).join(" L ")} L ${points[points.length - 1].x} 166 L ${points[0].x} 166 Z` : "";
+    const delta = values.length > 1 && values[0] ? ((values[values.length - 1] - values[0]) / values[0]) * 100 : 0;
+    return { points, line, area, min, max, delta };
+  }, [wealthHistory]);
 
   async function loadAddress(address: string, options?: { source?: WalletRecord["source"]; label?: string; toastOnSuccess?: boolean }) {
     setIsRefreshing(true);
@@ -568,6 +778,21 @@ export default function Home() {
     // Wallet state should only be checked once when the app boots.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (isPreview || !assets.length) {
+      setWealthHistory([]);
+      setIsWealthHistoryLoading(false);
+      return () => { active = false; };
+    }
+    setIsWealthHistoryLoading(true);
+    void fetchWealthHistory(assets, totalEstimatedValue)
+      .then((points) => { if (active) setWealthHistory(points); })
+      .catch(() => { if (active) setWealthHistory([]); })
+      .finally(() => { if (active) setIsWealthHistoryLoading(false); });
+    return () => { active = false; };
+  }, [assets, isPreview, totalEstimatedValue]);
 
   return (
     <div className="app-shell">
@@ -658,10 +883,12 @@ export default function Home() {
             </div>
           </section>
 
+          <section className="wealth-history-card card-surface"><div className="section-heading"><div><span className="card-label">PORTFOLIO HISTORY</span><h2>Estimated wealth evolution</h2></div><span className={`wealth-status ${isWealthHistoryLoading ? "wealth-status--loading" : ""}`}><span /> {isWealthHistoryLoading ? "SYNCING" : wealthHistory.length ? "30D MARK-TO-MARKET" : "WAITING FOR DATA"}</span></div>{isWealthHistoryLoading ? <div className="wealth-chart-loading"><Loader2 size={18} className="spin" /> Loading market history…</div> : wealthHistory.length === 0 ? <div className="wealth-chart-loading">Historical mark-to-market points are temporarily unavailable.</div> : <><div className="wealth-chart-wrap"><svg viewBox="0 0 600 190" role="img" aria-label="Estimated portfolio wealth evolution over the last 30 days"><defs><linearGradient id="wealth-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#caff4a" stopOpacity=".22" /><stop offset="100%" stopColor="#caff4a" stopOpacity="0" /></linearGradient></defs><line x1="34" y1="38" x2="566" y2="38" /><line x1="34" y1="98" x2="566" y2="98" /><line x1="34" y1="166" x2="566" y2="166" /><text x="0" y="42">{isPrivacyMode ? "•••" : `$${formatNumber(wealthChart.max)}`}</text><text x="0" y="102">{isPrivacyMode ? "•••" : `$${formatNumber((wealthChart.max + wealthChart.min) / 2)}`}</text><text x="0" y="170">{isPrivacyMode ? "•••" : `$${formatNumber(wealthChart.min)}`}</text><path d={wealthChart.area} fill="url(#wealth-area)" /><polyline points={wealthChart.line} fill="none" stroke="#caff4a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />{wealthChart.points.map((point) => <circle key={point.date} cx={point.x} cy={point.y} r="4" fill="#111718" stroke="#caff4a" strokeWidth="2" />)}</svg></div><div className="wealth-chart-labels"><span>{wealthChart.points[0]?.label}</span><span>{wealthChart.points[Math.floor(wealthChart.points.length / 2)]?.label}</span><span>{wealthChart.points[wealthChart.points.length - 1]?.label}</span></div></>}<div className="wealth-chart-note"><span><CircleHelp size={14} /> Current token quantities replayed against historical market prices.</span><strong className={wealthChart.delta >= 0 ? "change-positive" : "change-negative"}>{isPrivacyMode ? "••••" : `${wealthChart.delta >= 0 ? "+" : ""}${wealthChart.delta.toFixed(2)}% / 30D`}</strong></div></section>
+
           <section className="middle-grid">
             <div className="assets-card card-surface">
               <div className="section-heading section-heading--table"><div><span className="card-label">YOUR ASSETS</span><h2>Token holdings <span>{assets.length}</span></h2></div><div className="search-box"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search assets" /></div></div>
-              <div className="asset-table-wrap"><table className="asset-table"><thead><tr><th>ASSET</th><th>BALANCE</th><th>EST. VALUE</th><th>30D</th><th /></tr></thead><tbody>{visibleAssets.map((asset) => <tr key={asset.id}><td><div className="asset-cell"><AssetIcon asset={asset} /><div><strong>{asset.symbol}</strong><span>{asset.name}</span></div></div></td><td><strong>{isPrivacyMode ? "••••" : asset.balance}</strong><span className="asset-unit"> {asset.symbol}</span></td><td>{asset.price ? <><strong>{isPrivacyMode ? "••••" : `$${formatNumber(asset.rawBalance * asset.price)}`}</strong><span className="asset-unit"> USD</span></> : <span className="muted-text">Not priced</span>}</td><td>{asset.change === null ? <span className="muted-text">—</span> : <span className={asset.change >= 0 ? "change-positive" : "change-negative"}>{asset.change >= 0 ? "+" : ""}{asset.change.toFixed(2)}%</span>}</td><td><button className="row-arrow" onClick={() => asset.contract && toast.info(`${asset.contract} is a SIP-010 token.`)} aria-label={`View ${asset.symbol}`}><ArrowUpRight size={15} /></button></td></tr>)}{visibleAssets.length === 0 && <tr><td colSpan={5}><div className="empty-state"><Search size={20} /><strong>No assets found</strong><span>Try a different search.</span></div></td></tr>}</tbody></table></div>
+              <div className="asset-table-wrap"><table className="asset-table"><thead><tr><th>ASSET</th><th>BALANCE</th><th>EST. VALUE</th><th>30D</th><th /></tr></thead><tbody>{visibleAssets.map((asset) => <tr key={asset.id}><td><div className="asset-cell"><AssetIcon asset={asset} /><div><strong>{asset.symbol}</strong><span>{asset.name}</span></div></div></td><td><strong>{isPrivacyMode ? "••••" : asset.balance}</strong><span className="asset-unit"> {asset.symbol}</span></td><td>{asset.price ? <><strong>{isPrivacyMode ? "••••" : `$${formatNumber(asset.rawBalance * asset.price)}`}</strong><span className="asset-unit asset-source"> {asset.priceSource || "Market"}</span></> : <span className="muted-text">Not priced</span>}</td><td>{asset.change === null ? <span className="muted-text">—</span> : <span className={asset.change >= 0 ? "change-positive" : "change-negative"}>{asset.change >= 0 ? "+" : ""}{asset.change.toFixed(2)}%</span>}</td><td><button className="row-arrow" onClick={() => asset.contract && toast.info(`${asset.contract} is a SIP-010 token.`)} aria-label={`View ${asset.symbol}`}><ArrowUpRight size={15} /></button></td></tr>)}{visibleAssets.length === 0 && <tr><td colSpan={5}><div className="empty-state"><Search size={20} /><strong>No assets found</strong><span>Try a different search.</span></div></td></tr>}</tbody></table></div>
               <div className="table-footer"><span>Showing {visibleAssets.length} of {assets.length} assets</span><button onClick={() => toast.info("Token metadata explorer is coming next.")}>View all tokens <ArrowUpRight size={14} /></button></div>
             </div>
             <div className="allocation-card card-surface"><div className="section-heading"><div><span className="card-label">ALLOCATION</span><h2>By priced asset</h2></div><button className="more-button" aria-label="Allocation help" onClick={() => toast.info("Allocation uses estimated USD value where available.")}><CircleHelp size={16} /></button></div><div className="allocation-visual"><div className="donut" style={{ background: allocationGradient }}><div className="donut__inner"><strong>{pricedAssets.length}</strong><span>priced</span></div></div><div className="allocation-list">{topAssets.map((asset) => <div className="allocation-row" key={asset.id}><div><span className={`allocation-dot allocation-dot--${asset.tone}`} />{asset.symbol}</div><strong>{`${asset.share.toFixed(1)}%`}</strong></div>)}</div></div><div className="allocation-note"><span><Sparkles size={14} /> Known prices across {wallets.length} wallet</span><ArrowUpRight size={14} /></div></div>

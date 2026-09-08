@@ -286,3 +286,27 @@ h1 em { color: #caff4a; font-style: normal; }
 .live-composition__note { display: flex; align-items: center; gap: 7px; margin-top: 17px; color: #758076; font-size: 10px; }
 .live-composition__note svg { color: #caff4a; flex: 0 0 auto; }
 @media (max-width: 760px) { .live-composition { gap: 8px; }.live-composition strong { font-size: 9px; }.live-composition__label { font-size: 7px; }.live-composition__note { font-size: 9px; } }
+
+.asset-source { display: block; margin-top: 4px; color: #91a36f; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.wealth-history-card { padding: 23px 25px 18px; margin-bottom: 17px; }
+.wealth-history-card h2 { text-transform: none; }
+.wealth-status { display: inline-flex; align-items: center; gap: 6px; color: #a8d96b; font: 9px "IBM Plex Mono", monospace; white-space: nowrap; }
+.wealth-status > span { width: 5px; height: 5px; border-radius: 50%; background: #caff4a; box-shadow: 0 0 8px #caff4a; }
+.wealth-status--loading { color: #7e897e; }
+.wealth-status--loading > span { background: #e3ba5d; box-shadow: 0 0 8px #e3ba5d; animation: pulse-dot 1.1s ease-in-out infinite; }
+.wealth-chart-wrap { height: 196px; margin-top: 20px; }
+.wealth-chart-wrap svg { width: 100%; height: 100%; overflow: visible; }
+.wealth-chart-wrap line { stroke: rgba(255,255,255,.08); stroke-width: 1; stroke-dasharray: 3 5; }
+.wealth-chart-wrap text { fill: #667269; font: 9px "IBM Plex Mono", monospace; }
+.wealth-chart-wrap path { animation: fade-chart .6s var(--ease-out) both; }
+.wealth-chart-wrap polyline { filter: drop-shadow(0 0 8px rgba(202,255,74,.25)); animation: draw-chart .8s var(--ease-out) both; stroke-dasharray: 900; stroke-dashoffset: 900; }
+.wealth-chart-wrap circle { transition: r .18s, fill .18s; animation: fade-chart .4s var(--ease-out) both; }
+.wealth-chart-wrap circle:hover { r: 6; fill: #caff4a; }
+.wealth-chart-labels { display: flex; justify-content: space-between; margin: 1px 2px 0 34px; color: #667269; font: 9px "IBM Plex Mono", monospace; }
+.wealth-chart-loading { min-height: 196px; display: flex; align-items: center; justify-content: center; gap: 9px; color: #758077; font-size: 11px; }
+.wealth-chart-note { display: flex; align-items: center; justify-content: space-between; gap: 15px; border-top: 1px solid rgba(255,255,255,.07); padding-top: 13px; margin-top: 6px; color: #788278; font-size: 10px; }
+.wealth-chart-note span { display: inline-flex; align-items: center; gap: 6px; }
+.wealth-chart-note svg { color: #9bbd69; }
+.wealth-chart-note strong { white-space: nowrap; }
+@keyframes pulse-dot { 50% { opacity: .35; } }
+@media (max-width: 760px) { .wealth-history-card { padding: 20px; }.wealth-status { font-size: 8px; }.wealth-chart-wrap { height: 176px; }.wealth-chart-labels { margin-left: 27px; font-size: 8px; }.wealth-chart-note { align-items: flex-start; flex-direction: column; gap: 8px; }.asset-source { max-width: 105px; } }

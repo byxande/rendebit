@@ -1,0 +1,412 @@
+import {
+  ArrowDownToLine,
+  ArrowRight,
+  BadgeCheck,
+  Banknote,
+  Bitcoin,
+  Building2,
+  Check,
+  ChevronDown,
+  CircleDollarSign,
+  Copy,
+  FileCheck2,
+  FileText,
+  Fingerprint,
+  Gauge,
+  Home,
+  Landmark,
+  Layers3,
+  LockKeyhole,
+  Menu,
+  Network,
+  PieChart,
+  QrCode,
+  ReceiptText,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  WalletCards,
+  X,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+type SectionId = "inicio" | "rendimento" | "lotes" | "resgate" | "fiscal" | "reservas" | "empresas";
+
+type NavItem = {
+  id: SectionId;
+  label: string;
+  icon: LucideIcon;
+};
+
+const navItems: NavItem[] = [
+  { id: "inicio", label: "Visão geral", icon: Home },
+  { id: "rendimento", label: "Meu rendimento", icon: TrendingUp },
+  { id: "lotes", label: "Meus lotes", icon: Layers3 },
+  { id: "resgate", label: "Resgatar via Pix", icon: QrCode },
+  { id: "fiscal", label: "Relatório fiscal", icon: FileText },
+  { id: "reservas", label: "Reservas on-chain", icon: ShieldCheck },
+  { id: "empresas", label: "Para empresas", icon: Building2 },
+];
+
+const wealthPoints = [
+  { label: "10 jun", value: 115800 },
+  { label: "24 jun", value: 116950 },
+  { label: "08 jul", value: 116420 },
+  { label: "22 jul", value: 118730 },
+  { label: "05 ago", value: 120180 },
+  { label: "19 ago", value: 119540 },
+  { label: "02 set", value: 122314 },
+];
+
+const lots = [
+  { date: "10/06/2026", amount: "0,12000000", rate: "1,000000", cost: "R$ 48.240,00", value: "R$ 51.648,00", gain: "+R$ 3.408,00", status: "Em rendimento" },
+  { date: "02/07/2026", amount: "0,08421500", rate: "1,008400", cost: "R$ 34.611,73", value: "R$ 36.234,82", gain: "+R$ 1.623,09", status: "Em rendimento" },
+  { date: "18/08/2026", amount: "0,08000000", rate: "1,019200", cost: "R$ 32.948,27", value: "R$ 34.431,18", gain: "+R$ 1.482,91", status: "Em rendimento" },
+];
+
+const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const btcBrl = 421930;
+const stbtcRate = 1.02684;
+
+function CopyButton({ value, label = "Copiar" }: { value: string; label?: string }) {
+  return (
+    <button
+      className="br-copy"
+      onClick={() => {
+        void navigator.clipboard?.writeText(value);
+        toast.success("Copiado para a área de transferência");
+      }}
+      type="button"
+    >
+      <Copy size={14} /> {label}
+    </button>
+  );
+}
+
+function MiniChart() {
+  const width = 760;
+  const height = 238;
+  const pad = 12;
+  const values = wealthPoints.map((point) => point.value);
+  const min = Math.min(...values) - 900;
+  const max = Math.max(...values) + 700;
+  const points = wealthPoints.map((point, index) => ({
+    ...point,
+    x: pad + (index / (wealthPoints.length - 1)) * (width - pad * 2),
+    y: pad + ((max - point.value) / (max - min)) * (height - pad * 2),
+  }));
+  const line = points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`).join(" ");
+  const area = `${line} L${points.at(-1)?.x},${height} L${points[0].x},${height} Z`;
+
+  return (
+    <div className="br-chart-wrap">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Evolução demonstrativa do patrimônio em reais">
+        <defs>
+          <linearGradient id="wealthArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#33e6b0" stopOpacity="0.28" />
+            <stop offset="1" stopColor="#33e6b0" stopOpacity="0" />
+          </linearGradient>
+          <filter id="softGlow"><feGaussianBlur stdDeviation="5" result="blur" /></filter>
+        </defs>
+        {[0.18, 0.5, 0.82].map((ratio) => (
+          <line key={ratio} x1="0" x2={width} y1={height * ratio} y2={height * ratio} stroke="#dce6e3" strokeDasharray="5 7" />
+        ))}
+        <path d={area} fill="url(#wealthArea)" />
+        <path d={line} fill="none" stroke="#12c890" strokeWidth="9" opacity="0.12" filter="url(#softGlow)" />
+        <path d={line} fill="none" stroke="#0aaa7e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((point, index) => (
+          <g key={point.label}>
+            <circle cx={point.x} cy={point.y} r={index === points.length - 1 ? 6 : 3.5} fill="#ffffff" stroke="#0aaa7e" strokeWidth="3" />
+          </g>
+        ))}
+      </svg>
+      <div className="br-chart-labels">
+        {wealthPoints.map((point) => <span key={point.label}>{point.label}</span>)}
+      </div>
+    </div>
+  );
+}
+
+function DemoPill() {
+  return <span className="br-demo-pill"><Sparkles size={13} /> Ambiente demonstrativo</span>;
+}
+
+function YieldSummary({ onRedeem }: { onRedeem: () => void }) {
+  return (
+    <>
+      <section className="br-hero-grid">
+        <div className="br-balance-card">
+          <div className="br-card-head">
+            <div>
+              <span className="br-eyebrow light">SEU SALDO EM BITCOIN</span>
+              <div className="br-btc-value"><span>₿</span> 0,28421500</div>
+              <p>stBTC em rendimento automático</p>
+            </div>
+            <div className="br-orbit"><Bitcoin size={28} /><i /><i /></div>
+          </div>
+          <div className="br-balance-brl">
+            <div><small>Valor estimado hoje</small><strong>R$ 122.314,00</strong></div>
+            <span className="br-positive">+5,63%</span>
+          </div>
+          <div className="br-balance-actions">
+            <button type="button" className="br-primary light" onClick={() => toast.info("Fluxo de aporte demonstrativo")}>Aumentar posição <ArrowRight size={17} /></button>
+            <button type="button" className="br-secondary light" onClick={onRedeem}>Resgatar via Pix</button>
+          </div>
+        </div>
+
+        <div className="br-yield-card br-panel">
+          <div className="br-card-headline"><span>Rendimento acumulado</span><span className="br-live"><i /> ATUALIZADO</span></div>
+          <strong className="br-yield-number">+R$ 6.514,00</strong>
+          <span className="br-yield-btc">+0,015438 sBTC</span>
+          <div className="br-divider" />
+          <div className="br-kv"><span>Taxa stBTC/sBTC</span><b>1,026840</b></div>
+          <div className="br-kv"><span>Preço BTC/BRL</span><b>R$ 421.930,00</b></div>
+          <div className="br-kv"><span>Desde o primeiro lote</span><b>90 dias</b></div>
+          <button type="button" className="br-text-action" onClick={() => toast.info("Detalhamento disponível na aba Meu rendimento")}>Entender o cálculo <ArrowRight size={15} /></button>
+        </div>
+      </section>
+
+      <section className="br-panel br-wealth-card">
+        <div className="br-section-head">
+          <div>
+            <span className="br-eyebrow">PATRIMÔNIO EM REAIS</span>
+            <h2>Sua evolução, sem perder a referência em Bitcoin.</h2>
+          </div>
+          <div className="br-period"><button className="active" type="button">90 dias</button><button type="button" onClick={() => toast.info("Mais períodos na versão completa")}>1 ano</button></div>
+        </div>
+        <div className="br-chart-summary">
+          <div><small>Valor inicial</small><b>R$ 115.800</b></div>
+          <ArrowRight size={19} />
+          <div><small>Valor atual</small><b>R$ 122.314</b></div>
+          <span className="br-positive">+R$ 6.514</span>
+        </div>
+        <MiniChart />
+        <div className="br-chart-note"><Fingerprint size={15} /> Simulação com quantidades atuais e taxas demonstrativas. Não representa rentabilidade garantida.</div>
+      </section>
+    </>
+  );
+}
+
+function InnovationGrid({ setSection }: { setSection: (section: SectionId) => void }) {
+  const items = [
+    { icon: Bitcoin, title: "Rendimento em Bitcoin", text: "O valor cresce pela taxa stBTC/sBTC, sem pagamentos artificiais em tokens de incentivo.", tone: "lime" },
+    { icon: QrCode, title: "Liquidação via Pix", text: "Cotação transparente antes da confirmação, com destino para conta de mesma titularidade.", tone: "cyan" },
+    { icon: ReceiptText, title: "Contabilidade por lote", text: "Cada entrada preserva custo, taxa inicial, rendimento realizado e histórico auditável.", tone: "violet" },
+    { icon: FileCheck2, title: "Relatório fiscal brasileiro", text: "Resumo em reais, eventos tributáveis e arquivo pronto para compartilhar com o contador.", tone: "orange" },
+    { icon: Network, title: "Prova on-chain", text: "Endereços, contratos e lastro apresentados em uma camada de transparência verificável.", tone: "green" },
+    { icon: LockKeyhole, title: "Custódia segregada", text: "Arquitetura visual que separa patrimônio do cliente, liquidez operacional e parceiro BRL.", tone: "blue" },
+  ];
+  return (
+    <section className="br-innovation">
+      <div className="br-section-head">
+        <div><span className="br-eyebrow">A INOVAÇÃO REAL</span><h2>Bitcoin útil para a vida financeira no Brasil.</h2></div>
+        <button type="button" className="br-outline" onClick={() => setSection("empresas")}>Solução para empresas <ArrowRight size={16} /></button>
+      </div>
+      <div className="br-feature-grid">
+        {items.map(({ icon: Icon, title, text, tone }) => (
+          <article className="br-feature-card" key={title}>
+            <div className={`br-feature-icon ${tone}`}><Icon size={22} /></div>
+            <h3>{title}</h3><p>{text}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function YieldPage() {
+  return (
+    <div className="br-stack">
+      <section className="br-page-hero compact"><div><span className="br-eyebrow">MEU RENDIMENTO</span><h1>Rendimento que cresce em Bitcoin.</h1><p>Veja de onde vem a evolução da sua posição, sem confundir valorização do BTC com rendimento do protocolo.</p></div><div className="br-big-icon"><TrendingUp /></div></section>
+      <div className="br-metric-grid">
+        <div className="br-panel br-metric"><small>Rendimento stBTC</small><strong>+2,684%</strong><span>pela taxa stBTC/sBTC</span></div>
+        <div className="br-panel br-metric"><small>Variação do BTC/BRL</small><strong>+2,87%</strong><span>desde o primeiro lote</span></div>
+        <div className="br-panel br-metric"><small>Retorno combinado</small><strong>+5,63%</strong><span>R$ 6.514,00</span></div>
+      </div>
+      <section className="br-panel br-formula-card">
+        <div><span className="br-eyebrow">FÓRMULA TRANSPARENTE</span><h2>Como seu saldo é calculado</h2></div>
+        <div className="br-formula"><span>0,284215 stBTC</span><i>×</i><span>1,026840 sBTC</span><i>×</i><span>R$ 421.930</span><i>=</i><b>R$ 122.314</b></div>
+        <p>Saldo stBTC × taxa de conversão do protocolo × preço de execução BTC/BRL. Taxas e slippage são exibidos separadamente no resgate.</p>
+      </section>
+      <section className="br-panel br-breakdown">
+        <div className="br-section-head"><div><span className="br-eyebrow">HISTÓRICO</span><h2>Evolução da taxa stBTC/sBTC</h2></div><span className="br-positive">+2,684%</span></div>
+        <MiniChart />
+      </section>
+    </div>
+  );
+}
+
+function LotsPage() {
+  return (
+    <div className="br-stack">
+      <section className="br-page-hero compact"><div><span className="br-eyebrow">CONTABILIDADE POR LOTE</span><h1>Cada entrada tem sua própria história.</h1><p>Custo de aquisição, taxa inicial, resultado e eventos de cada lote em um único lugar.</p></div><div className="br-big-icon"><Layers3 /></div></section>
+      <section className="br-panel br-table-card">
+        <div className="br-section-head"><div><h2>Seus lotes de stBTC</h2><p>Valores demonstrativos atualizados em 08/09/2026.</p></div><button className="br-outline" type="button" onClick={() => toast.success("CSV demonstrativo preparado")}>Exportar CSV <ArrowDownToLine size={16} /></button></div>
+        <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Quantidade stBTC</th><th>Taxa de entrada</th><th>Custo em BRL</th><th>Valor atual</th><th>Resultado</th><th>Status</th></tr></thead><tbody>{lots.map((lot) => <tr key={lot.date}><td><b>{lot.date}</b></td><td className="mono">{lot.amount}</td><td className="mono">{lot.rate}</td><td>{lot.cost}</td><td>{lot.value}</td><td className="gain">{lot.gain}</td><td><span className="br-status"><i />{lot.status}</span></td></tr>)}</tbody></table></div>
+        <div className="br-table-total"><span>Total investido <b>R$ 115.800,00</b></span><span>Valor atual <b>R$ 122.314,00</b></span><span>Ganho não realizado <b className="gain">+R$ 6.514,00</b></span></div>
+      </section>
+    </div>
+  );
+}
+
+function RedeemPage({ amount, setAmount, onConfirm }: { amount: string; setAmount: (value: string) => void; onConfirm: () => void }) {
+  const numericAmount = Number(amount.replace(",", ".")) || 0;
+  const gross = numericAmount * stbtcRate * btcBrl;
+  const protocolFee = gross * 0.0015;
+  const fxFee = gross * 0.0045;
+  const net = Math.max(0, gross - protocolFee - fxFee);
+  return (
+    <div className="br-stack">
+      <section className="br-page-hero compact pix"><div><span className="br-eyebrow">RESGATE EM REAIS</span><h1>Do Bitcoin para o Pix, com total transparência.</h1><p>Você confere a cotação, todas as taxas e o valor líquido antes de assinar qualquer transação.</p></div><div className="br-big-icon"><QrCode /></div></section>
+      <div className="br-redeem-grid">
+        <section className="br-panel br-quote-form">
+          <span className="br-eyebrow">QUANTO DESEJA RESGATAR?</span>
+          <label className="br-amount-input"><input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" aria-label="Quantidade de stBTC" /><span>stBTC</span></label>
+          <div className="br-chips"><button type="button" onClick={() => setAmount("0,07105375")}>25%</button><button type="button" onClick={() => setAmount("0,14210750")}>50%</button><button type="button" onClick={() => setAmount("0,28421500")}>Máximo</button></div>
+          <div className="br-pix-account"><div className="br-bank-icon"><Landmark size={20} /></div><div><small>Conta Pix de destino</small><b>Banco Inter •••• 4821</b><span>Alexandre Bastos — mesma titularidade</span></div><BadgeCheck size={21} /></div>
+          <button type="button" className="br-primary full" onClick={onConfirm}>Revisar e continuar <ArrowRight size={17} /></button>
+        </section>
+        <section className="br-panel br-live-quote">
+          <div className="br-card-headline"><h2>Cotação transparente</h2><span className="br-live"><i /> 58s</span></div>
+          <div className="br-quote-value"><small>Você receberá</small><strong>{currency.format(net)}</strong><span>via Pix após a liquidação</span></div>
+          <div className="br-divider" />
+          <div className="br-kv"><span>Valor bruto</span><b>{currency.format(gross)}</b></div>
+          <div className="br-kv"><span>Resgate do protocolo (0,15%)</span><b>-{currency.format(protocolFee)}</b></div>
+          <div className="br-kv"><span>Conversão e Pix (0,45%)</span><b>-{currency.format(fxFee)}</b></div>
+          <div className="br-kv total"><span>Valor líquido</span><b>{currency.format(net)}</b></div>
+          <div className="br-warning"><ShieldCheck size={18} /><p><b>Sem taxa escondida.</b> O valor só é confirmado após sua assinatura na carteira.</p></div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function FiscalPage() {
+  return (
+    <div className="br-stack">
+      <section className="br-page-hero compact fiscal"><div><span className="br-eyebrow">ANO-CALENDÁRIO 2026</span><h1>Um relatório que fala a língua do seu contador.</h1><p>Posição patrimonial, custo por lote e eventos de realização organizados em reais.</p></div><div className="br-big-icon"><FileCheck2 /></div></section>
+      <div className="br-fiscal-grid">
+        <section className="br-panel br-report-preview">
+          <div className="br-report-top"><div className="br-report-mark"><Bitcoin /> <b>NEXO</b></div><span>RELATÓRIO FISCAL 2026</span></div>
+          <div className="br-report-person"><small>Titular</small><b>Alexandre B. • CPF •••.482.•••-••</b></div>
+          <div className="br-report-values"><div><small>Posição em 31/12</small><b>R$ 122.314,00</b></div><div><small>Custo de aquisição</small><b>R$ 115.800,00</b></div><div><small>Ganhos realizados</small><b>R$ 0,00</b></div></div>
+          <div className="br-report-lines"><i /><i /><i /><i /></div>
+          <div className="br-report-seal"><FileCheck2 /><span>Conciliação por lote concluída</span></div>
+        </section>
+        <section className="br-panel br-report-actions"><span className="br-eyebrow">PRONTO PARA EXPORTAR</span><h2>Pacote fiscal completo</h2><ul><li><Check /> Bens e Direitos em BRL</li><li><Check /> Memória de cálculo por lote</li><li><Check /> Resgates e conversões realizados</li><li><Check /> Extrato anual das taxas</li><li><Check /> Arquivo auxiliar em CSV</li></ul><button className="br-primary full" type="button" onClick={() => toast.success("PDF demonstrativo gerado")}>Baixar relatório em PDF <ArrowDownToLine size={17} /></button><button className="br-outline full" type="button" onClick={() => toast.info("Compartilhamento seguro disponível na versão completa")}>Compartilhar com contador</button><p className="br-legal-note">Material informativo demonstrativo. A classificação tributária deve ser validada por profissional habilitado.</p></section>
+      </div>
+    </div>
+  );
+}
+
+function ReservesPage() {
+  const reserveItems = [
+    { label: "stBTC em circulação", value: "142,8047 stBTC", detail: "Contrato do token" },
+    { label: "sBTC em reservas e bonds", value: "146,6239 sBTC", detail: "Lastro verificável" },
+    { label: "Índice de cobertura", value: "102,67%", detail: "Atualizado no bloco 612.842" },
+  ];
+  return (
+    <div className="br-stack">
+      <section className="br-page-hero compact reserves"><div><span className="br-eyebrow">PROVA ON-CHAIN</span><h1>Confiança que pode ser verificada.</h1><p>A interface organiza contratos, lastro e segregação. Os números abaixo são demonstrativos para o MVP.</p></div><div className="br-big-icon"><ShieldCheck /></div></section>
+      <div className="br-reserve-grid">{reserveItems.map((item, index) => <div className="br-panel br-reserve-metric" key={item.label}><div className={`br-number-chip n${index}`}>0{index + 1}</div><small>{item.label}</small><strong>{item.value}</strong><span>{item.detail}</span></div>)}</div>
+      <section className="br-panel br-custody-card">
+        <div className="br-section-head"><div><span className="br-eyebrow">CUSTÓDIA SEGREGADA</span><h2>Patrimônio do cliente separado da operação.</h2></div><span className="br-verified"><BadgeCheck /> Estrutura verificável</span></div>
+        <div className="br-custody-flow">
+          <div className="br-flow-node"><div><WalletCards /></div><b>Carteiras dos clientes</b><span>Posições individualizadas</span></div><ArrowRight />
+          <div className="br-flow-node highlighted"><div><LockKeyhole /></div><b>Vault segregado</b><span>Sem mistura com caixa</span></div><ArrowRight />
+          <div className="br-flow-node"><div><Network /></div><b>Protocolo stBTC</b><span>Reservas + PoX-5</span></div><ArrowRight />
+          <div className="br-flow-node"><div><Landmark /></div><b>Parceiro BRL</b><span>Liquidação via Pix</span></div>
+        </div>
+      </section>
+      <section className="br-panel br-contract-card"><div><span className="br-eyebrow">ENDEREÇO DEMONSTRATIVO</span><h3>Vault segregado de clientes</h3><code>SP2NEXO...8FA2.stbtc-client-vault-v1</code></div><CopyButton value="SP2NEXO8EXAMPLE8FA2.stbtc-client-vault-v1" label="Copiar endereço" /></section>
+    </div>
+  );
+}
+
+function BusinessPage() {
+  return (
+    <div className="br-stack">
+      <section className="br-business-hero"><div><span className="br-eyebrow light">NEXO PARA EMPRESAS</span><h1>Leve rendimento em Bitcoin aos seus clientes.</h1><p>Uma camada white-label em português para fintechs, exchanges e tesourarias — da posição em stBTC ao resgate em reais.</p><div className="br-business-actions"><button className="br-primary light" type="button" onClick={() => toast.success("Solicitação de demonstração registrada")}>Solicitar demonstração <ArrowRight /></button><button className="br-secondary light" type="button" onClick={() => toast.info("Documentação da API disponível na próxima etapa")}>Ver documentação</button></div></div><div className="br-api-visual"><div className="br-code-head"><span /><span /><span /><b>POST /v1/quotes/pix</b></div><pre>{`{
+  "asset": "stBTC",
+  "amount": "0.025",
+  "settlement": "BRL_PIX",
+  "customer": "verified"
+}`}</pre><div className="br-api-result"><Check /> Cotação criada em 184ms</div></div></section>
+      <div className="br-b2b-grid">
+        <div className="br-panel br-b2b-card"><div className="br-feature-icon lime"><Zap /></div><h3>API de rendimento</h3><p>Saldos, lotes, taxa stBTC/sBTC e eventos de protocolo normalizados.</p><span>REST + webhooks</span></div>
+        <div className="br-panel br-b2b-card"><div className="br-feature-icon cyan"><QrCode /></div><h3>Orquestração Pix</h3><p>Cotação, liquidação e conciliação com parceiros adequados ao fluxo brasileiro.</p><span>BRL settlement</span></div>
+        <div className="br-panel br-b2b-card"><div className="br-feature-icon violet"><Gauge /></div><h3>Painel white-label</h3><p>Marca, domínio, limites, taxas e jornadas configuráveis para cada distribuidor.</p><span>Go-live modular</span></div>
+      </div>
+      <section className="br-panel br-partner-strip"><div><span className="br-eyebrow">PRONTO PARA INTEGRAR</span><h2>Seu produto. Nossa infraestrutura Bitcoin.</h2></div><div className="br-partner-types"><span><Building2 /> Fintechs</span><span><CircleDollarSign /> Exchanges</span><span><Landmark /> Tesourarias</span></div><button className="br-outline" type="button" onClick={() => toast.success("Contato comercial demonstrativo iniciado")}>Falar com especialista</button></section>
+    </div>
+  );
+}
+
+export default function BitcoinYield() {
+  const [section, setSection] = useState<SectionId>("inicio");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [redeemOpen, setRedeemOpen] = useState(false);
+  const [amount, setAmount] = useState("0,01500000");
+  const activeLabel = useMemo(() => navItems.find((item) => item.id === section)?.label ?? "Visão geral", [section]);
+
+  function navigate(next: SectionId) {
+    setSection(next);
+    setMobileOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function confirmRedeem() {
+    setRedeemOpen(false);
+    toast.success("Simulação concluída", { description: "Nenhuma transação real foi realizada neste MVP." });
+  }
+
+  return (
+    <div className="btcbr-app">
+      <header className="br-mobile-header">
+        <button className="br-mobile-menu" type="button" onClick={() => setMobileOpen((open) => !open)} aria-label="Abrir menu">{mobileOpen ? <X /> : <Menu />}</button>
+        <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>NEXO</b><small>BITCOIN EM REAIS</small></div></div>
+        <button className="br-avatar" type="button">AB</button>
+      </header>
+      <aside className={`br-sidebar ${mobileOpen ? "open" : ""}`}>
+        <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>NEXO</b><small>BITCOIN EM REAIS</small></div></div>
+        <div className="br-profile"><div className="br-avatar">AB</div><div><b>Olá, Alexandre</b><span>Conta verificada <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
+        <nav>{navItems.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => navigate(id)} type="button"><Icon size={19} /><span>{label}</span>{id === "empresas" && <em>B2B</em>}</button>)}</nav>
+        <div className="br-sidebar-security"><ShieldCheck /><div><b>Ambiente protegido</b><span>Seus dados e posições são demonstrativos.</span></div></div>
+        <div className="br-sidebar-footer"><button type="button" onClick={() => toast.info("Central de ajuda demonstrativa")}>Central de ajuda</button><span>v0.1 MVP</span></div>
+      </aside>
+
+      <main className="br-main">
+        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-wallet-button" type="button" onClick={() => toast.success("Carteira demo conectada")}><WalletCards size={17} /> SP7CD8...EPAPR <i /></button></div></div>
+        <div className="br-content">
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seus reais disponíveis.</em></h1><p>Rendimento nativo em Bitcoin, transparência on-chain e resgate em BRL — em uma experiência feita para o Brasil.</p></div><div className="br-trust-row"><span><BadgeCheck /> Residência verificada</span><span><ShieldCheck /> Custódia segregada</span></div></section><YieldSummary onRedeem={() => setRedeemOpen(true)} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Da sua carteira ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Deposite BTC ou sBTC</h3><p>A posição é convertida em stBTC na taxa vigente.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acumule em Bitcoin</h3><p>As recompensas aumentam a taxa de conversão do token.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Veja a cotação líquida e confirme somente se concordar.</p></div></div></section></div>}
+          {section === "rendimento" && <YieldPage />}
+          {section === "lotes" && <LotsPage />}
+          {section === "resgate" && <RedeemPage amount={amount} setAmount={setAmount} onConfirm={() => setRedeemOpen(true)} />}
+          {section === "fiscal" && <FiscalPage />}
+          {section === "reservas" && <ReservesPage />}
+          {section === "empresas" && <BusinessPage />}
+        </div>
+      </main>
+
+      <Dialog open={redeemOpen} onOpenChange={setRedeemOpen}>
+        <DialogContent className="br-confirm-dialog">
+          <DialogHeader><DialogTitle>Confirmar simulação de resgate</DialogTitle><DialogDescription>Este é um MVP frontend. Nenhum ativo será movimentado e nenhum Pix será enviado.</DialogDescription></DialogHeader>
+          <div className="br-confirm-summary"><div><span>Quantidade</span><b>{amount} stBTC</b></div><div><span>Conta de destino</span><b>Banco Inter •••• 4821</b></div><div><span>Valor líquido estimado</span><b>{currency.format((Number(amount.replace(",", ".")) || 0) * stbtcRate * btcBrl * 0.994)}</b></div></div>
+          <button className="br-primary full" type="button" onClick={confirmRedeem}>Concluir demonstração <Check size={17} /></button>
+          <button className="br-dialog-cancel" type="button" onClick={() => setRedeemOpen(false)}>Voltar</button>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

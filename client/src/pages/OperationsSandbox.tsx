@@ -31,6 +31,7 @@ export default function OperationsSandbox() {
   const pixDepositsQuery = trpc.pixDeposits.operationalList.useQuery(undefined, { enabled: isAdmin });
   const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated });
   const redemptionsQuery = trpc.redemptions.operationalList.useQuery(undefined, { enabled: isAdmin });
+  const mercadoPagoQuery = trpc.integrations.mercadoPago.useQuery(undefined, { enabled: isAdmin });
   const [organizationName, setOrganizationName] = useState("Organização RendeBit");
   const [wallet, setWallet] = useState("");
   const [asset, setAsset] = useState<"STX" | "sBTC" | "stBTC">("sBTC");
@@ -118,7 +119,7 @@ export default function OperationsSandbox() {
       <div className="br-ops-status-grid">
         <article className="br-panel"><Database /><small>Persistência</small><b>Banco ativo</b><span>{purchasesQuery.data?.length ?? 0} compras registradas</span></article>
         <article className="br-panel"><BadgeCheck /><small>KYC</small><b>Adaptador sandbox</b><span>Webhook idempotente</span></article>
-        <article className="br-panel"><Landmark /><small>Pix e custódia</small><b>Eventos simulados</b><span>{pixDeposits.length} depósitos • {redemptions.length} resgates</span></article>
+        <article className="br-panel"><Landmark /><small>Mercado Pago</small><b>{mercadoPagoQuery.data?.configured ? `Conectado · ${mercadoPagoQuery.data.mode}` : "Aguardando credencial"}</b><span>Pix e cartão · compra de BTC separada</span></article>
         <article className="br-panel"><WalletCards /><small>Tesouraria</small><b>{settings?.status === "ready" ? "Pronta" : "Bloqueada"}</b><span>{settings?.stacksWalletAddress ? `${settings.stacksWalletAddress.slice(0, 8)}…` : "Carteira não informada"}</span></article>
       </div>
 

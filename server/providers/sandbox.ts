@@ -1,4 +1,4 @@
-import type { CustodyProvider, KycProvider, PixProvider, YieldProvider } from "./types";
+import type { CustodyProvider, KycProvider, PixProvider, PurchasePaymentProvider, YieldProvider } from "./types";
 
 const sandboxId = (prefix: string, stableId: number) => `${prefix}-sandbox-${stableId}`;
 
@@ -42,6 +42,18 @@ export const sandboxPixProvider: PixProvider = {
       externalId: sandboxId("pix-out", redemptionId),
       status: "settled",
       payload: { amountBrl, pixDestinationMasked },
+    };
+  },
+};
+
+export const sandboxPurchasePaymentProvider: PurchasePaymentProvider = {
+  provider: "sandbox_payments",
+  mode: "sandbox",
+  async createCheckout({ purchaseId, paymentMethod }) {
+    return {
+      externalId: sandboxId("payment", purchaseId),
+      status: "approved",
+      payload: { checkoutUrl: null, paymentMethod, paymentStatus: "approved" },
     };
   },
 };

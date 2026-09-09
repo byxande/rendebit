@@ -116,7 +116,7 @@ export async function verifySandboxProfile(userId: number, providerReference: st
 }
 
 export async function recordProviderEvent(input: {
-  provider: "sandbox_kyc" | "sandbox_pix" | "sandbox_custody" | "sandbox_stacks" | "stacks_testnet";
+  provider: "sandbox_kyc" | "sandbox_pix" | "sandbox_payments" | "mercado_pago" | "sandbox_custody" | "sandbox_stacks" | "stacks_testnet";
   eventType: string;
   externalId: string;
   payload: unknown;
@@ -254,6 +254,8 @@ export async function startSandboxPurchase(input: {
   userId: number;
   quoteId: number;
   idempotencyKey: string;
+  paymentMethod: "pix" | "credit_card";
+  paymentProvider: "sandbox" | "mercado_pago";
 }) {
   const db = await requireDb();
   const existing = (await db.select().from(purchases).where(eq(purchases.externalReference, input.idempotencyKey)).limit(1))[0];
@@ -268,11 +270,14 @@ export async function startSandboxPurchase(input: {
       userId: input.userId,
       quoteId: quote.id,
       externalReference: input.idempotencyKey,
+      paymentMethod: input.paymentMethod,
+      paymentProvider: input.paymentProvider,
+      paymentStatus: "pending",
       amountBrl: quote.amountBrl,
       serviceFeeBrl: quote.serviceFeeBrl,
       btcAmount: quote.btcAmount,
       executionBtcBrl: quote.executionBtcBrl,
-      status: "processing",
+      status: "awaiting_payment",
       yieldStatus: "pending",
     });
     const purchase = (await tx.select().from(purchases).where(eq(purchases.externalReference, input.idempotencyKey)).limit(1))[0];
@@ -281,6 +286,56 @@ export async function startSandboxPurchase(input: {
     await tx.update(purchaseQuotes).set({ status: "confirmed" }).where(eq(purchaseQuotes.id, quote.id));
     return purchase;
   });
+}
+
+export async function attachPurchasePayment(input: {
+  userId: number;
+  purchaseId: number;
+  paymentReference: string;
+  paymentStatus: "pending" | "approved";
+  checkoutUrl: string | null;
+}) {
+  const db = await requireDb();
+  await db.update(purchases).set({
+    paymentReference: input.paymentReference,
+    paymentStatus: input.paymentStatus,
+    checkoutUrl: input.checkoutUrl,
+    status: input.paymentStatus === "approved" ? "processing" : "awaiting_payment",
+  }).where(and(eq(purchases.id, input.purchaseId), eq(purchases.userId, input.userId), eq(purchases.status, "awaiting_payment")));
+  return (await db.select().from(purchases).where(and(eq(purchases.id, input.purchaseId), eq(purchases.userId, input.userId))).limit(1))[0];
+}
+
+export async function getPurchaseById(purchaseId: number) {
+  const db = await requireDb();
+  return (await db.select().from(purchases).where(eq(purchases.id, purchaseId)).limit(1))[0] ?? null;
+}
+
+export async function approvePurchasePayment(input: { purchaseId: number; paymentReference: string }) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    const purchase = (await tx.select().from(purchases).where(eq(purchases.id, input.purchaseId)).limit(1))[0];
+    if (!purchase) throw new Error("Compra não encontrada para conciliação.");
+    if (purchase.paymentReference && purchase.paymentReference !== input.paymentReference && purchase.paymentProvider !== "mercado_pago") {
+      throw new Error("Referência de pagamento não corresponde à compra.");
+    }
+    if (purchase.status === "settled") return purchase;
+    if (purchase.status !== "awaiting_payment" && purchase.status !== "processing") throw new Error("Compra não pode receber aprovação no estado atual.");
+    await tx.update(purchases).set({
+      paymentReference: input.paymentReference,
+      paymentStatus: "approved",
+      status: "processing",
+    }).where(eq(purchases.id, input.purchaseId));
+    return (await tx.select().from(purchases).where(eq(purchases.id, input.purchaseId)).limit(1))[0];
+  });
+}
+
+export async function rejectPurchasePayment(input: { purchaseId: number; paymentReference: string }) {
+  const db = await requireDb();
+  await db.update(purchases).set({
+    paymentReference: input.paymentReference,
+    paymentStatus: "rejected",
+    status: "failed",
+  }).where(and(eq(purchases.id, input.purchaseId), eq(purchases.status, "awaiting_payment")));
 }
 
 export async function settleSandboxPurchase(input: {

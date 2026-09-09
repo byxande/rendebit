@@ -83,8 +83,9 @@ try {
   });
   if (!storedQuote) throw new Error("Cotação não foi persistida.");
 
-  const firstPurchase = await confirmPurchaseWorkflow({ userId, quoteId: storedQuote.id, idempotencyKey: `purchase-${suffix}` });
-  const duplicatePurchase = await confirmPurchaseWorkflow({ userId, quoteId: storedQuote.id, idempotencyKey: `purchase-${suffix}` });
+  const paymentInput = { userId, quoteId: storedQuote.id, idempotencyKey: `purchase-${suffix}`, paymentMethod: "pix" as const, payerEmail: "sandbox@example.com", returnBaseUrl: "https://sandbox.rendebit.local" };
+  const firstPurchase = await confirmPurchaseWorkflow(paymentInput);
+  const duplicatePurchase = await confirmPurchaseWorkflow(paymentInput);
   if (firstPurchase.id !== duplicatePurchase.id) throw new Error("Idempotência da compra falhou.");
 
   const availableBefore = await getAvailableBtcBalance(userId);

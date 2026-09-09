@@ -982,3 +982,131 @@ h1 em { color: #caff4a; font-style: normal; }
   .br-pix-balance { width: 100%; max-width: 100%; align-items: flex-start; }
   .br-pix-balance strong { max-width: 100%; overflow-wrap: anywhere; }
 }
+
+/* RendeBit warm fintech refresh — beige surfaces, restrained Bitcoin orange */
+.btcbr-app {
+  --br-navy: #2a211b;
+  --br-navy-2: #3a2b20;
+  --br-ink: #2d261f;
+  --br-subtle: #766b5f;
+  --br-paper: #f4eee3;
+  --br-card: #fffaf1;
+  --br-line: #e5dac9;
+  --br-orange: #f7931a;
+  --br-mint: #2f8b63;
+  background: radial-gradient(circle at 78% 2%, rgba(247,147,26,.12), transparent 27rem), linear-gradient(180deg,#fbf6ed 0%,#f2eadf 100%);
+}
+.br-sidebar { color: #f7f0e7; background: linear-gradient(180deg,#2a211b 0%,#1e1814 100%); box-shadow: 16px 0 44px rgba(47,34,24,.10); }
+.br-sidebar::after { background: rgba(247,147,26,.10); }
+.br-sidebar nav button { color: #b9aa9b; }
+.br-sidebar nav button:hover { color: #fffaf2; background: rgba(255,255,255,.06); }
+.br-sidebar nav button.active { color: #fff3df; background: linear-gradient(90deg,rgba(247,147,26,.21),rgba(247,147,26,.07)); box-shadow: inset 2px 0 var(--br-orange); }
+.br-sidebar nav button.active svg, .br-sidebar-footer button:hover { color: var(--br-orange); }
+.br-sidebar nav em { color: #3a2818; background: #f8b75f; }
+.br-profile { border-color: rgba(255,255,255,.09); background: rgba(255,255,255,.035); }
+.br-avatar { color: #ffe1b8; background: #493527; }
+.br-profile span, .br-brand small { color: #a89483; }
+.br-profile span svg { color: #f8a63e; }
+.br-sidebar-security { border-color: rgba(247,147,26,.18); background: rgba(247,147,26,.06); }
+.br-sidebar-security > svg { color: #f8a63e; }
+.br-sidebar-security span { color: #9c897a; }
+.br-main { background: transparent; }
+.br-topbar { border-color: #e6dccd; background: rgba(250,245,236,.84); }
+.br-topbar > div:first-child span, .br-eyebrow { color: #8e7968; }
+.br-demo-pill, .br-account-button { border-color: #dfd2c0; color: #6f6054; background: rgba(255,250,242,.86); box-shadow: 0 4px 14px rgba(73,51,32,.04); }
+.br-demo-pill svg { color: var(--br-orange); }
+.br-account-button:hover { border-color: #efa74f; color: #a35308; }
+.br-account-status { background: #fbe1bd; }
+.br-account-status i { background: var(--br-orange); }
+.br-welcome h1 em { color: #dc790b; }
+.br-welcome p, .br-page-hero p, .br-section-head p { color: var(--br-subtle); }
+.br-trust-row span { color: #76685c; }
+.br-trust-row svg { color: var(--br-orange); }
+.br-panel { border-color: var(--br-line); background: rgba(255,250,241,.92); box-shadow: 0 12px 38px rgba(74,51,31,.055); }
+.br-balance-card { color: #fff7ea; background: radial-gradient(circle at 85% 14%,rgba(247,147,26,.26),transparent 33%),radial-gradient(circle at 8% 100%,rgba(255,206,141,.11),transparent 36%),linear-gradient(135deg,#3a2a20 0%,#241b16 100%); box-shadow: 0 18px 48px rgba(58,40,25,.20); }
+.br-btc-value span, .br-orbit { color: var(--br-orange); }
+.br-balance-card p, .br-balance-brl small { color: #c5b5a5; }
+.br-orbit { border-color: rgba(247,147,26,.32); background: rgba(247,147,26,.09); }
+.br-orbit i { border-color: rgba(247,147,26,.21); }
+.br-orbit i:last-child { border-color: rgba(255,225,188,.10); }
+.br-brl-badge { border-color: rgba(247,147,26,.28); color: #ffe1b8; background: rgba(247,147,26,.10); }
+.br-brl-badge svg { color: var(--br-orange); }
+.br-positive { color: #9e5507; background: #fce3c3; }
+.br-balance-brl .br-positive { color: #ffc471; background: rgba(247,147,26,.15); }
+.br-primary { border-color: #e9830d; color: #fff; background: #ed890f; box-shadow: 0 8px 24px rgba(231,128,10,.20); }
+.br-primary:hover { background: #d97706; }
+.br-primary.light { border-color: var(--br-orange); color: #2c1d10; background: var(--br-orange); box-shadow: 0 8px 26px rgba(247,147,26,.18); }
+.br-primary.light:hover { background: #ffa633; }
+.br-secondary.light { border-color: rgba(255,255,255,.17); color: #f1e4d6; background: rgba(255,255,255,.055); }
+.br-outline { border-color: #dccdb9; color: #5e4e41; background: #fffaf2; }
+.br-outline:hover { border-color: #eda44b; color: #a9570b; }
+.br-yield-number, .br-section-head h2, .br-metric strong, .br-report-actions h2, .br-purchase-summary b { color: var(--br-navy); }
+.br-yield-btc, .br-text-action, .br-metric span, .br-feature-card h3 { color: #c66b09; }
+.br-live i, .br-buy-quote-head span i { background: var(--br-orange); box-shadow: 0 0 0 4px rgba(247,147,26,.12); }
+.br-kv, .br-card-headline { color: #7c6d61; }
+.br-kv b { color: #4a3b30; }
+.br-kv.total b { color: #b76008; }
+.br-period { border-color: #e2d5c3; background: #f2e9dc; }
+.br-period button.active { background: #3a2b20; }
+.br-feature-card { border-color: var(--br-line); background: #fffaf2; box-shadow: 0 10px 30px rgba(73,51,32,.035); }
+.br-feature-card:hover { border-color: #ebc18d; box-shadow: 0 16px 34px rgba(73,51,32,.08); }
+.br-feature-icon.lime,.br-feature-icon.cyan,.br-feature-icon.violet,.br-feature-icon.orange,.br-feature-icon.green,.br-feature-icon.blue { color: #ac5b09; background: #fbe5c8; }
+.br-steps > div { background: #f7efe3; }
+.br-steps > div > svg { color: var(--br-orange); }
+.br-steps h3 { color: #44362b; }
+.br-page-hero { border-color: var(--br-line); background: radial-gradient(circle at 84% 30%,rgba(247,147,26,.15),transparent 18rem),#fffaf2; box-shadow: 0 12px 40px rgba(73,51,32,.055); }
+.br-page-hero.pix,.br-page-hero.fiscal,.br-page-hero.reserves,.br-pix-hero { background: radial-gradient(circle at 84% 30%,rgba(247,147,26,.16),transparent 18rem),#fffaf2; }
+.br-big-icon { border-color: #ead5b8; color: #d87408; background: linear-gradient(145deg,#fffaf2,#f9e6cc); box-shadow: 0 15px 30px rgba(73,51,32,.08); }
+.br-business-hero,.br-help-hero,.br-ops-hero { background: radial-gradient(circle at 84% 16%,rgba(247,147,26,.25),transparent 22rem),linear-gradient(135deg,#3a2a20,#241b16); box-shadow: 0 18px 45px rgba(58,40,25,.19); }
+.br-business-hero p,.br-help-hero p { color: #c5b4a4; }
+.br-help-search { border-color: rgba(247,147,26,.23); background: rgba(255,255,255,.07); }
+.br-help-search:focus-within { border-color: rgba(247,147,26,.78); box-shadow: 0 0 0 4px rgba(247,147,26,.09); }
+.br-help-search svg,.br-help-orbit { color: var(--br-orange); }
+.br-help-orbit { border-color: rgba(247,147,26,.28); background: rgba(247,147,26,.07); }
+.br-help-categories,.br-faq { border-color: var(--br-line); background: rgba(255,250,242,.86); }
+.br-help-categories button.active,.br-faq-trigger:hover { color: #a65508; background: #fae8ce; }
+.br-faq-trigger small,.br-faq-plus { color: #bf6508; }
+.br-faq-plus { border-color: #ead4b4; background: #fff2df; }
+.br-confirm-dialog,.dark .br-confirm-dialog { border-color: #dfcfba !important; color: #392f27 !important; background: #fffaf2 !important; }
+.br-confirm-dialog [data-slot="dialog-title"],.dark .br-confirm-dialog [data-slot="dialog-title"] { color: #2a211b !important; }
+.br-confirm-dialog [data-slot="dialog-description"],.dark .br-confirm-dialog [data-slot="dialog-description"] { color: #76685d !important; }
+.br-amount-field,.br-eligibility-grid input,.br-eligibility-grid select,.br-check-stack label,.br-risk-check,.br-buy-quote { border-color: #e1d3c0; background: #fffaf3; }
+.br-amount-field:focus-within,.br-eligibility-grid input:focus,.br-eligibility-grid select:focus { border-color: var(--br-orange); box-shadow: 0 0 0 4px rgba(247,147,26,.09); }
+.br-amount-field span,.br-check-stack b { color: #9e5507; }
+.br-check-stack input,.br-risk-check input { accent-color: var(--br-orange); }
+.br-buy-chips button,.br-chips button { border-color: #dfd0bd; color: #6d5c4f; background: #fffaf2; }
+.br-buy-chips button:hover,.br-chips button:hover { border-color: #eaa34c; color: #9e5507; background: #fff3e1; }
+.br-buy-total,.br-history-disclosure,.br-warning,.br-pix-rules,.br-login-note { color: #754a20; background: #fbe8cc; }
+.br-buy-total strong { color: #5a3511; }
+.br-success-icon,.br-login-shield,.br-pix-empty > svg,.br-bank-icon,.br-help-contact-icon { color: #b65f08; background: #fbe6c8; box-shadow: 0 0 0 9px rgba(247,147,26,.06); }
+.br-purchase-progress > span.active,.br-redemption-progress > span.active { color: #a85708; }
+.br-purchase-progress > span.active i,.br-redemption-progress > span.active i { color: #402408; background: #f7a63e; box-shadow: 0 0 0 4px rgba(247,147,26,.15); }
+.br-payment-methods { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin: 13px 0; }
+.br-payment-methods button { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; min-height: 64px; padding: 11px 13px; border: 1px solid #e0d2bf; border-radius: 12px; color: #6e5e51; background: #fffaf3; text-align: left; }
+.br-payment-methods button > svg { width: 21px; color: #ae6725; }
+.br-payment-methods button span { display: flex; flex-direction: column; gap: 2px; }
+.br-payment-methods button b { color: #3e3128; font-size: 10px; }
+.br-payment-methods button small { color: #8b7a6c; font-size: 8px; }
+.br-payment-methods button > i { width: 14px; height: 14px; border: 1px solid #cdbda9; border-radius: 50%; }
+.br-payment-methods button.active { border-color: #e9912e; background: #fff0db; box-shadow: 0 0 0 3px rgba(247,147,26,.08); }
+.br-payment-methods button.active > i { border: 4px solid var(--br-orange); background: #fff; }
+.br-payment-methods button.active > svg { color: #d77408; }
+.br-mercado-pago-note { display: flex; align-items: flex-start; gap: 8px; margin: 2px 0 12px; padding: 10px 11px; border-radius: 10px; color: #76675a; background: #f3eadf; font-size: 8px; line-height: 1.5; }
+.br-mercado-pago-note svg { flex: 0 0 auto; color: #c56a0a; }
+.br-pix-balance strong,.br-pix-charge-head h2 { color: #3b2e25; }
+.br-pix-balance span,.br-pix-rules svg,.br-pix-code .br-copy { color: #b55f08; }
+.br-pix-code { border-color: #e1d4c1; background: #f8f0e5; }
+.br-pix-code code { color: #624d3c; }
+.br-mobile-header { background: rgba(42,33,27,.98); }
+.br-ops-page,.br-ops-gate { background: #f3ecdf; color: #332a23; }
+.br-ops-status-grid svg,.br-safety-note svg,.br-ops-gate > svg { color: var(--br-orange); }
+.br-ops-form input,.br-ops-form select { border-color: #dfd2c0; background: #fffaf3; color: #382e26; }
+.br-ops-form input:focus,.br-ops-form select:focus { border-color: var(--br-orange); box-shadow: 0 0 0 3px rgba(247,147,26,.1); }
+.br-ops-footer { background: #2a211b; color: #f1dfca; }
+@media (max-width: 650px) { .br-payment-methods { grid-template-columns: 1fr; } }
+
+.br-status.pending { background: #fff1d8; color: #8a4a08; border-color: rgba(247, 147, 26, 0.28); }
+.br-status.pending i { background: #f7931a; }
+.br-resume-checkout { display: block; margin-top: 7px; border: 0; background: transparent; color: #a95308; font-size: 11px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.br-resume-checkout:hover { color: #d66b08; }
+.br-resume-checkout:focus-visible { outline: 2px solid #f7931a; outline-offset: 3px; border-radius: 3px; }

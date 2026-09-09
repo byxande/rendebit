@@ -1,8 +1,10 @@
 export type ProviderResult<T> = {
   externalId: string;
-  status: "approved" | "settled" | "active";
+  status: "approved" | "settled" | "active" | "pending";
   payload: T;
 };
+
+export type PurchasePaymentMethod = "pix" | "credit_card";
 
 export interface KycProvider {
   verifyIdentity(input: { userId: number; cpfMasked: string }): Promise<ProviderResult<{ taxStatus: "regular" }>>;
@@ -13,6 +15,23 @@ export interface PixProvider {
   confirmCashInCharge(input: { depositId: number; amountBrl: string; idempotencyKey: string }): Promise<ProviderResult<{ amountBrl: string; endToEndId: string }>>;
   settleCashIn(input: { purchaseId: number; amountBrl: string; idempotencyKey: string }): Promise<ProviderResult<{ amountBrl: string }>>;
   settleCashOut(input: { redemptionId: number; amountBrl: string; pixDestinationMasked: string; idempotencyKey: string }): Promise<ProviderResult<{ amountBrl: string; pixDestinationMasked: string }>>;
+}
+
+export interface PurchasePaymentProvider {
+  provider: "sandbox_payments" | "mercado_pago";
+  mode: "sandbox" | "test" | "production";
+  createCheckout(input: {
+    purchaseId: number;
+    amountBrl: string;
+    payerEmail: string | null;
+    paymentMethod: PurchasePaymentMethod;
+    idempotencyKey: string;
+    returnBaseUrl: string;
+  }): Promise<ProviderResult<{
+    checkoutUrl: string | null;
+    paymentMethod: PurchasePaymentMethod;
+    paymentStatus: "pending" | "approved";
+  }>>;
 }
 
 export interface CustodyProvider {

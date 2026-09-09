@@ -10,6 +10,7 @@ import {
   ChevronDown,
   CircleDollarSign,
   Copy,
+  CreditCard,
   FileCheck2,
   FileText,
   Fingerprint,
@@ -93,6 +94,10 @@ type PurchaseRecord = {
   currentValue: number;
   gain: number;
   status: string;
+  paymentMethod?: "pix" | "credit_card";
+  paymentStatus?: "not_started" | "pending" | "approved" | "rejected" | "refunded";
+  checkoutUrl?: string | null;
+  completed: boolean;
 };
 
 const navItems: NavItem[] = [
@@ -108,12 +113,12 @@ const navItems: NavItem[] = [
 ];
 
 const wealthPoints = [
-  { label: "10 jun", value: 115800 },
-  { label: "24 jun", value: 116950 },
-  { label: "08 jul", value: 116420 },
-  { label: "22 jul", value: 118730 },
-  { label: "05 ago", value: 120180 },
-  { label: "19 ago", value: 119540 },
+  { label: "10 jun", value: 121409 },
+  { label: "24 jun", value: 121520 },
+  { label: "08 jul", value: 121498 },
+  { label: "22 jul", value: 121702 },
+  { label: "05 ago", value: 121910 },
+  { label: "19 ago", value: 122040 },
   { label: "02 set", value: 122314 },
 ];
 
@@ -169,8 +174,8 @@ function MiniChart() {
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Evolução demonstrativa do patrimônio em reais">
         <defs>
           <linearGradient id="wealthArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#33e6b0" stopOpacity="0.28" />
-            <stop offset="1" stopColor="#33e6b0" stopOpacity="0" />
+            <stop offset="0" stopColor="#f7931a" stopOpacity="0.22" />
+            <stop offset="1" stopColor="#f7931a" stopOpacity="0" />
           </linearGradient>
           <filter id="softGlow"><feGaussianBlur stdDeviation="5" result="blur" /></filter>
         </defs>
@@ -178,11 +183,11 @@ function MiniChart() {
           <line key={ratio} x1="0" x2={width} y1={height * ratio} y2={height * ratio} stroke="#dce6e3" strokeDasharray="5 7" />
         ))}
         <path d={area} fill="url(#wealthArea)" />
-        <path d={line} fill="none" stroke="#12c890" strokeWidth="9" opacity="0.12" filter="url(#softGlow)" />
-        <path d={line} fill="none" stroke="#0aaa7e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={line} fill="none" stroke="#f7931a" strokeWidth="9" opacity="0.12" filter="url(#softGlow)" />
+        <path d={line} fill="none" stroke="#e47f0b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         {points.map((point, index) => (
           <g key={point.label}>
-            <circle cx={point.x} cy={point.y} r={index === points.length - 1 ? 6 : 3.5} fill="#ffffff" stroke="#0aaa7e" strokeWidth="3" />
+            <circle cx={point.x} cy={point.y} r={index === points.length - 1 ? 6 : 3.5} fill="#fffaf1" stroke="#e47f0b" strokeWidth="3" />
           </g>
         ))}
       </svg>
@@ -205,7 +210,7 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney }: { onRedeem: () => voi
           <div className="br-card-head">
             <div>
               <span className="br-eyebrow light">SEU SALDO EM BITCOIN</span>
-              <div className="br-btc-value"><span>₿</span> 0,28421500</div>
+              <div className="br-btc-value"><span>₿</span> 0,28989168</div>
               <p>Seu rendimento é acompanhado em reais (BRL)</p>
             </div>
             <div className="br-orbit"><Bitcoin size={28} /><i /><i /></div>
@@ -213,7 +218,7 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney }: { onRedeem: () => voi
           <div className="br-brl-badge"><Banknote size={15} /> Rendimento calculado e exibido em reais (BRL)</div>
           <div className="br-balance-brl">
             <div><small>Valor em reais hoje (BRL)</small><strong>R$ 122.314,00</strong></div>
-            <span className="br-positive">+5,63%</span>
+            <span className="br-positive">+0,74% em 90 dias</span>
           </div>
           <div className="br-balance-actions">
             <button type="button" className="br-primary light" onClick={onDeposit}>Depositar via Pix <ArrowDownToLine size={17} /></button>
@@ -223,13 +228,13 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney }: { onRedeem: () => voi
         </div>
 
         <div className="br-yield-card br-panel">
-          <div className="br-card-headline"><span>Seu rendimento em reais (BRL)</span><span className="br-live"><i /> ATUALIZADO</span></div>
-          <strong className="br-yield-number">+R$ 6.514,00</strong>
-          <span className="br-yield-btc">+R$ 6.514,00 estimados no período</span>
+          <div className="br-card-headline"><span>Retorno nativo estimado</span><span className="br-live"><i /> REFERÊNCIA</span></div>
+          <strong className="br-yield-number">~3% a.a.</strong>
+          <span className="br-yield-btc">≈ R$ 3.669,42 em 12 meses sobre o saldo atual</span>
           <div className="br-divider" />
-          <div className="br-kv"><span>Parcela gerada pelo protocolo</span><b>+2,68%</b></div>
+          <div className="br-kv"><span>Estimativa para 90 dias</span><b>+0,74%</b></div>
           <div className="br-kv"><span>Referência de conversão BTC/BRL</span><b>R$ 421.930,00</b></div>
-          <div className="br-kv"><span>Desde o seu primeiro aporte</span><b>90 dias</b></div>
+          <div className="br-kv"><span>Natureza do retorno</span><b>Variável, não garantido</b></div>
           <button type="button" className="br-text-action" onClick={() => toast.info("Aqui você verá o detalhamento do seu ganho, sem precisar entender a tecnologia por trás.")}>Como esse valor é calculado <ArrowRight size={15} /></button>
         </div>
       </section>
@@ -243,10 +248,10 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney }: { onRedeem: () => voi
           <div className="br-period"><button className="active" type="button">90 dias</button><button type="button" onClick={() => toast.info("Mais períodos na versão completa")}>1 ano</button></div>
         </div>
         <div className="br-chart-summary">
-          <div><small>Valor inicial</small><b>R$ 115.800</b></div>
+          <div><small>Valor inicial</small><b>R$ 121.409</b></div>
           <ArrowRight size={19} />
           <div><small>Valor atual</small><b>R$ 122.314</b></div>
-          <span className="br-positive">+R$ 6.514</span>
+          <span className="br-positive">+R$ 905</span>
         </div>
         <MiniChart />
         <div className="br-chart-note"><Fingerprint size={15} /> Simulação com quantidades atuais e taxas demonstrativas. Não representa rentabilidade garantida.</div>
@@ -285,11 +290,11 @@ function InnovationGrid({ setSection }: { setSection: (section: SectionId) => vo
 function YieldPage() {
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact"><div><span className="br-eyebrow">MEU RENDIMENTO EM BRL</span><h1>Rendimento em reais, com origem em Bitcoin.</h1><p>Veja quanto o seu saldo pode representar em reais e separe o que veio do protocolo do que veio da variação do Bitcoin.</p></div><div className="br-big-icon"><TrendingUp /></div></section>
+      <section className="br-page-hero compact"><div><span className="br-eyebrow">RETORNO NATIVO EM BITCOIN</span><h1>~3% a.a., acompanhado em reais.</h1><p>Estimativa anual variável gerada pela estratégia em Bitcoin. A valorização ou queda do BTC em BRL é mostrada separadamente.</p></div><div className="br-big-icon"><TrendingUp /></div></section>
       <div className="br-metric-grid">
-        <div className="br-panel br-metric"><small>Crescimento do saldo</small><strong>+2,684%</strong><span>gerado pelo protocolo</span></div>
-        <div className="br-panel br-metric"><small>Variação do Bitcoin</small><strong>+2,87%</strong><span>desde o primeiro aporte</span></div>
-        <div className="br-panel br-metric"><small>Retorno combinado</small><strong>+5,63%</strong><span>R$ 6.514,00</span></div>
+        <div className="br-panel br-metric"><small>Retorno anual estimado</small><strong>~3% a.a.</strong><span>variável e não garantido</span></div>
+        <div className="br-panel br-metric"><small>Estimativa em 90 dias</small><strong>+0,74%</strong><span>aprox. R$ 904,78</span></div>
+        <div className="br-panel br-metric"><small>Variação do Bitcoin</small><strong>Separada</strong><span>pode aumentar ou reduzir o valor em BRL</span></div>
       </div>
       <section className="br-panel br-formula-card">
         <div><span className="br-eyebrow">TRANSPARÊNCIA SEM COMPLICAÇÃO</span><h2>Como chegamos ao seu valor</h2></div>
@@ -297,7 +302,7 @@ function YieldPage() {
         <p>O painel combina seu saldo em Bitcoin, o rendimento acumulado e a cotação em BRL. Custos e diferenças de execução aparecem separadamente antes da compra ou do resgate.</p>
       </section>
       <section className="br-panel br-breakdown">
-        <div className="br-section-head"><div><span className="br-eyebrow">HISTÓRICO</span><h2>Evolução do rendimento acumulado</h2></div><span className="br-positive">+2,684%</span></div>
+        <div className="br-section-head"><div><span className="br-eyebrow">HISTÓRICO</span><h2>Evolução estimada do retorno nativo</h2></div><span className="br-positive">+0,74% em 90 dias</span></div>
         <MiniChart />
       </section>
     </div>
@@ -305,14 +310,16 @@ function YieldPage() {
 }
 
 function LotsPage({ purchases }: { purchases: PurchaseRecord[] }) {
-  const totals = purchases.reduce((acc, purchase) => ({ invested: acc.invested + purchase.invested, current: acc.current + purchase.currentValue, gain: acc.gain + purchase.gain }), { invested: 0, current: 0, gain: 0 });
+  const completedPurchases = purchases.filter(purchase => purchase.completed);
+  const pendingPurchases = purchases.length - completedPurchases.length;
+  const totals = completedPurchases.reduce((acc, purchase) => ({ invested: acc.invested + purchase.invested, current: acc.current + purchase.currentValue, gain: acc.gain + purchase.gain }), { invested: 0, current: 0, gain: 0 });
   return (
     <div className="br-stack">
       <section className="br-page-hero compact"><div><span className="br-eyebrow">HISTÓRICO DE COMPRAS</span><h1>Cada aporte, do Pix ao rendimento.</h1><p>Acompanhe quanto você investiu em reais, quanto Bitcoin foi comprado e quando o rendimento foi ativado.</p></div><div className="br-big-icon"><Layers3 /></div></section>
-      <div className="br-purchase-summary"><div className="br-panel"><small>Total investido</small><b>{currency.format(totals.invested)}</b><span>{purchases.length} compras</span></div><div className="br-panel"><small>Valor atual</small><b>{currency.format(totals.current)}</b><span>estimado em BRL</span></div><div className="br-panel"><small>Resultado estimado</small><b className={totals.gain >= 0 ? "gain" : "loss"}>{formatSignedCurrency(totals.gain)}</b><span>não garantido</span></div></div>
+      <div className="br-purchase-summary"><div className="br-panel"><small>Total investido</small><b>{currency.format(totals.invested)}</b><span>{completedPurchases.length} concluídas{pendingPurchases ? ` · ${pendingPurchases} pendentes` : ""}</span></div><div className="br-panel"><small>Valor atual</small><b>{currency.format(totals.current)}</b><span>somente compras concluídas</span></div><div className="br-panel"><small>Resultado estimado</small><b className={totals.gain >= 0 ? "gain" : "loss"}>{formatSignedCurrency(totals.gain)}</b><span>não garantido</span></div></div>
       <section className="br-panel br-table-card">
         <div className="br-section-head"><div><h2>Compras e ativações</h2><p>Valores demonstrativos atualizados em 08/09/2026.</p></div><button className="br-outline" type="button" onClick={() => toast.success("CSV demonstrativo preparado")}>Exportar CSV <ArrowDownToLine size={16} /></button></div>
-        <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Aporte em BRL</th><th>Bitcoin comprado</th><th>Cotação BTC/BRL</th><th>Valor atual</th><th>Resultado</th><th>Status</th></tr></thead><tbody>{purchases.map((purchase) => <tr key={purchase.id}><td><b>{purchase.date}</b></td><td>{currency.format(purchase.invested)}</td><td className="mono">₿ {formatBtc(purchase.btc)}</td><td>{currency.format(purchase.quote)}</td><td>{currency.format(purchase.currentValue)}</td><td className={purchase.gain >= 0 ? "gain" : "loss"}>{formatSignedCurrency(purchase.gain)}</td><td><span className="br-status"><i />{purchase.status}</span></td></tr>)}</tbody></table></div>
+        <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Aporte em BRL</th><th>Pagamento</th><th>Bitcoin comprado</th><th>Cotação BTC/BRL</th><th>Valor atual</th><th>Resultado</th><th>Status</th></tr></thead><tbody>{purchases.map((purchase) => <tr key={purchase.id}><td><b>{purchase.date}</b></td><td>{currency.format(purchase.invested)}</td><td>{purchase.paymentMethod === "credit_card" ? "Cartão" : "Pix"}</td><td className="mono">{purchase.completed ? `₿ ${formatBtc(purchase.btc)}` : "Aguardando"}</td><td>{currency.format(purchase.quote)}</td><td>{purchase.completed ? currency.format(purchase.currentValue) : "—"}</td><td className={purchase.completed ? (purchase.gain >= 0 ? "gain" : "loss") : ""}>{purchase.completed ? formatSignedCurrency(purchase.gain) : "—"}</td><td><span className={`br-status ${purchase.completed ? "" : "pending"}`}><i />{purchase.status}</span>{purchase.checkoutUrl && !purchase.completed && <button className="br-resume-checkout" type="button" onClick={() => window.location.assign(purchase.checkoutUrl!)}>Continuar pagamento</button>}</td></tr>)}</tbody></table></div>
         <div className="br-history-disclosure"><ShieldCheck size={17} /><div><b>Rendimento ativado nos bastidores</b><span>A tela mostra a experiência em reais e Bitcoin. A trilha técnica de conversão e aplicação permanece verificável na área Segurança.</span></div></div>
       </section>
     </div>
@@ -400,7 +407,7 @@ function PixDepositPage({ deposits, availableBrl, amount, setAmount, authenticat
 
   useEffect(() => {
     if (!active?.qrCodeText) { setQrDataUrl(""); return; }
-    void QRCode.toDataURL(active.qrCodeText, { width: 260, margin: 1, color: { dark: "#082d33", light: "#ffffff" } }).then(setQrDataUrl);
+    void QRCode.toDataURL(active.qrCodeText, { width: 260, margin: 1, color: { dark: "#2a211b", light: "#fffaf2" } }).then(setQrDataUrl);
   }, [active?.id, active?.qrCodeText]);
 
   useEffect(() => {
@@ -535,6 +542,7 @@ export default function BitcoinYield() {
   const [quoteNonce, setQuoteNonce] = useState(0);
   const [eligibility, setEligibility] = useState({ resident: false, cpf: false, pix: false });
   const [riskAccepted, setRiskAccepted] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"pix" | "credit_card">("pix");
   const [redemptionStep, setRedemptionStep] = useState<RedemptionStep>("review");
   const [redemptionQuote, setRedemptionQuote] = useState<RedemptionQuoteView | null>(null);
   const [redemptionQuoteSeconds, setRedemptionQuoteSeconds] = useState(0);
@@ -578,6 +586,16 @@ export default function BitcoinYield() {
     setPurchases(livePurchases.map(item => {
       const invested = Number(item.amountBrl);
       const currentValue = Number(item.btcAmount) * btcBrl;
+      const completed = item.status === "settled";
+      const status = item.yieldStatus === "active"
+        ? "Rendimento ativo"
+        : item.paymentStatus === "pending"
+          ? "Aguardando pagamento"
+          : item.paymentStatus === "rejected"
+            ? "Pagamento não aprovado"
+            : item.status === "processing"
+              ? "Pagamento aprovado · processando"
+              : item.status;
       return {
         id: String(item.id),
         date: new Date(item.createdAt).toLocaleDateString("pt-BR"),
@@ -586,10 +604,36 @@ export default function BitcoinYield() {
         quote: Number(item.executionBtcBrl),
         currentValue,
         gain: currentValue - invested,
-        status: item.yieldStatus === "active" ? "Rendimento ativo" : item.status,
+        status,
+        paymentMethod: item.paymentMethod,
+        paymentStatus: item.paymentStatus,
+        checkoutUrl: item.checkoutUrl,
+        completed,
       };
     }));
   }, [purchasesQuery.data]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentReturn = params.get("payment");
+    const purchaseId = params.get("purchase");
+    if (!paymentReturn || !purchaseId) return;
+
+    navigate("lotes");
+    void utils.purchases.list.invalidate();
+    if (paymentReturn === "success") {
+      toast.success("Pagamento enviado para conciliação", { description: "A compra de Bitcoin só começa após a confirmação assinada do Mercado Pago." });
+    } else if (paymentReturn === "pending") {
+      toast.info("Pagamento em análise", { description: "Você pode acompanhar o status em Meus aportes." });
+    } else {
+      toast.error("Pagamento não concluído", { description: "Nenhum Bitcoin foi comprado e nenhum rendimento foi ativado." });
+    }
+
+    params.delete("payment");
+    params.delete("purchase");
+    const cleanQuery = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
+  }, []);
 
   useEffect(() => {
     if (!addMoneyOpen || purchaseStep !== "quote" || quoteSeconds <= 0) return;
@@ -760,8 +804,13 @@ export default function BitcoinYield() {
   async function confirmPurchase() {
     if (!serverQuote) return;
     try {
-      await confirmPurchaseMutation.mutateAsync({ quoteId: serverQuote.id, idempotencyKey: `purchase-${crypto.randomUUID()}` });
+      const result = await confirmPurchaseMutation.mutateAsync({ quoteId: serverQuote.id, idempotencyKey: `purchase-${crypto.randomUUID()}`, paymentMethod });
       await Promise.all([utils.purchases.list.invalidate(), utils.purchases.ledger.invalidate()]);
+      if (result.checkoutUrl) {
+        toast.info("Abrindo o checkout seguro do Mercado Pago", { description: "Escolha Pix ou cartão no ambiente do parceiro." });
+        window.location.assign(result.checkoutUrl);
+        return;
+      }
       setPurchaseStep("success");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível confirmar a compra sandbox.");
@@ -786,7 +835,7 @@ export default function BitcoinYield() {
       <main className="br-main">
         <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => isAuthenticated ? toast.success("Conta e dados sincronizados com o sandbox.") : requestLogin()}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? "Conta conectada" : "Entrar"} <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">8 DE SETEMBRO DE 2026</span><h1>Seu Bitcoin trabalhando.<br /><em>Seu rendimento em reais.</em></h1><p>Uma conta simples para depositar via Pix, acompanhar seu Bitcoin, ver o rendimento estimado em reais (BRL) e resgatar — sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Você não precisa entender a tecnologia</span></div></section><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu dinheiro ao Pix em três etapas.</h2></div><div className="br-steps"><div><span>01</span><Bitcoin /><h3>Deposite com Pix</h3><p>Você coloca reais na conta e acompanha a confirmação do pagamento.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Compre e ative</h3><p>A estratégia é aplicada nos bastidores e o resultado aparece em reais.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN QUE PODE RENDER</span><h1>Acumule BTC.<br /><em>Ganhe rendimentos nativos em reais.</em></h1><p>Retorno estimado de <b>~3% a.a.</b>, variável e não garantido. Compre com Pix ou cartão, acompanhe em BRL e resgate via Pix sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Simples para começar</span></div></section><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu pagamento ao rendimento em três etapas.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Pague em reais</h3><p>Use Pix ou cartão no checkout protegido do Mercado Pago.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Compre e ative</h3><p>Após a aprovação, o backend compra BTC e ativa a estratégia.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
           {section === "depositar" && <PixDepositPage deposits={(pixDepositsQuery.data?.deposits ?? []) as PixDepositRecord[]} availableBrl={pixDepositsQuery.data?.availableBrl ?? 0} amount={pixDepositAmount} setAmount={setPixDepositAmount} authenticated={isAuthenticated} loading={createPixDepositMutation.isPending || settlePixDepositMutation.isPending || pixDepositsQuery.isLoading} onCreate={() => void createPixDeposit()} onPay={depositId => void settlePixDeposit(depositId)} onLogin={requestLogin} />}
           {section === "rendimento" && <YieldPage />}
           {section === "lotes" && <LotsPage purchases={purchases} />}
@@ -841,11 +890,13 @@ export default function BitcoinYield() {
             <label className="br-amount-label" htmlFor="add-money-amount">Quanto você quer investir?</label>
             <div className="br-amount-field"><span>R$</span><input id="add-money-amount" inputMode="decimal" value={addAmount} onChange={(event) => { setAddAmount(event.target.value); setQuoteSeconds(0); setServerQuote(null); }} aria-label="Valor da compra em reais" /></div>
             <div className="br-buy-chips"><button type="button" onClick={() => { setAddAmount("500,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 500</button><button type="button" onClick={() => { setAddAmount("1.000,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 1.000</button><button type="button" onClick={() => { setAddAmount("5.000,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 5.000</button></div>
-            <section className="br-buy-quote"><div className="br-buy-quote-head"><span><i /> Cotação persistida</span><b className={quoteSeconds === 0 ? "expired" : ""}>{quoteSeconds === 0 ? "Atualize" : `00:${String(quoteSeconds).padStart(2, "0")}`}</b></div><div className="br-kv"><span>Referência BTC/BRL</span><b>{currency.format(serverQuote ? Number(serverQuote.referenceBtcBrl) : btcBrl)}</b></div><div className="br-kv"><span>Preço de execução (spread 0,65%)</span><b>{currency.format(purchaseQuote.executionPrice)}</b></div><div className="br-kv"><span>Taxa de serviço (0,50%)</span><b>-{currency.format(purchaseQuote.serviceFee)}</b></div><div className="br-kv"><span>Valor aplicado</span><b>{currency.format(purchaseQuote.applied)}</b></div><div className="br-buy-total"><span>Você compra aproximadamente</span><strong>₿ {formatBtc(purchaseQuote.btc)}</strong><small>Liquidação sandbox persistida no ledger</small></div></section>
+            <section className="br-buy-quote"><div className="br-buy-quote-head"><span><i /> Cotação persistida</span><b className={quoteSeconds === 0 ? "expired" : ""}>{quoteSeconds === 0 ? "Atualize" : `00:${String(quoteSeconds).padStart(2, "0")}`}</b></div><div className="br-kv"><span>Referência BTC/BRL</span><b>{currency.format(serverQuote ? Number(serverQuote.referenceBtcBrl) : btcBrl)}</b></div><div className="br-kv"><span>Preço de execução (spread 0,65%)</span><b>{currency.format(purchaseQuote.executionPrice)}</b></div><div className="br-kv"><span>Taxa de serviço (0,50%)</span><b>-{currency.format(purchaseQuote.serviceFee)}</b></div><div className="br-kv"><span>Valor aplicado</span><b>{currency.format(purchaseQuote.applied)}</b></div><div className="br-buy-total"><span>Você compra aproximadamente</span><strong>₿ {formatBtc(purchaseQuote.btc)}</strong><small>Retorno estimado: ~3% a.a., variável e não garantido</small></div></section>
+            <div className="br-payment-methods" role="radiogroup" aria-label="Forma de pagamento"><button className={paymentMethod === "pix" ? "active" : ""} type="button" role="radio" aria-checked={paymentMethod === "pix"} onClick={() => setPaymentMethod("pix")}><Banknote /><span><b>Pix</b><small>Pagamento à vista</small></span><i /></button><button className={paymentMethod === "credit_card" ? "active" : ""} type="button" role="radio" aria-checked={paymentMethod === "credit_card"} onClick={() => setPaymentMethod("credit_card")}><CreditCard /><span><b>Cartão de crédito</b><small>Processado pelo Mercado Pago</small></span><i /></button></div>
+            <div className="br-mercado-pago-note"><ShieldCheck size={16} /><span>O Mercado Pago processa o pagamento em BRL. Depois da aprovação, a RendeBit executa separadamente a compra e a aplicação do BTC. Dados do cartão não passam pelo backend da RendeBit.</span></div>
             {(!serverQuote || quoteSeconds === 0) && <button className="br-outline full" type="button" onClick={() => void regenerateServerQuote()} disabled={createQuoteMutation.isPending}><RefreshCw className={createQuoteMutation.isPending ? "animate-spin" : ""} size={15} /> Atualizar cotação</button>}
-            <label className="br-risk-check"><input type="checkbox" checked={riskAccepted} onChange={(event) => setRiskAccepted(event.target.checked)} /><span>Entendi que o preço do Bitcoin e o rendimento variam, e que este MVP não realiza uma compra real.</span></label>
+            <label className="br-risk-check"><input type="checkbox" checked={riskAccepted} onChange={(event) => setRiskAccepted(event.target.checked)} /><span>Entendi que o preço do Bitcoin varia e que o retorno de ~3% a.a. é uma estimativa variável, não uma promessa ou garantia.</span></label>
             <details className="br-how-it-works"><summary>Como funciona por trás?</summary><p>Após a compra, a posição pode passar por conversões técnicas para os ativos de liquidez do protocolo e ser aplicada na estratégia de rendimento. Isso envolve riscos de mercado, protocolo, liquidez e contraparte. Os registros verificáveis ficam em Segurança.</p></details>
-            <button className="br-primary full" type="button" disabled={!riskAccepted || !serverQuote || quoteSeconds === 0 || confirmPurchaseMutation.isPending} onClick={() => void confirmPurchase()}>{confirmPurchaseMutation.isPending ? <RefreshCw className="animate-spin" size={17} /> : <ArrowRight size={17} />} Confirmar no sandbox</button>
+            <button className="br-primary full" type="button" disabled={!riskAccepted || !serverQuote || quoteSeconds === 0 || confirmPurchaseMutation.isPending} onClick={() => void confirmPurchase()}>{confirmPurchaseMutation.isPending ? <RefreshCw className="animate-spin" size={17} /> : <ArrowRight size={17} />} {paymentMethod === "pix" ? "Continuar com Pix" : "Continuar com cartão"}</button>
             <button className="br-dialog-cancel" type="button" onClick={() => setPurchaseStep("eligibility")}>Voltar</button>
           </>}
 
@@ -858,6 +909,11 @@ export default function BitcoinYield() {
 
 function HelpPage() {
   const faqs = [
+    {
+      category: "Rendimento",
+      question: "Quanto o meu Bitcoin pode render?",
+      answer: "A referência atual da experiência é aproximadamente 3% ao ano sobre a quantidade de Bitcoin aplicada. É uma estimativa variável, não garantida, e pode mudar conforme o protocolo e a liquidez. A variação do preço do BTC em reais é outro efeito e aparece separadamente.",
+    },
     {
       category: "Primeiros passos",
       question: "Posso entrar com Gmail ou Apple?",

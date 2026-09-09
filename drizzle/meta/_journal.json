@@ -43,6 +43,13 @@
       "when": 1788909781224,
       "tag": "0005_curvy_lila_cheney",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1788911400717,
+      "tag": "0006_flashy_peter_parker",
+      "breakpoints": true
     }
   ]
 }

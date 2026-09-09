@@ -1,7 +1,7 @@
 export type BtcBrlQuote = {
   pair: "BTC/BRL";
   priceBrl: number;
-  source: "Coinbase" | "CoinGecko";
+  source: "Binance" | "Coinbase" | "CoinGecko";
   sourceUrl: string;
   marketUpdatedAt: number;
   fetchedAt: number;
@@ -32,6 +32,21 @@ async function fetchJson(url: string, fetcher: FetchLike) {
   return response.json() as Promise<unknown>;
 }
 
+export async function fetchBinanceBtcBrl(fetcher: FetchLike = fetch, now = Date.now()): Promise<BtcBrlQuote> {
+  const sourceUrl = "https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCBRL";
+  const payload = await fetchJson(sourceUrl, fetcher) as { symbol?: unknown; price?: unknown };
+  if (payload.symbol !== "BTCBRL") throw new Error("Par inesperado na resposta da Binance.");
+  return {
+    pair: "BTC/BRL",
+    priceBrl: validPrice(payload.price),
+    source: "Binance",
+    sourceUrl,
+    marketUpdatedAt: now,
+    fetchedAt: now,
+    stale: false,
+  };
+}
+
 export async function fetchCoinbaseBtcBrl(fetcher: FetchLike = fetch, now = Date.now()): Promise<BtcBrlQuote> {
   const sourceUrl = "https://api.coinbase.com/v2/prices/BTC-BRL/spot";
   const payload = await fetchJson(sourceUrl, fetcher) as { data?: { amount?: unknown; base?: string; currency?: string } };
@@ -60,7 +75,7 @@ export async function getBtcBrlQuote(options: { fetcher?: FetchLike; now?: numbe
   if (!options.forceRefresh && cachedQuote && now - cachedQuote.fetchedAt < CACHE_TTL_MS) return cachedQuote;
 
   const errors: string[] = [];
-  for (const source of [fetchCoinbaseBtcBrl, fetchCoinGeckoBtcBrl]) {
+  for (const source of [fetchBinanceBtcBrl, fetchCoinbaseBtcBrl, fetchCoinGeckoBtcBrl]) {
     try {
       const quote = await source(fetcher, now);
       cachedQuote = quote;

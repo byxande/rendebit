@@ -1732,3 +1732,40 @@ h1 em { color: #caff4a; font-style: normal; }
   .br-stacks-wallet-form { grid-template-columns: 1fr; }
   .br-stacks-wallet-form label.wide, .br-stacks-wallet-form .br-primary { grid-column: auto; }
 }
+
+/* Cotação BTC/BRL Binance — componente da visão geral */
+.br-btc-quote-card {
+  margin: 18px 0;
+  padding: 20px 22px 17px;
+  border: 1px solid rgba(220, 121, 11, 0.2);
+  border-radius: 18px;
+  background: linear-gradient(112deg, rgba(255, 250, 241, 0.98), rgba(255, 242, 216, 0.9));
+  box-shadow: 0 12px 32px rgba(74, 51, 31, 0.045);
+}
+.br-btc-quote-card.is-stale { border-color: rgba(168, 115, 52, 0.38); background: linear-gradient(112deg, rgba(255, 250, 241, 0.98), rgba(249, 239, 220, 0.92)); }
+.br-btc-quote-head, .br-btc-quote-body, .br-btc-quote-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.br-btc-quote-head h2 { margin: 5px 0 0; color: var(--br-navy); font: 600 clamp(20px, 2.4vw, 28px) "Space Grotesk", sans-serif; letter-spacing: -.035em; }
+.br-btc-quote-head h2 span { color: #9b7955; font: 600 10px "IBM Plex Mono", monospace; letter-spacing: .12em; margin-left: 8px; vertical-align: middle; }
+.br-quote-refresh { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(220, 121, 11, 0.25); border-radius: 999px; padding: 9px 12px; background: rgba(255,255,255,.54); color: #9a5b15; font: 600 10px "IBM Plex Mono", monospace; transition: border-color .18s, background .18s, transform .16s var(--ease-out); }
+.br-quote-refresh:hover:not(:disabled) { border-color: rgba(220, 121, 11, 0.55); background: #fffaf1; }
+.br-quote-refresh:active:not(:disabled) { transform: scale(.97); }
+.br-quote-refresh:disabled { cursor: wait; opacity: .62; }
+.br-btc-quote-body { align-items: end; margin-top: 18px; }
+.br-btc-quote-value { display: flex; align-items: baseline; gap: 9px; min-height: 42px; }
+.br-btc-quote-value strong { color: #382717; font: 600 clamp(30px, 4.2vw, 44px)/1 "Space Grotesk", sans-serif; letter-spacing: -.055em; }
+.br-btc-quote-value > span:not(.br-quote-loading) { color: #9b7955; font-size: 11px; }
+.br-quote-loading { color: #9b7955; font: 500 15px "Space Grotesk", sans-serif; }
+.br-quote-source { display: inline-flex; align-items: center; gap: 7px; color: #8d7863; font: 600 10px "IBM Plex Mono", monospace; letter-spacing: .05em; text-transform: uppercase; }
+.br-quote-source i { width: 7px; height: 7px; border-radius: 50%; background: #a98d69; display: inline-block; }
+.br-quote-source.is-primary { color: #b46711; }
+.br-quote-source.is-primary i { background: #f7931a; box-shadow: 0 0 10px rgba(247, 147, 26, .38); }
+.br-btc-quote-meta { margin-top: 13px; padding-top: 12px; border-top: 1px solid rgba(133, 98, 61, .14); color: #9b8875; font: 9px "IBM Plex Mono", monospace; }
+.br-btc-quote-note { margin-top: 12px; color: #887565; font-size: 10px; line-height: 1.55; }
+@media (max-width: 600px) {
+  .br-btc-quote-card { padding: 17px; }
+  .br-btc-quote-head, .br-btc-quote-body, .br-btc-quote-meta { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .br-btc-quote-head { flex-direction: row; align-items: center; }
+  .br-btc-quote-body { margin-top: 16px; }
+  .br-btc-quote-meta { gap: 5px; }
+  .br-quote-refresh { padding: 8px 10px; }
+}

@@ -1,16 +1,20 @@
 # Cotação BTC/BRL ao vivo
 
-**Data de validação:** 08/09/2026.
+**Data de validação:** 09/09/2026.
+**Estado:** componente público de referência; não representa cotação firme de compra.
 
-A RendeBit consulta a cotação pública `BTC-BRL` da Coinbase como fonte principal:
+A RendeBit consulta primeiro o ticker público Spot `BTCBRL` da **Binance**:
 
-- https://api.coinbase.com/v2/prices/BTC-BRL/spot
+- https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCBRL
+- Documentação: https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints
 
-Se a fonte principal estiver indisponível, usa o endpoint oficial `simple/price` do CoinGecko com `ids=bitcoin`, `vs_currencies=brl` e `include_last_updated_at=true`:
+O endpoint `GET /api/v3/ticker/price` retorna o último preço para um símbolo. A implementação valida tanto o símbolo `BTCBRL` quanto uma faixa defensiva de preço antes de expor a informação ao cliente. Durante a validação de 09/09/2026, o endpoint respondeu HTTP 200 com `{"symbol":"BTCBRL","price":"400782.00000000"}`.
 
-- https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=brl&include_last_updated_at=true
-- Documentação: https://docs.coingecko.com/reference/simple-price
+Caso a fonte principal fique indisponível, o backend tenta a Coinbase e, em seguida, o CoinGecko:
 
-A documentação do CoinGecko informa atualização a cada 60 segundos na API pública sem chave. O backend mantém cache em memória por 60 segundos, timeout de cinco segundos por fonte e aceita o último valor conhecido por até quinze minutos apenas quando as duas fontes falham, marcando-o como desatualizado.
+1. https://api.coinbase.com/v2/prices/BTC-BRL/spot
+2. https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=brl&include_last_updated_at=true
 
-Na validação, a Coinbase respondeu HTTP 200 com **R$ 400.115,59** e o CoinGecko respondeu HTTP 200 com **R$ 400.094,00**. Uma verificação independente por Yahoo Finance, derivando `BTC-USD × USD-BRL`, retornou **R$ 400.064,12**. Esses valores são apenas o registro do teste; a aplicação consulta novamente em tempo de execução.
+O backend mantém cache em memória por 60 segundos, timeout de cinco segundos por fonte e aceita o último valor conhecido por até quinze minutos somente quando todas as fontes falham. Esse último valor é devolvido com `stale: true`; a interface o identifica como “Último valor conhecido”. A página inicial mostra a fonte efetivamente usada, horário de atualização e uma ação manual de atualização.
+
+> O preço spot público é uma referência de mercado. A cotação de uma compra pode possuir spread, taxa, slippage, limite, validade e preço de execução próprios. A visualização não é oferta, recomendação ou garantia de preço.

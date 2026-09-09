@@ -246,6 +246,53 @@ function BrazilFirstStrip() {
   );
 }
 
+function BtcBrlQuoteCard({
+  quote,
+  loading,
+  refreshing,
+  onRefresh,
+}: {
+  quote: { priceBrl: number; source: string; marketUpdatedAt: number; stale: boolean } | undefined;
+  loading: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const updateTime = quote
+    ? new Date(quote.marketUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : null;
+  const isBinance = quote?.source === "Binance";
+
+  return (
+    <section className={`br-btc-quote-card${quote?.stale ? " is-stale" : ""}`} aria-labelledby="btc-brl-quote-title">
+      <div className="br-btc-quote-head">
+        <div>
+          <span className="br-eyebrow">COTAÇÃO BTC/BRL</span>
+          <h2 id="btc-brl-quote-title">Bitcoin em reais <span>BTC/BRL</span></h2>
+        </div>
+        <button className="br-quote-refresh" type="button" onClick={onRefresh} disabled={refreshing} aria-label="Atualizar cotação BTC/BRL">
+          <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
+          Atualizar
+        </button>
+      </div>
+      <div className="br-btc-quote-body">
+        <div className="br-btc-quote-value">
+          {loading ? <span className="br-quote-loading">Carregando cotação…</span> : quote ? <strong>{currency.format(quote.priceBrl)}</strong> : <strong>Indisponível</strong>}
+          {quote && <span>por 1 BTC</span>}
+        </div>
+        <div className={`br-quote-source${isBinance ? " is-primary" : ""}`}>
+          <i />
+          {isBinance ? "Binance Spot" : quote ? `Fonte reserva · ${quote.source}` : "Aguardando fonte"}
+        </div>
+      </div>
+      <div className="br-btc-quote-meta">
+        <span>{updateTime ? `Atualizado às ${updateTime}` : "Buscando o preço mais recente"}</span>
+        <span>{quote?.stale ? "Último valor conhecido" : "Atualiza automaticamente a cada 60 s"}</span>
+      </div>
+      <p className="br-btc-quote-note">Preço spot público da Binance para referência. A cotação de uma compra pode incluir spread, taxa e validade própria.</p>
+    </section>
+  );
+}
+
 function YieldSummary({ onRedeem, onDeposit, onAddMoney, onSimulate, btcPriceBrl, quoteSource, quoteTime, quoteStale, pendingPixDeposit }: { onRedeem: () => void; onDeposit: () => void; onAddMoney: () => void; onSimulate: () => void; btcPriceBrl: number; quoteSource: string; quoteTime: string | null; quoteStale: boolean; pendingPixDeposit: { amountBrl: string } | null }) {
   const currentValue = DEMO_BTC_BALANCE * btcPriceBrl;
   const initialValue = currentValue * wealthPattern[0].factor;
@@ -1057,7 +1104,7 @@ export default function BitcoinYield() {
       <main className="br-main">
         <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={requestLogin}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? loginProviderLabel : "Entrar"} <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN DO JEITO BRASILEIRO</span><h1>Acumule BTC.<br /><em>Receba rendimentos em reais.</em></h1><p>Uma experiência feita exclusivamente para residentes no Brasil. Comece com Pix ou cartão, acompanhe tudo em reais e, quando quiser, peça o resgate via Pix. A referência atual de rendimento é de <b>~3% a.a.</b></p></div><div className="br-trust-row"><span><BadgeCheck /> Exclusiva para residentes no Brasil</span><span><ShieldCheck /> Seu dinheiro separado</span><span><Sparkles /> Simples e em português</span></div></section><BrazilFirstStrip /><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} onSimulate={() => navigate("simulador")} btcPriceBrl={liveBtcBrl} quoteSource={marketQuoteQuery.data?.source ?? "Referência temporária"} quoteTime={marketQuoteTime} quoteStale={marketQuoteQuery.data?.stale ?? true} pendingPixDeposit={pendingPixDeposit} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Você cuida da sua vida. A RendeBit simplifica o caminho.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Comece em reais</h3><p>Use Pix ou cartão, como você já faz no dia a dia.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe com clareza</h3><p>Veja seu Bitcoin e o rendimento estimado sempre em BRL.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Receba via Pix</h3><p>Confira o valor líquido e mande para sua conta verificada.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN DO JEITO BRASILEIRO</span><h1>Acumule BTC.<br /><em>Receba rendimentos em reais.</em></h1><p>Uma experiência feita exclusivamente para residentes no Brasil. Comece com Pix ou cartão, acompanhe tudo em reais e, quando quiser, peça o resgate via Pix. A referência atual de rendimento é de <b>~3% a.a.</b></p></div><div className="br-trust-row"><span><BadgeCheck /> Exclusiva para residentes no Brasil</span><span><ShieldCheck /> Seu dinheiro separado</span><span><Sparkles /> Simples e em português</span></div></section><BrazilFirstStrip /><BtcBrlQuoteCard quote={marketQuoteQuery.data} loading={marketQuoteQuery.isLoading} refreshing={marketQuoteQuery.isFetching} onRefresh={() => void marketQuoteQuery.refetch()} /><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} onSimulate={() => navigate("simulador")} btcPriceBrl={liveBtcBrl} quoteSource={marketQuoteQuery.data?.source ?? "Referência temporária"} quoteTime={marketQuoteTime} quoteStale={marketQuoteQuery.data?.stale ?? true} pendingPixDeposit={pendingPixDeposit} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Você cuida da sua vida. A RendeBit simplifica o caminho.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Comece em reais</h3><p>Use Pix ou cartão, como você já faz no dia a dia.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe com clareza</h3><p>Veja seu Bitcoin e o rendimento estimado sempre em BRL.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Receba via Pix</h3><p>Confira o valor líquido e mande para sua conta verificada.</p></div></div></section></div>}
           {section === "depositar" && <PixDepositPage deposits={(pixDepositsQuery.data?.deposits ?? []) as PixDepositRecord[]} availableBrl={pixDepositsQuery.data?.availableBrl ?? 0} amount={pixDepositAmount} setAmount={setPixDepositAmount} authenticated={isAuthenticated} loading={createPixDepositMutation.isPending || settlePixDepositMutation.isPending || pixDepositsQuery.isLoading} onCreate={() => void createPixDeposit()} onPay={depositId => void settlePixDeposit(depositId)} onLogin={requestLogin} />}
           {section === "rendimento" && <YieldPage btcPriceBrl={liveBtcBrl} />}
           {section === "mercado" && <Suspense fallback={<section className="br-panel btc-chart-loading"><RefreshCw className="spinning" /><b>Abrindo o mercado para você…</b></section>}><BtcMarketChart /></Suspense>}
@@ -1164,7 +1211,7 @@ function HelpPage({ onNavigate }: { onNavigate: (section: SectionId) => void }) 
     {
       category: "Primeiros passos",
       question: "De onde vem a cotação do Bitcoin em reais?",
-      answer: "A RendeBit busca o preço BTC/BRL ao vivo na Coinbase e usa o CoinGecko como segunda fonte se houver instabilidade. O painel mostra a origem e o horário da atualização. Se as fontes estiverem fora do ar, avisamos quando o valor exibido for apenas a última referência disponível.",
+      answer: "A RendeBit busca primeiro o preço spot público BTC/BRL na Binance e usa Coinbase ou CoinGecko como fontes de reserva se houver instabilidade. O painel mostra a origem e o horário da atualização. Se as fontes estiverem fora do ar, avisamos quando o valor exibido for apenas a última referência disponível.",
     },
     {
       category: "Mercado",

@@ -10,6 +10,7 @@ import {
 import { calculateRedemptionQuote } from "../finance";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { confirmRedemptionWorkflow } from "../services/redemptionOrchestrator";
+import { assertBrazilianCustomer } from "../services/brazilEligibility";
 
 export const redemptionsRouter = router({
   summary: protectedProcedure.query(async ({ ctx }) => ({
@@ -25,12 +26,7 @@ export const redemptionsRouter = router({
   })).mutation(async ({ ctx, input }) => {
     try {
       const profile = await getCustomerProfile(ctx.user.id);
-      if (!profile || profile.verificationStatus !== "verified") {
-        throw new Error("Conclua a verificação de identidade antes de resgatar.");
-      }
-      if (!profile.pixOwnershipConfirmed || !profile.pixAccountMasked) {
-        throw new Error("Confirme uma conta Pix de mesma titularidade antes de resgatar.");
-      }
+      assertBrazilianCustomer(profile, { requirePix: true });
       const quote = calculateRedemptionQuote(input.btcAmount);
       const stored = await createRedemptionQuote({
         userId: ctx.user.id,
@@ -38,7 +34,7 @@ export const redemptionsRouter = router({
         idempotencyKey: input.idempotencyKey,
         expiresAt: new Date(Date.now() + 60_000),
       });
-      return { ...stored, pixDestinationMasked: profile.pixAccountMasked };
+      return { ...stored, pixDestinationMasked: profile.pixAccountMasked! };
     } catch (error) {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: error instanceof Error ? error.message : "Não foi possível gerar a cotação de resgate." });
     }
@@ -50,6 +46,7 @@ export const redemptionsRouter = router({
     riskAccepted: z.literal(true),
   })).mutation(async ({ ctx, input }) => {
     try {
+      assertBrazilianCustomer(await getCustomerProfile(ctx.user.id), { requirePix: true });
       return await confirmRedemptionWorkflow({
         userId: ctx.user.id,
         quoteId: input.quoteId,

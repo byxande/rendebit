@@ -1110,3 +1110,43 @@ h1 em { color: #caff4a; font-style: normal; }
 .br-resume-checkout { display: block; margin-top: 7px; border: 0; background: transparent; color: #a95308; font-size: 11px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .br-resume-checkout:hover { color: #d66b08; }
 .br-resume-checkout:focus-visible { outline: 2px solid #f7931a; outline-offset: 3px; border-radius: 3px; }
+
+/* Brazil-first positioning */
+.br-brazil-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  border: 1px solid rgba(190, 119, 31, 0.2);
+  border-radius: 18px;
+  background: linear-gradient(110deg, #fff9ee 0%, #fff3dc 58%, #f8e5c4 100%);
+  box-shadow: 0 12px 32px rgba(95, 61, 28, 0.07);
+  color: #2a211b;
+}
+.br-brazil-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  color: #a75408;
+  background: rgba(247, 147, 26, 0.14);
+  border: 1px solid rgba(247, 147, 26, 0.24);
+}
+.br-brazil-icon svg { width: 21px; height: 21px; }
+.br-brazil-strip > div:nth-child(2) { display: grid; gap: 3px; }
+.br-brazil-strip > div:nth-child(2) > span { color: #a75408; font: 600 9px/1.2 "IBM Plex Mono", monospace; letter-spacing: .16em; }
+.br-brazil-strip b { font-size: 15px; letter-spacing: -.02em; }
+.br-brazil-strip p { margin: 0; max-width: 780px; color: #716156; font-size: 12px; line-height: 1.55; }
+.br-brazil-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.br-brazil-chips span { padding: 6px 8px; border-radius: 999px; color: #80501e; background: rgba(255, 255, 255, 0.62); border: 1px solid rgba(128, 80, 30, 0.16); font: 600 9px/1 "IBM Plex Mono", monospace; letter-spacing: .08em; }
+@media (max-width: 760px) {
+  .br-brazil-strip { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; padding: 15px; }
+  .br-brazil-chips { grid-column: 1 / -1; justify-content: flex-start; padding-left: 58px; }
+}
+@media (max-width: 430px) {
+  .br-brazil-strip { grid-template-columns: 1fr; }
+  .br-brazil-icon { width: 40px; height: 40px; }
+  .br-brazil-chips { grid-column: auto; padding-left: 0; }
+}

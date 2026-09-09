@@ -10,6 +10,7 @@ import { calculatePurchaseQuote } from "../finance";
 import { ENV } from "../_core/env";
 import { protectedProcedure, router } from "../_core/trpc";
 import { confirmPurchaseWorkflow } from "../services/purchaseOrchestrator";
+import { assertBrazilianCustomer } from "../services/brazilEligibility";
 
 export const purchasesRouter = router({
   list: protectedProcedure.query(({ ctx }) => listPurchases(ctx.user.id)),
@@ -20,8 +21,10 @@ export const purchasesRouter = router({
     idempotencyKey: z.string().min(8).max(120),
   })).mutation(async ({ ctx, input }) => {
     const profile = await getCustomerProfile(ctx.user.id);
-    if (!profile || profile.verificationStatus !== "verified") {
-      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Conclua a verificação sandbox antes de cotar." });
+    try {
+      assertBrazilianCustomer(profile, { requirePix: true });
+    } catch (error) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: error instanceof Error ? error.message : "Conclua seu cadastro brasileiro antes de cotar." });
     }
     const quote = calculatePurchaseQuote(input.amountBrl);
     return createPurchaseQuote({
@@ -38,6 +41,7 @@ export const purchasesRouter = router({
     paymentMethod: z.enum(["pix", "credit_card"]),
   })).mutation(async ({ ctx, input }) => {
     try {
+      assertBrazilianCustomer(await getCustomerProfile(ctx.user.id), { requirePix: true });
       const forwardedProto = ctx.req.headers["x-forwarded-proto"];
       const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",")[0] : ctx.req.protocol;
       const returnBaseUrl = ENV.publicBaseUrl || `${protocol}://${ctx.req.get("host")}`;

@@ -1,8 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { getAvailableBrlBalance, listOperationalPixDeposits, listPixDeposits } from "../db";
+import { getAvailableBrlBalance, getCustomerProfile, listOperationalPixDeposits, listPixDeposits } from "../db";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { createPixDepositWorkflow, settlePixDepositWorkflow } from "../services/pixDepositOrchestrator";
+import { assertBrazilianCustomer } from "../services/brazilEligibility";
 
 export const pixDepositsRouter = router({
   summary: protectedProcedure.query(async ({ ctx }) => ({
@@ -15,6 +16,7 @@ export const pixDepositsRouter = router({
     idempotencyKey: z.string().min(8).max(120),
   })).mutation(async ({ ctx, input }) => {
     try {
+      assertBrazilianCustomer(await getCustomerProfile(ctx.user.id), { requirePix: true });
       return await createPixDepositWorkflow({ userId: ctx.user.id, ...input });
     } catch (error) {
       throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Falha ao gerar cobrança Pix." });
@@ -26,6 +28,7 @@ export const pixDepositsRouter = router({
     idempotencyKey: z.string().min(8).max(120),
   })).mutation(async ({ ctx, input }) => {
     try {
+      assertBrazilianCustomer(await getCustomerProfile(ctx.user.id), { requirePix: true });
       return await settlePixDepositWorkflow({ userId: ctx.user.id, ...input });
     } catch (error) {
       throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Falha ao liquidar depósito Pix." });

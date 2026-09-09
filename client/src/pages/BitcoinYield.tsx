@@ -20,6 +20,7 @@ import {
   Landmark,
   Layers3,
   LockKeyhole,
+  MapPin,
   Menu,
   Network,
   PieChart,
@@ -103,9 +104,9 @@ type PurchaseRecord = {
 const navItems: NavItem[] = [
   { id: "inicio", label: "Visão geral", icon: Home },
   { id: "depositar", label: "Depositar via Pix", icon: ArrowDownToLine },
-  { id: "rendimento", label: "Meu rendimento", icon: TrendingUp },
+  { id: "rendimento", label: "Meus rendimentos", icon: TrendingUp },
   { id: "lotes", label: "Meus aportes", icon: Layers3 },
-  { id: "resgate", label: "Resgatar via Pix", icon: QrCode },
+  { id: "resgate", label: "Receber via Pix", icon: QrCode },
   { id: "fiscal", label: "Relatório fiscal", icon: FileText },
   { id: "reservas", label: "Segurança", icon: ShieldCheck },
   { id: "empresas", label: "Para empresas", icon: Building2 },
@@ -199,7 +200,21 @@ function MiniChart() {
 }
 
 function DemoPill() {
-  return <span className="br-demo-pill"><Sparkles size={13} /> Ambiente demonstrativo</span>;
+  return <span className="br-demo-pill"><Sparkles size={13} /> Brasil · Ambiente demonstrativo</span>;
+}
+
+function BrazilFirstStrip() {
+  return (
+    <section className="br-brazil-strip">
+      <div className="br-brazil-icon"><MapPin /></div>
+      <div>
+        <span>FEITA EXCLUSIVAMENTE PARA O BRASIL</span>
+        <b>Da entrada em reais ao resgate via Pix.</b>
+        <p>Uma experiência em português, com CPF, conta Pix da sua titularidade, valores em BRL e informações organizadas para o seu contador.</p>
+      </div>
+      <div className="br-brazil-chips"><span>CPF</span><span>PIX</span><span>BRL</span><span>PT-BR</span></div>
+    </section>
+  );
 }
 
 function YieldSummary({ onRedeem, onDeposit, onAddMoney }: { onRedeem: () => void; onDeposit: () => void; onAddMoney: () => void }) {
@@ -221,9 +236,9 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney }: { onRedeem: () => voi
             <span className="br-positive">+0,74% em 90 dias</span>
           </div>
           <div className="br-balance-actions">
-            <button type="button" className="br-primary light" onClick={onDeposit}>Depositar via Pix <ArrowDownToLine size={17} /></button>
+            <button type="button" className="br-primary light" onClick={onDeposit}>Colocar reais via Pix <ArrowDownToLine size={17} /></button>
             <button type="button" className="br-secondary light" onClick={onAddMoney}>Comprar Bitcoin</button>
-            <button type="button" className="br-secondary light" onClick={onRedeem}>Resgatar via Pix</button>
+            <button type="button" className="br-secondary light" onClick={onRedeem}>Receber via Pix</button>
           </div>
         </div>
 
@@ -262,17 +277,17 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney }: { onRedeem: () => voi
 
 function InnovationGrid({ setSection }: { setSection: (section: SectionId) => void }) {
   const items = [
-    { icon: Bitcoin, title: "Rendimento em Bitcoin", text: "O valor do seu Bitcoin evolui dentro do protocolo, sem você precisar operar nada.", tone: "lime" },
-    { icon: QrCode, title: "Liquidação via Pix", text: "Cotação transparente antes da confirmação, com destino para conta de mesma titularidade.", tone: "cyan" },
-    { icon: ReceiptText, title: "Histórico de aportes", text: "Veja quanto colocou, quando colocou e como cada aporte evoluiu em reais.", tone: "violet" },
-    { icon: FileCheck2, title: "Relatório fiscal brasileiro", text: "Resumo em reais pronto para compartilhar com o seu contador.", tone: "orange" },
-    { icon: Network, title: "Prova pública das reservas", text: "Uma forma simples de conferir que existe lastro por trás da operação.", tone: "green" },
-    { icon: LockKeyhole, title: "Seu patrimônio separado", text: "O dinheiro dos clientes fica separado da operação da empresa.", tone: "blue" },
+    { icon: Bitcoin, title: "Bitcoin com rendimento", text: "Seu Bitcoin pode render sem você precisar lidar com a parte técnica.", tone: "lime" },
+    { icon: QrCode, title: "Pix para entrar e sair", text: "Coloque reais e peça seu resgate para uma conta Pix da sua titularidade.", tone: "cyan" },
+    { icon: ReceiptText, title: "Tudo bem organizado", text: "Veja quanto colocou, quando comprou e como cada aporte está hoje.", tone: "violet" },
+    { icon: FileCheck2, title: "Ajuda para o seu contador", text: "Relatórios em reais, pensados para facilitar sua declaração e sua organização.", tone: "orange" },
+    { icon: Network, title: "Reservas que você confere", text: "A parte técnica fica nos bastidores, mas a comprovação continua disponível.", tone: "green" },
+    { icon: LockKeyhole, title: "Seu dinheiro separado", text: "O patrimônio dos clientes não se mistura com o caixa da RendeBit.", tone: "blue" },
   ];
   return (
     <section className="br-innovation">
       <div className="br-section-head">
-        <div><span className="br-eyebrow">A INOVAÇÃO REAL</span><h2>Bitcoin útil para a vida financeira no Brasil.</h2></div>
+        <div><span className="br-eyebrow">PENSADA PARA A VIDA REAL</span><h2>Bitcoin que conversa com a vida financeira brasileira.</h2></div>
         <button type="button" className="br-outline" onClick={() => setSection("empresas")}>Solução para empresas <ArrowRight size={16} /></button>
       </div>
       <div className="br-feature-grid">
@@ -290,7 +305,7 @@ function InnovationGrid({ setSection }: { setSection: (section: SectionId) => vo
 function YieldPage() {
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact"><div><span className="br-eyebrow">RETORNO NATIVO EM BITCOIN</span><h1>~3% a.a., acompanhado em reais.</h1><p>Estimativa anual variável gerada pela estratégia em Bitcoin. A valorização ou queda do BTC em BRL é mostrada separadamente.</p></div><div className="br-big-icon"><TrendingUp /></div></section>
+      <section className="br-page-hero compact"><div><span className="br-eyebrow">SEU BITCOIN TRABALHANDO</span><h1>Veja seu rendimento sem complicação.</h1><p>A referência atual é de ~3% ao ano, variável e não garantida. Mostramos o rendimento e a variação do Bitcoin separadamente, sempre em reais.</p></div><div className="br-big-icon"><TrendingUp /></div></section>
       <div className="br-metric-grid">
         <div className="br-panel br-metric"><small>Retorno anual estimado</small><strong>~3% a.a.</strong><span>variável e não garantido</span></div>
         <div className="br-panel br-metric"><small>Estimativa em 90 dias</small><strong>+0,74%</strong><span>aprox. R$ 904,78</span></div>
@@ -315,7 +330,7 @@ function LotsPage({ purchases }: { purchases: PurchaseRecord[] }) {
   const totals = completedPurchases.reduce((acc, purchase) => ({ invested: acc.invested + purchase.invested, current: acc.current + purchase.currentValue, gain: acc.gain + purchase.gain }), { invested: 0, current: 0, gain: 0 });
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact"><div><span className="br-eyebrow">HISTÓRICO DE COMPRAS</span><h1>Cada aporte, do Pix ao rendimento.</h1><p>Acompanhe quanto você investiu em reais, quanto Bitcoin foi comprado e quando o rendimento foi ativado.</p></div><div className="br-big-icon"><Layers3 /></div></section>
+      <section className="br-page-hero compact"><div><span className="br-eyebrow">SEUS APORTES, BEM ORGANIZADOS</span><h1>Cada compra conta uma parte da sua história.</h1><p>Confira quanto colocou em reais, quanto Bitcoin recebeu e como cada aporte está hoje.</p></div><div className="br-big-icon"><Layers3 /></div></section>
       <div className="br-purchase-summary"><div className="br-panel"><small>Total investido</small><b>{currency.format(totals.invested)}</b><span>{completedPurchases.length} concluídas{pendingPurchases ? ` · ${pendingPurchases} pendentes` : ""}</span></div><div className="br-panel"><small>Valor atual</small><b>{currency.format(totals.current)}</b><span>somente compras concluídas</span></div><div className="br-panel"><small>Resultado estimado</small><b className={totals.gain >= 0 ? "gain" : "loss"}>{formatSignedCurrency(totals.gain)}</b><span>não garantido</span></div></div>
       <section className="br-panel br-table-card">
         <div className="br-section-head"><div><h2>Compras e ativações</h2><p>Valores demonstrativos atualizados em 08/09/2026.</p></div><button className="br-outline" type="button" onClick={() => toast.success("CSV demonstrativo preparado")}>Exportar CSV <ArrowDownToLine size={16} /></button></div>
@@ -358,7 +373,7 @@ function RedeemPage({
   const statusLabel = (status: string) => ({ settled: "Pix concluído", processing: "Em processamento", manual_review: "Em revisão", failed: "Não concluído", cancelled: "Cancelado" }[status] ?? status);
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact pix"><div><span className="br-eyebrow">RENDIMENTO REALIZADO EM BRL</span><h1>Do seu rendimento em reais para o Pix.</h1><p>Quando você realiza o rendimento, ele é convertido para BRL. Você confere a cotação, todas as taxas e o valor líquido antes de confirmar.</p></div><div className="br-big-icon"><QrCode /></div></section>
+      <section className="br-page-hero compact pix"><div><span className="br-eyebrow">RECEBA NA SUA CONTA PIX</span><h1>Precisou usar seu dinheiro? É só pedir.</h1><p>Antes de confirmar, você vê a cotação, as taxas e o valor líquido em reais. O Pix vai para uma conta verificada no seu nome.</p></div><div className="br-big-icon"><QrCode /></div></section>
       <div className="br-redemption-status"><ShieldCheck size={17} /><div><b>Resgate protegido por saldo reservado</b><span>O valor só fica indisponível após sua confirmação. Em sandbox, nenhuma transação ou Pix real é enviado.</span></div><strong>Disponível: ₿ {formatBtc(availableBtc)}</strong></div>
       <div className="br-redeem-grid">
         <section className="br-panel br-quote-form">
@@ -429,7 +444,7 @@ function PixDepositPage({ deposits, availableBrl, amount, setAmount, authenticat
 
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact br-pix-hero"><div><span className="br-eyebrow">SALDO EM REAIS</span><h1>Deposite via Pix.</h1><p>Gere uma cobrança, copie o código ou use o QR Code. O saldo só é creditado após a confirmação do pagamento.</p></div><div className="br-pix-balance"><small>Disponível na conta</small><strong>{currency.format(availableBrl)}</strong><span><ShieldCheck size={14} /> Separado do caixa da empresa</span></div></section>
+      <section className="br-page-hero compact br-pix-hero"><div><span className="br-eyebrow">COLOQUE REAIS COM PIX</span><h1>Seu primeiro passo leva poucos minutos.</h1><p>Escolha o valor, escaneie o QR Code ou use o Pix Copia e Cola. O saldo aparece somente depois da confirmação do pagamento.</p></div><div className="br-pix-balance"><small>Seus reais disponíveis</small><strong>{currency.format(availableBrl)}</strong><span><ShieldCheck size={14} /> Separados do caixa da empresa</span></div></section>
 
       <div className="br-pix-grid">
         <section className="br-panel br-pix-create">
@@ -460,7 +475,7 @@ function PixDepositPage({ deposits, availableBrl, amount, setAmount, authenticat
 function FiscalPage() {
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact fiscal"><div><span className="br-eyebrow">ANO-CALENDÁRIO 2026</span><h1>Um relatório que fala a língua do seu contador.</h1><p>Posição patrimonial, custo por lote e eventos de realização organizados em reais.</p></div><div className="br-big-icon"><FileCheck2 /></div></section>
+      <section className="br-page-hero compact fiscal"><div><span className="br-eyebrow">ANO-CALENDÁRIO 2026</span><h1>Na hora de falar com seu contador, fica mais simples.</h1><p>Posição patrimonial, custo de cada compra e resgates organizados em reais, num só lugar.</p></div><div className="br-big-icon"><FileCheck2 /></div></section>
       <div className="br-fiscal-grid">
         <section className="br-panel br-report-preview">
           <div className="br-report-top"><div className="br-report-mark"><Bitcoin /> <b>RENDEBIT</b></div><span>RELATÓRIO FISCAL 2026</span></div>
@@ -483,7 +498,7 @@ function ReservesPage() {
   ];
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact reserves"><div><span className="br-eyebrow">PROVA ON-CHAIN</span><h1>Confiança que pode ser verificada.</h1><p>A interface organiza contratos, lastro e segregação. Os números abaixo são demonstrativos para o MVP.</p></div><div className="br-big-icon"><ShieldCheck /></div></section>
+      <section className="br-page-hero compact reserves"><div><span className="br-eyebrow">SEGURANÇA EXPLICADA COM CLAREZA</span><h1>Você não precisa entender a tecnologia para conferir.</h1><p>Traduzimos reservas, lastro e separação do patrimônio para uma linguagem simples. Os números abaixo são demonstrativos.</p></div><div className="br-big-icon"><ShieldCheck /></div></section>
       <div className="br-reserve-grid">{reserveItems.map((item, index) => <div className="br-panel br-reserve-metric" key={item.label}><div className={`br-number-chip n${index}`}>0{index + 1}</div><small>{item.label}</small><strong>{item.value}</strong><span>{item.detail}</span></div>)}</div>
       <section className="br-panel br-custody-card">
         <div className="br-section-head"><div><span className="br-eyebrow">CUSTÓDIA SEGREGADA</span><h2>Patrimônio do cliente separado da operação.</h2></div><span className="br-verified"><BadgeCheck /> Estrutura verificável</span></div>
@@ -502,7 +517,7 @@ function ReservesPage() {
 function BusinessPage() {
   return (
     <div className="br-stack">
-      <section className="br-business-hero"><div><span className="br-eyebrow light">RENDEBIT PARA EMPRESAS</span><h1>Leve rendimento em Bitcoin aos seus clientes.</h1><p>Uma camada white-label em português para fintechs, exchanges e tesourarias — da posição em stBTC ao resgate em reais.</p><div className="br-business-actions"><button className="br-primary light" type="button" onClick={() => toast.success("Solicitação de demonstração registrada")}>Solicitar demonstração <ArrowRight /></button><button className="br-secondary light" type="button" onClick={() => toast.info("Documentação da API disponível na próxima etapa")}>Ver documentação</button></div></div><div className="br-api-visual"><div className="br-code-head"><span /><span /><span /><b>POST /v1/quotes/pix</b></div><pre>{`{
+      <section className="br-business-hero"><div><span className="br-eyebrow light">RENDEBIT PARA EMPRESAS BRASILEIRAS</span><h1>Uma experiência em Bitcoin pronta para a sua marca.</h1><p>Infraestrutura white-label em português, com Pix, valores em BRL, trilha por cliente e jornadas pensadas para o mercado brasileiro.</p><div className="br-business-actions"><button className="br-primary light" type="button" onClick={() => toast.success("Que bom ter seu interesse!", { description: "A solicitação de demonstração foi registrada no sandbox." })}>Quero conhecer <ArrowRight /></button><button className="br-secondary light" type="button" onClick={() => toast.info("A documentação da API entra na próxima etapa do projeto.")}>Ver documentação</button></div></div><div className="br-api-visual"><div className="br-code-head"><span /><span /><span /><b>POST /v1/quotes/pix</b></div><pre>{`{
   "asset": "stBTC",
   "amount": "0.025",
   "settlement": "BRL_PIX",
@@ -828,14 +843,14 @@ export default function BitcoinYield() {
         <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>RENDEBIT</b><small>BITCOIN EM REAIS</small></div></div>
         <div className="br-profile"><div className="br-avatar">{user?.name?.slice(0, 2).toUpperCase() || "AB"}</div><div><b>Olá, {user?.name?.split(" ")[0] || "Alexandre"}</b><span>{isAuthenticated ? loginProviderLabel : "Modo de leitura"} <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
         <nav>{navItems.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => navigate(id)} type="button"><Icon size={19} /><span>{label}</span>{id === "empresas" && <em>B2B</em>}</button>)}</nav>
-        <div className="br-sidebar-security"><ShieldCheck /><div><b>Ambiente protegido</b><span>Seus dados e posições são demonstrativos.</span></div></div>
-        <div className="br-sidebar-footer"><button type="button" onClick={() => toast.success("Atendimento demonstrativo iniciado")}>Atendimento</button>{user?.role === "admin" && <button type="button" onClick={() => { window.location.href = "/operacao"; }}>Operação</button>}<span>v0.2 sandbox</span></div>
+        <div className="br-sidebar-security"><ShieldCheck /><div><b>Feita para brasileiros</b><span>CPF, Pix, BRL e atendimento em português.</span></div></div>
+        <div className="br-sidebar-footer"><button type="button" onClick={() => toast.success("Pode contar com a gente", { description: "O atendimento em português será conectado na próxima etapa." })}>Fale com a gente</button>{user?.role === "admin" && <button type="button" onClick={() => { window.location.href = "/operacao"; }}>Operação</button>}<span>v0.3 Brasil · sandbox</span></div>
       </aside>
 
       <main className="br-main">
         <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => isAuthenticated ? toast.success("Conta e dados sincronizados com o sandbox.") : requestLogin()}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? "Conta conectada" : "Entrar"} <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN QUE PODE RENDER</span><h1>Acumule BTC.<br /><em>Ganhe rendimentos nativos em reais.</em></h1><p>Retorno estimado de <b>~3% a.a.</b>, variável e não garantido. Compre com Pix ou cartão, acompanhe em BRL e resgate via Pix sem precisar entender carteiras ou contratos.</p></div><div className="br-trust-row"><span><BadgeCheck /> Conta protegida</span><span><ShieldCheck /> Patrimônio separado</span><span><Sparkles /> Simples para começar</span></div></section><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Do seu pagamento ao rendimento em três etapas.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Pague em reais</h3><p>Use Pix ou cartão no checkout protegido do Mercado Pago.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Compre e ative</h3><p>Após a aprovação, o backend compra BTC e ativa a estratégia.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Resgate via Pix</h3><p>Confira o valor líquido e confirme quando quiser.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN DO JEITO BRASILEIRO</span><h1>Acumule BTC.<br /><em>Receba rendimentos em reais.</em></h1><p>Uma experiência feita exclusivamente para residentes no Brasil. Comece com Pix ou cartão, acompanhe tudo em reais e, quando quiser, peça o resgate via Pix. O retorno estimado é de <b>~3% a.a.</b>, variável e não garantido.</p></div><div className="br-trust-row"><span><BadgeCheck /> Exclusiva para residentes no Brasil</span><span><ShieldCheck /> Seu dinheiro separado</span><span><Sparkles /> Simples e em português</span></div></section><BrazilFirstStrip /><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Você cuida da sua vida. A RendeBit simplifica o caminho.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Comece em reais</h3><p>Use Pix ou cartão, como você já faz no dia a dia.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe com clareza</h3><p>Veja seu Bitcoin e o rendimento estimado sempre em BRL.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Receba via Pix</h3><p>Confira o valor líquido e mande para sua conta verificada.</p></div></div></section></div>}
           {section === "depositar" && <PixDepositPage deposits={(pixDepositsQuery.data?.deposits ?? []) as PixDepositRecord[]} availableBrl={pixDepositsQuery.data?.availableBrl ?? 0} amount={pixDepositAmount} setAmount={setPixDepositAmount} authenticated={isAuthenticated} loading={createPixDepositMutation.isPending || settlePixDepositMutation.isPending || pixDepositsQuery.isLoading} onCreate={() => void createPixDeposit()} onPay={depositId => void settlePixDeposit(depositId)} onLogin={requestLogin} />}
           {section === "rendimento" && <YieldPage />}
           {section === "lotes" && <LotsPage purchases={purchases} />}
@@ -850,12 +865,12 @@ export default function BitcoinYield() {
       <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
         <DialogContent className="br-confirm-dialog br-login-dialog">
           <div className="br-login-shield"><LockKeyhole /></div>
-          <DialogHeader><DialogTitle>Entre na RendeBit</DialogTitle><DialogDescription>Use sua conta Google — incluindo Gmail — ou Apple. A autenticação acontece no portal seguro e a RendeBit não recebe sua senha.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Que bom ter você por aqui</DialogTitle><DialogDescription>Entre com Google ou Apple para cuidar do seu Bitcoin em uma experiência feita para brasileiros. Sua senha fica sempre no portal oficial.</DialogDescription></DialogHeader>
           <div className="br-social-login">
             <button type="button" onClick={() => { setLoginOpen(false); startLogin(); }}><span className="br-google-mark">G</span><b>Continuar com Google</b><small>Contas Gmail e Google Workspace</small><ArrowRight size={16} /></button>
             <button type="button" onClick={() => { setLoginOpen(false); startLogin(); }}><span className="br-apple-mark">A</span><b>Continuar com Apple</b><small>Entrar com Apple ID</small><ArrowRight size={16} /></button>
           </div>
-          <div className="br-login-note"><ShieldCheck size={15} /><span>Na próxima tela, confirme Google ou Apple no portal oficial. A sessão usa cookie seguro, nonce de uso único e proteção contra login CSRF.</span></div>
+            <div className="br-login-note"><ShieldCheck size={15} /><span>Seu acesso é protegido. A RendeBit recebe somente os dados básicos que você autorizar e nunca vê sua senha.</span></div>
         </DialogContent>
       </Dialog>
 
@@ -878,9 +893,9 @@ export default function BitcoinYield() {
           <div className="br-purchase-progress" aria-label={`Etapa ${purchaseStep === "eligibility" ? 1 : purchaseStep === "quote" ? 2 : 3} de 3`}><span className={purchaseStep !== "success" ? "active" : "done"}><i>{purchaseStep === "success" ? <Check size={11} /> : "1"}</i> Cadastro</span><b /><span className={purchaseStep === "quote" ? "active" : purchaseStep === "success" ? "done" : ""}><i>{purchaseStep === "success" ? <Check size={11} /> : "2"}</i> Cotação</span><b /><span className={purchaseStep === "success" ? "active" : ""}><i>3</i> Conclusão</span></div>
 
           {purchaseStep === "eligibility" && <>
-            <DialogHeader><DialogTitle>{onboardingIntent === "deposit" ? "Vamos preparar seu depósito Pix" : "Vamos preparar sua compra"}</DialogTitle><DialogDescription>{onboardingIntent === "deposit" ? "Confirme residência, CPF e titularidade da conta antes de gerar a cobrança. Tudo abaixo é demonstrativo." : "Confirme seus dados básicos para comprar Bitcoin com reais. Tudo abaixo é demonstrativo."}</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>{onboardingIntent === "deposit" ? "Vamos preparar seu Pix" : "Vamos preparar sua compra"}</DialogTitle><DialogDescription>{onboardingIntent === "deposit" ? "É rapidinho: confirme que você mora no Brasil, seu CPF e a conta Pix no seu nome." : "É rapidinho: confirme seus dados brasileiros para comprar Bitcoin com reais."} Tudo aqui ainda é demonstrativo.</DialogDescription></DialogHeader>
             <div className="br-eligibility-grid"><label><span>Nome completo</span><input value={legalName} onChange={(event) => setLegalName(event.target.value)} /></label><label><span>CPF mascarado</span><input value={cpfMasked} onChange={(event) => setCpfMasked(event.target.value)} /></label><label><span>Residência</span><select defaultValue="BR"><option value="BR">Brasil</option></select></label><label><span>Conta Pix mascarada</span><input value={pixAccount} onChange={(event) => setPixAccount(event.target.value)} /></label></div>
-            <div className="br-check-stack"><label><input type="checkbox" checked={eligibility.resident} onChange={(event) => setEligibility((value) => ({ ...value, resident: event.target.checked }))} /><span><b>Sou residente no Brasil</b><small>Produto demonstrado apenas para residentes no país.</small></span></label><label><input type="checkbox" checked={eligibility.cpf} onChange={(event) => setEligibility((value) => ({ ...value, cpf: event.target.checked }))} /><span><b>Meu CPF está regular e verificado</b><small>Identificação necessária antes de movimentar valores reais.</small></span></label><label><input type="checkbox" checked={eligibility.pix} onChange={(event) => setEligibility((value) => ({ ...value, pix: event.target.checked }))} /><span><b>A conta Pix é da minha titularidade</b><small>Compras e resgates usam uma conta com o mesmo titular.</small></span></label></div>
+            <div className="br-check-stack"><label><input type="checkbox" checked={eligibility.resident} onChange={(event) => setEligibility((value) => ({ ...value, resident: event.target.checked }))} /><span><b>Moro no Brasil</b><small>A RendeBit será oferecida exclusivamente a residentes no país.</small></span></label><label><input type="checkbox" checked={eligibility.cpf} onChange={(event) => setEligibility((value) => ({ ...value, cpf: event.target.checked }))} /><span><b>Tenho CPF regular</b><small>Vamos confirmar sua identidade antes de movimentar valores reais.</small></span></label><label><input type="checkbox" checked={eligibility.pix} onChange={(event) => setEligibility((value) => ({ ...value, pix: event.target.checked }))} /><span><b>A conta Pix está no meu nome</b><small>Para sua segurança, entradas e saídas usam a mesma titularidade.</small></span></label></div>
             <button className="br-primary full" type="button" disabled={!isEligible || saveProfileMutation.isPending || verifyKycMutation.isPending || createQuoteMutation.isPending || createPixDepositMutation.isPending} onClick={() => void continueToQuote()}>{saveProfileMutation.isPending || verifyKycMutation.isPending || createQuoteMutation.isPending || createPixDepositMutation.isPending ? <RefreshCw className="animate-spin" size={17} /> : <ArrowRight size={17} />} {onboardingIntent === "deposit" ? "Verificar e gerar QR Code" : "Verificar e gerar cotação"}</button>
             <p className="br-dialog-footnote"><ShieldCheck size={13} /> O sandbox persiste apenas dados mascarados e simula a aprovação do provedor KYC.</p>
           </>}
@@ -909,6 +924,11 @@ export default function BitcoinYield() {
 
 function HelpPage() {
   const faqs = [
+    {
+      category: "Primeiros passos",
+      question: "Quem pode usar a RendeBit?",
+      answer: "A RendeBit foi pensada exclusivamente para pessoas que moram no Brasil. Para movimentar valores reais, será necessário ter CPF regular e uma conta Pix da mesma titularidade. Nesta fase, tudo funciona em ambiente demonstrativo.",
+    },
     {
       category: "Rendimento",
       question: "Quanto o meu Bitcoin pode render?",
@@ -1001,17 +1021,17 @@ function HelpPage() {
       <section className="br-help-hero">
         <div className="br-help-hero-copy">
           <span className="br-eyebrow light">CENTRAL DE AJUDA</span>
-          <h1>Respostas claras para decisões tranquilas.</h1>
-          <p>Não encontrou o que procura? Comece por uma pergunta simples. A gente explica o produto sem esconder riscos ou usar palavras difíceis.</p>
+          <h1>Pode perguntar. A gente explica com calma.</h1>
+          <p>Bitcoin não precisa ser um bicho de sete cabeças. Aqui você encontra respostas diretas, em português, sem letrinhas escondidas e sem palavras difíceis.</p>
           <label className="br-help-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Busque uma dúvida, como “resgate”" aria-label="Buscar na central de ajuda" />{query && <button type="button" onClick={() => setQuery("")} aria-label="Limpar busca"><X size={15} /></button>}</label>
         </div>
-        <div className="br-help-orbit"><HelpCircle size={45} /><span>Estamos aqui<br />para explicar.</span></div>
+        <div className="br-help-orbit"><HelpCircle size={45} /><span>Conte com<br />a gente.</span></div>
       </section>
       <div className="br-help-layout">
         <aside className="br-help-categories"><span className="br-eyebrow">NAVEGAR POR TEMA</span>{categories.map((item) => <button className={category === item ? "active" : ""} type="button" key={item} onClick={() => setCategory(item)}>{item}<span>{item === "Todas" ? faqs.length : faqs.filter((faq) => faq.category === item).length}</span></button>)}</aside>
         <section className="br-help-list"><div className="br-help-list-head"><div><span className="br-eyebrow">PERGUNTAS FREQUENTES</span><h2>{filtered.length} {filtered.length === 1 ? "resposta encontrada" : "respostas encontradas"}</h2></div><span className="br-help-honesty"><ShieldCheck size={15} /> Sem promessa escondida</span></div>{filtered.length === 0 ? <div className="br-panel br-help-empty"><HelpCircle /><h3>Não encontramos essa resposta ainda.</h3><p>Tente usar palavras como Pix, segurança, rendimento ou impostos.</p><button type="button" className="br-outline" onClick={() => { setQuery(""); setCategory("Todas"); }}>Ver todas as perguntas</button></div> : <div className="br-faq-stack">{filtered.map((faq) => { const isOpen = open === faq.question; return <article className={`br-faq ${isOpen ? "open" : ""}`} key={faq.question}><button type="button" className="br-faq-trigger" onClick={() => setOpen(isOpen ? null : faq.question)}><span><small>{faq.category}</small><b>{faq.question}</b></span><span className="br-faq-plus">{isOpen ? "−" : "+"}</span></button>{isOpen && <div className="br-faq-answer"><p>{faq.answer}</p>{faq.question === "Meu dinheiro está seguro?" && <button type="button" className="br-text-action" onClick={() => toast.info("A área Segurança mostra o fluxo de custódia e a prova pública das reservas.")}>Ver como a segurança funciona <ArrowRight size={15} /></button>}</div>}</article>; })}</div>}</section>
       </div>
-      <section className="br-panel br-help-contact"><div className="br-help-contact-icon"><MessageCircleIcon /></div><div><span className="br-eyebrow">AINDA COM DÚVIDA?</span><h2>Fale com uma pessoa, não com um robô.</h2><p>O atendimento pode orientar sobre o produto, mas nunca vai prometer retorno ou pedir sua senha.</p></div><button className="br-primary" type="button" onClick={() => toast.success("Atendimento demonstrativo iniciado")}>Iniciar atendimento <ArrowRight size={16} /></button></section>
+      <section className="br-panel br-help-contact"><div className="br-help-contact-icon"><MessageCircleIcon /></div><div><span className="br-eyebrow">AINDA COM DÚVIDA?</span><h2>Fale com a gente, do seu jeito.</h2><p>Nosso atendimento será em português e sem pressa. A equipe pode explicar o produto, mas nunca vai prometer retorno nem pedir sua senha.</p></div><button className="br-primary" type="button" onClick={() => toast.success("Estamos por aqui!", { description: "O atendimento em português será conectado na próxima etapa." })}>Conversar com a equipe <ArrowRight size={16} /></button></section>
     </div>
   );
 }

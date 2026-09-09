@@ -1410,3 +1410,103 @@ h1 em { color: #caff4a; font-style: normal; }
   .br-login-dialog { width: calc(100vw - 24px); }
   .br-account-detail { padding: 12px; }
 }
+
+
+/* --------------------------------------------------------------------------
+   RENDEBIT — global editorial footer
+   Inspired by the supplied reference: quiet grid, newsletter, app entry,
+   trust markers and a generous navigation directory.
+   -------------------------------------------------------------------------- */
+.rendebit-footer {
+  --rf-ink: #211c18;
+  --rf-muted: #776e66;
+  --rf-line: #e7dfd5;
+  --rf-paper: #fffaf2;
+  --rf-soft: #f5eee5;
+  --rf-orange: #f7931a;
+  width: 100%;
+  margin-top: 42px;
+  border-top: 1px solid var(--rf-line);
+  color: var(--rf-ink);
+  background: var(--rf-paper);
+  font-family: "DM Sans", sans-serif;
+}
+.rendebit-footer * { box-sizing: border-box; }
+.rendebit-footer button, .rendebit-footer a { -webkit-tap-highlight-color: transparent; }
+.rendebit-footer-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-bottom: 1px solid var(--rf-line); }
+.rendebit-footer-newsletter, .rendebit-footer-app { min-height: 252px; padding: 30px clamp(22px, 4vw, 62px) 32px; }
+.rendebit-footer-newsletter { border-right: 1px solid var(--rf-line); }
+.rendebit-footer-kicker { display: block; color: #9b8d7f; font: 600 9px/1.2 "IBM Plex Mono", monospace; letter-spacing: .14em; }
+.rendebit-footer h2 { max-width: 460px; margin: 12px 0 26px; color: var(--rf-ink); font-family: "Space Grotesk", sans-serif; font-size: clamp(22px, 2.15vw, 31px); font-weight: 500; letter-spacing: -.035em; line-height: 1.18; }
+.rendebit-footer-newsletter form { display: flex; max-width: 430px; gap: 7px; }
+.rendebit-footer-newsletter input { min-width: 0; flex: 1; height: 43px; padding: 0 15px; border: 1px solid #d9d0c6; border-radius: 7px; outline: none; color: var(--rf-ink); background: #fff; font-size: 11px; }
+.rendebit-footer-newsletter input::placeholder { color: #91887f; }
+.rendebit-footer-newsletter input:focus { border-color: var(--rf-orange); box-shadow: 0 0 0 3px rgba(247,147,26,.13); }
+.rendebit-footer-newsletter form button { display: inline-flex; align-items: center; justify-content: space-between; gap: 22px; height: 43px; padding: 0 14px; border: 1px solid #211c18; border-radius: 7px; color: #fffaf2; background: #211c18; font-size: 11px; font-weight: 700; cursor: pointer; }
+.rendebit-footer-newsletter form button:hover { background: #41382f; }
+.rendebit-footer-app { display: flex; flex-direction: column; justify-content: space-between; }
+.rendebit-footer-app h2 { margin-bottom: 5px; }
+.rendebit-footer-app p { max-width: 480px; margin: 0; color: var(--rf-muted); font-size: 11px; line-height: 1.5; }
+.rendebit-footer-app-download { display: flex; align-items: center; gap: 22px; }
+.rendebit-footer-qr { width: 92px; height: 92px; display: grid; place-items: center; padding: 7px; border: 1px solid #d9d0c6; border-radius: 4px; color: var(--rf-ink); background: #fff; }
+.rendebit-footer-qr img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.rendebit-footer-badges { display: flex; flex-direction: column; gap: 6px; }
+.rendebit-footer-app-badge { width: 147px; height: 43px; display: flex; align-items: center; gap: 9px; padding: 0 11px; border: 1px solid #211c18; border-radius: 7px; color: #fffaf2; background: #211c18; text-align: left; cursor: pointer; }
+.rendebit-footer-app-badge:hover { background: #41382f; transform: translateY(-1px); }
+.rendebit-footer-app-badge > span:last-child { display: flex; flex-direction: column; line-height: 1; }
+.rendebit-footer-app-badge small { font-size: 7px; font-weight: 400; }
+.rendebit-footer-app-badge b { margin-top: 3px; font-size: 13px; letter-spacing: -.02em; }
+.rendebit-footer-app-icon { width: 19px; font-size: 18px; text-align: center; }
+.rendebit-footer-trust { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--rf-line); }
+.rendebit-footer-trust > div { min-height: 119px; display: flex; align-items: center; gap: 14px; padding: 22px clamp(20px, 3vw, 42px); }
+.rendebit-footer-trust > div + div { border-left: 1px solid var(--rf-line); }
+.rendebit-footer-trust svg { flex: 0 0 auto; color: var(--rf-ink); }
+.rendebit-footer-trust span { display: flex; flex-direction: column; gap: 5px; }
+.rendebit-footer-trust b { font-size: 11px; font-weight: 500; }
+.rendebit-footer-trust small { color: var(--rf-muted); font-size: 9px; }
+.rendebit-footer-links { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(140px, .85fr); gap: 28px; padding: 52px clamp(22px, 4vw, 62px) 62px; }
+.rendebit-footer-links section { display: flex; flex-direction: column; align-items: flex-start; gap: 11px; }
+.rendebit-footer-links h3 { margin: 0 0 4px; color: var(--rf-ink); font-size: 11px; font-weight: 600; }
+.rendebit-footer-link { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: #7f766d; background: transparent; font-size: 10px; line-height: 1.3; text-decoration: none; text-align: left; cursor: pointer; }
+.rendebit-footer-link:hover { color: var(--rf-orange); }
+.rendebit-footer-network { justify-content: flex-start; }
+.rendebit-footer-social-label { margin-top: auto; padding-top: 29px; color: var(--rf-ink); font-size: 10px; font-weight: 600; }
+.rendebit-footer-social { display: flex; gap: 8px; }
+.rendebit-footer-social button { width: 31px; height: 31px; display: grid; place-items: center; border: 0; border-radius: 7px; color: #fffaf2; background: #211c18; font-size: 15px; cursor: pointer; }
+.rendebit-footer-social button:hover { color: #211c18; background: var(--rf-orange); transform: translateY(-2px); }
+.rendebit-footer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 55px; padding: 0 clamp(22px, 4vw, 62px); border-top: 1px solid var(--rf-line); color: #9b9187; font: 9px "IBM Plex Mono", monospace; }
+.rendebit-footer-bottom span { display: inline-flex; align-items: center; gap: 6px; }
+.rendebit-footer-bottom svg { color: var(--rf-orange); }
+.rendebit-footer--portfolio { margin-top: 52px; margin-left: -48px; width: calc(100% + 96px); }
+.rendebit-footer--portfolio .rendebit-footer-top, .rendebit-footer--portfolio .rendebit-footer-trust, .rendebit-footer--portfolio .rendebit-footer-links, .rendebit-footer--portfolio .rendebit-footer-bottom { padding-left: clamp(22px, 4vw, 62px); padding-right: clamp(22px, 4vw, 62px); }
+.rendebit-not-found-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: space-between; color: var(--rf-ink); background: var(--rf-paper); }
+.rendebit-not-found-card-wrap { min-height: 60vh; display: grid; place-items: center; padding: 48px 20px; }
+.rendebit-not-found-card-wrap .bg-white\/80 { background: rgba(255,255,255,.82); }
+@media (max-width: 900px) {
+  .rendebit-footer-top { grid-template-columns: 1fr; }
+  .rendebit-footer-newsletter { border-right: 0; border-bottom: 1px solid var(--rf-line); }
+  .rendebit-footer-links { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rendebit-footer-network { grid-column: span 3; }
+  .rendebit-footer-social-label { margin-top: 18px; padding-top: 0; }
+  .rendebit-footer--portfolio { margin-left: -20px; width: calc(100% + 40px); }
+}
+@media (max-width: 620px) {
+  .rendebit-footer { margin-top: 30px; }
+  .rendebit-footer-newsletter, .rendebit-footer-app { min-height: 0; padding: 26px 20px; }
+  .rendebit-footer-newsletter h2, .rendebit-footer-app h2 { font-size: 24px; }
+  .rendebit-footer-newsletter form { flex-direction: column; }
+  .rendebit-footer-newsletter form button { width: 100%; }
+  .rendebit-footer-app-download { align-items: flex-start; margin-top: 25px; gap: 14px; }
+  .rendebit-footer-qr { width: 78px; height: 78px; }
+  .rendebit-footer-app-badge { width: 138px; height: 39px; }
+  .rendebit-footer-trust { grid-template-columns: 1fr; }
+  .rendebit-footer-trust > div { min-height: 75px; padding: 17px 20px; }
+  .rendebit-footer-trust > div + div { border-top: 1px solid var(--rf-line); border-left: 0; }
+  .rendebit-footer-links { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 20px; padding: 36px 20px 42px; }
+  .rendebit-footer-network { grid-column: span 2; }
+  .rendebit-footer-bottom { align-items: flex-start; flex-direction: column; justify-content: center; gap: 7px; min-height: 80px; padding: 17px 20px; }
+  .rendebit-footer--portfolio { margin-left: -17px; width: calc(100% + 34px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rendebit-footer button, .rendebit-footer a { transition: none; }
+}

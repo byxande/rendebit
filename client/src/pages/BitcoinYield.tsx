@@ -45,6 +45,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
+import RendeBitFooter from "@/components/RendeBitFooter";
 import FutureCalculator from "./FutureCalculator";
 import {
   Dialog,
@@ -931,6 +932,7 @@ export default function BitcoinYield() {
           {section === "empresas" && <BusinessPage />}
           {section === "ajuda" && <HelpPage onNavigate={navigate} />}
         </div>
+        <RendeBitFooter onNavigate={navigate} />
       </main>
 
       <Dialog open={loginOpen} onOpenChange={setLoginOpen}>

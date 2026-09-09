@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
+import RendeBitFooter from "@/components/RendeBitFooter";
 import {
   AlertTriangle,
   ArrowRight,
@@ -169,6 +170,7 @@ export default function OperationsSandbox() {
       </section>
 
       <footer className="br-ops-footer"><Bitcoin size={17} /><span>Política configurada: 100% do <b>lucro distribuível</b> vai para a carteira Stacks definida — nunca o principal do cliente.</span><Banknote size={17} /></footer>
+      <RendeBitFooter />
     </div>
   );
 }

@@ -12,7 +12,6 @@ import {
   Eye,
   EyeOff,
   LayoutDashboard,
-  Link2,
   Loader2,
   LogOut,
   Menu,
@@ -28,6 +27,7 @@ import {
 import { connect, disconnect, getLocalStorage, isConnected } from "@stacks/connect";
 import { cvToJSON, deserializeCV } from "@stacks/transactions";
 import { toast } from "sonner";
+import RendeBitFooter from "@/components/RendeBitFooter";
 
 type Network = "mainnet" | "testnet";
 type HistoricalPriceKey = "stx" | "btc" | "alex" | "ststx" | "stable";
@@ -896,11 +896,11 @@ export default function Home() {
 
           <section className="wallets-section"><div className="section-heading section-heading--wallets"><div><span className="card-label">CONNECTED SOURCES</span><h2>Wallets <span>{wallets.length}</span></h2></div><button className="text-button" onClick={() => setIsAddOpen(true)}>Manage wallets <ArrowUpRight size={14} /></button></div><div className="wallet-grid">{wallets.slice(0, 3).map((wallet, index) => <div className={`wallet-card ${wallet.address === activeAddress ? "wallet-card--active" : ""}`} key={wallet.address}><div className="wallet-card__top"><span className="wallet-badge"><Wallet size={16} /></span><span className="wallet-source">{wallet.source === "preview" ? "SAMPLE" : wallet.source === "connected" ? "CONNECTED" : "WATCH ONLY"}</span><button onClick={() => viewExplorer(wallet.address)} aria-label="Open explorer"><ExternalLink size={15} /></button></div><div className="wallet-card__name">{wallet.label}</div><button className="wallet-card__address" onClick={() => { setActiveAddress(wallet.address); void loadAddress(wallet.address, { source: wallet.source, label: wallet.label }); }}><span>{compactAddress(wallet.address)}</span><Copy size={13} /></button><div className="wallet-card__bottom"><span>{wallet.address === activeAddress ? <><span className="wallet-active-dot" /> Active wallet</> : "Stacks address"}</span><span className="wallet-network">{network === "mainnet" ? "MAINNET" : "TESTNET"}</span></div></div>)}<button className="add-wallet-card" onClick={() => setIsAddOpen(true)}><span><Plus size={20} /></span><strong>Add a wallet</strong><small>Connect or track an address</small></button></div></section>
 
-          <footer className="main-footer"><span>RendeBit Portfolio <span className="footer-divider">/</span> Built for Stacks</span><span className="footer-links"><a href="https://docs.stacks.co" target="_blank" rel="noreferrer">Docs <ExternalLink size={12} /></a><a href="https://explorer.hiro.so" target="_blank" rel="noreferrer">Explorer <ExternalLink size={12} /></a><span><Link2 size={13} /> Public API</span></span></footer>
           </>
           ) : (
             <StstxTracker address={activeAddress} network={network} />
           )}
+          <RendeBitFooter variant="portfolio" />
         </main>
       </div>
 

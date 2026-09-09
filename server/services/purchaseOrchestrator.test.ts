@@ -30,37 +30,100 @@ const workflowInput = {
 
 function dependencies(paymentStatus: "approved" | "pending" = "approved") {
   const calls: string[] = [];
-  const processingPurchase = { ...awaitingPurchase, paymentReference: "payment-42", paymentStatus, checkoutUrl: paymentStatus === "pending" ? "https://checkout.example" : null, status: paymentStatus === "approved" ? "processing" : "awaiting_payment" };
+  const processingPurchase = {
+    ...awaitingPurchase,
+    paymentReference: "payment-42",
+    paymentStatus,
+    checkoutUrl:
+      paymentStatus === "pending" ? "https://checkout.example" : null,
+    status: paymentStatus === "approved" ? "processing" : "awaiting_payment",
+  };
   return {
     calls,
     deps: {
       startPurchase: vi.fn(async () => ({ ...awaitingPurchase })),
       attachPayment: vi.fn(async () => ({ ...processingPurchase })),
-      approvePayment: vi.fn(async () => ({ ...processingPurchase, paymentStatus: "approved", status: "processing" })),
+      approvePayment: vi.fn(async () => ({
+        ...processingPurchase,
+        paymentStatus: "approved",
+        status: "processing",
+      })),
       getPurchase: vi.fn(async () => ({ ...processingPurchase })),
-      settlePurchase: vi.fn(async () => ({ ...processingPurchase, status: "settled", yieldStatus: "active" })),
+      settlePurchase: vi.fn(async () => ({
+        ...processingPurchase,
+        status: "settled",
+        yieldStatus: "active",
+      })),
       failPurchase: vi.fn(async () => undefined),
-      recordEvent: vi.fn(async input => { calls.push(`event:${input.provider}`); return input; }),
+      recordEvent: vi.fn(async input => {
+        calls.push(`event:${input.provider}`);
+        return input;
+      }),
       payment: {
         provider: "sandbox_payments" as const,
         mode: "sandbox" as const,
         createCheckout: vi.fn(async () => {
           calls.push("payment");
-          return { externalId: "payment-42", status: paymentStatus, payload: { checkoutUrl: paymentStatus === "pending" ? "https://checkout.example" : null, paymentMethod: "pix" as const, paymentStatus } } as const;
+          return {
+            externalId: "payment-42",
+            status: paymentStatus,
+            payload: {
+              checkoutUrl:
+                paymentStatus === "pending" ? "https://checkout.example" : null,
+              paymentMethod: "pix" as const,
+              paymentStatus,
+            },
+          } as const;
         }),
       },
-      custody: { buyBitcoin: vi.fn(async () => { calls.push("custody"); return { externalId: "custody-42", status: "settled", payload: { btcAmount: "0.00247144" } } as const; }) },
+      custody: {
+        buyBitcoin: vi.fn(async () => {
+          calls.push("custody");
+          return {
+            externalId: "custody-42",
+            status: "settled",
+            payload: { btcAmount: "0.00247144" },
+          } as const;
+        }),
+      },
       sbtcConversion: {
         provider: "sandbox_custody" as const,
         network: "sandbox" as const,
-        preflight: vi.fn(async () => { calls.push("sbtc-preflight"); }),
-        convertBtcToSbtc: vi.fn(async () => { calls.push("sbtc-conversion"); return { externalId: "sbtc-42", status: "settled", payload: { btcAmount: "0.00247144", sbtcAmount: "0.00247144", route: "BTC>sBTC" as const, network: "sandbox" as const } }; }),
+        preflight: vi.fn(async () => {
+          calls.push("sbtc-preflight");
+        }),
+        convertBtcToSbtc: vi.fn(async () => {
+          calls.push("sbtc-conversion");
+          return {
+            externalId: "sbtc-42",
+            status: "settled",
+            payload: {
+              btcAmount: "0.00247144",
+              sbtcAmount: "0.00247144",
+              route: "BTC>sBTC" as const,
+              network: "sandbox" as const,
+            },
+          };
+        }),
       },
       yieldProvider: {
         provider: "sandbox_stacks" as const,
         network: "sandbox" as const,
-        preflight: vi.fn(async () => { calls.push("preflight"); }),
-        activatePosition: vi.fn(async () => { calls.push("yield"); return { externalId: "stacks-42", status: "active", payload: { btcAmount: "0.00247144", sbtcAmount: "0.00247144", route: "BTC>sBTC>stBTC" } } as const; }),
+        preflight: vi.fn(async () => {
+          calls.push("preflight");
+        }),
+        activatePosition: vi.fn(async () => {
+          calls.push("yield");
+          return {
+            externalId: "stacks-42",
+            status: "active",
+            payload: {
+              btcAmount: "0.00247144",
+              sbtcAmount: "0.00247144",
+              route: "BTC>sBTC>stBTC",
+            },
+          } as const;
+        }),
       },
     },
   };
@@ -71,10 +134,82 @@ describe("confirmPurchaseWorkflow", () => {
     const { deps, calls } = dependencies("approved");
     const result = await confirmPurchaseWorkflow(workflowInput, deps as never);
     expect(result.status).toBe("settled");
-    expect(calls).toEqual(["sbtc-preflight", "preflight", "payment", "event:sandbox_payments", "sbtc-preflight", "preflight", "custody", "event:sandbox_custody", "sbtc-conversion", "event:sandbox_custody", "yield", "event:sandbox_stacks"]);
-    expect(deps.sbtcConversion.convertBtcToSbtc).toHaveBeenCalledWith(expect.objectContaining({ btcAmount: "0.00247144" }));
-    expect(deps.yieldProvider.activatePosition).toHaveBeenCalledWith(expect.objectContaining({ sbtcAmount: "0.00247144" }));
+    expect(calls).toEqual([
+      "sbtc-preflight",
+      "preflight",
+      "payment",
+      "event:sandbox_payments",
+      "sbtc-preflight",
+      "preflight",
+      "custody",
+      "event:sandbox_custody",
+      "sbtc-conversion",
+      "event:sandbox_custody",
+      "yield",
+      "event:sandbox_stacks",
+    ]);
+    expect(deps.sbtcConversion.convertBtcToSbtc).toHaveBeenCalledWith(
+      expect.objectContaining({ btcAmount: "0.00247144" })
+    );
+    expect(deps.yieldProvider.activatePosition).toHaveBeenCalledWith(
+      expect.objectContaining({ sbtcAmount: "0.00247144" })
+    );
     expect(deps.settlePurchase).toHaveBeenCalledOnce();
+  });
+
+  it("liquida BTCBRL antes de criar a trilha Stacks e persiste a próxima etapa", async () => {
+    const { deps, calls } = dependencies("approved");
+    const workflowDeps = deps as Record<string, any>;
+    workflowDeps.liquidity = {
+      provider: "sandbox_binance",
+      mode: "sandbox",
+      preflight: vi.fn(async () => {
+        calls.push("binance-preflight");
+      }),
+      buyBitcoin: vi.fn(async () => {
+        calls.push("binance-order");
+        return {
+          externalId: "binance-btcbrl-42",
+          status: "settled" as const,
+          payload: {
+            amountBrl: "1000.00",
+            btcAmount: "0.00247144",
+            executionBtcBrl: "402600.00",
+            symbol: "BTCBRL" as const,
+            orderId: "binance-btcbrl-42",
+            status: "filled" as const,
+          },
+        };
+      }),
+    };
+    workflowDeps.registerLiquiditySettlement = vi.fn(async () => ({
+      id: 22,
+      status: "stacks_pending" as const,
+      blockerReason: null,
+      network: "testnet" as const,
+    }));
+
+    await confirmPurchaseWorkflow(workflowInput, deps as never);
+
+    expect(calls).toContain("binance-preflight");
+    expect(calls.indexOf("binance-order")).toBeLessThan(
+      calls.indexOf("sbtc-conversion")
+    );
+    expect(workflowDeps.registerLiquiditySettlement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        purchaseId: 42,
+        userId: 7,
+        liquidity: expect.objectContaining({
+          provider: "sandbox_binance",
+          btcAmount: "0.00247144",
+        }),
+      })
+    );
+    expect(deps.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "stacks.customer.settlement.pending",
+      })
+    );
   });
 
   it("mantém a compra aguardando quando o checkout hospedado ainda está pendente", async () => {
@@ -86,10 +221,32 @@ describe("confirmPurchaseWorkflow", () => {
     expect(deps.yieldProvider.activatePosition).not.toHaveBeenCalled();
   });
 
+  it("bloqueia liquidez real antes do checkout sem endereço Stacks testnet", async () => {
+    const { deps } = dependencies("pending");
+    const workflowDeps = deps as Record<string, any>;
+    workflowDeps.liquidity = {
+      provider: "binance",
+      mode: "production",
+      preflight: vi.fn(),
+      buyBitcoin: vi.fn(),
+    };
+    workflowDeps.getCustomerStacksWallet = vi.fn(async () => null);
+
+    await expect(
+      confirmPurchaseWorkflow(workflowInput, workflowDeps as never)
+    ).rejects.toThrow("carteira pública Stacks testnet");
+    expect(deps.payment.createCheckout).not.toHaveBeenCalled();
+    expect(deps.sbtcConversion.preflight).not.toHaveBeenCalled();
+  });
+
   it("não ativa rendimento quando a conversão BTC para sBTC falha", async () => {
     const { deps } = dependencies("approved");
-    deps.sbtcConversion.convertBtcToSbtc.mockRejectedValueOnce(new Error("Conversão BTC para sBTC indisponível") as never);
-    await expect(confirmPurchaseWorkflow(workflowInput, deps as never)).rejects.toThrow("Conversão BTC para sBTC indisponível");
+    deps.sbtcConversion.convertBtcToSbtc.mockRejectedValueOnce(
+      new Error("Conversão BTC para sBTC indisponível") as never
+    );
+    await expect(
+      confirmPurchaseWorkflow(workflowInput, deps as never)
+    ).rejects.toThrow("Conversão BTC para sBTC indisponível");
     expect(deps.custody.buyBitcoin).toHaveBeenCalledOnce();
     expect(deps.yieldProvider.activatePosition).not.toHaveBeenCalled();
     expect(deps.failPurchase).toHaveBeenCalledOnce();
@@ -97,15 +254,24 @@ describe("confirmPurchaseWorkflow", () => {
 
   it("não cria checkout quando o preflight dos contratos falha", async () => {
     const { deps } = dependencies();
-    deps.yieldProvider.preflight.mockRejectedValueOnce(new Error("stBTC testnet não configurado") as never);
-    await expect(confirmPurchaseWorkflow(workflowInput, deps as never)).rejects.toThrow("stBTC testnet não configurado");
+    deps.yieldProvider.preflight.mockRejectedValueOnce(
+      new Error("stBTC testnet não configurado") as never
+    );
+    await expect(
+      confirmPurchaseWorkflow(workflowInput, deps as never)
+    ).rejects.toThrow("stBTC testnet não configurado");
     expect(deps.payment.createCheckout).not.toHaveBeenCalled();
     expect(deps.custody.buyBitcoin).not.toHaveBeenCalled();
   });
 
   it("não repete provedores quando a compra já está liquidada", async () => {
     const { deps } = dependencies();
-    deps.startPurchase.mockResolvedValueOnce({ ...awaitingPurchase, status: "settled", paymentStatus: "approved", yieldStatus: "active" } as never);
+    deps.startPurchase.mockResolvedValueOnce({
+      ...awaitingPurchase,
+      status: "settled",
+      paymentStatus: "approved",
+      yieldStatus: "active",
+    } as never);
     await confirmPurchaseWorkflow(workflowInput, deps as never);
     expect(deps.payment.createCheckout).not.toHaveBeenCalled();
     expect(deps.settlePurchase).not.toHaveBeenCalled();

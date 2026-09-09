@@ -1,6 +1,8 @@
 import { eq, like } from "drizzle-orm";
 import {
+  btcLiquiditySettlements,
   customerProfiles,
+  customerWallets,
   dailyReconciliations,
   ledgerEntries,
   pixDeposits,
@@ -60,7 +62,11 @@ try {
   userId = user.id;
   await db
     .insert(users)
-    .values({ openId: `sandbox-second-approver-${suffix}`, name: "Segundo aprovador", role: "admin" });
+    .values({
+      openId: `sandbox-second-approver-${suffix}`,
+      name: "Segundo aprovador",
+      role: "admin",
+    });
   const secondApprover = (
     await db
       .select()
@@ -237,14 +243,19 @@ try {
     "Segunda aprovação no sandbox.",
     `sweep-approval-${suffix}-two`
   );
-  if (approvedSweep.status !== "simulated_sent" || approvedSweep.quoteStatus !== "consumed")
+  if (
+    approvedSweep.status !== "simulated_sent" ||
+    approvedSweep.quoteStatus !== "consumed"
+  )
     throw new Error("Dupla aprovação ou consumo de cotação do sweep falhou.");
   const reconciliation = await reconcileDailyTreasury(
     userId,
     new Date().toISOString().slice(0, 10)
   );
   if (reconciliation.status !== "balanced")
-    throw new Error("Reconciliação diária encontrou uma divergência inesperada.");
+    throw new Error(
+      "Reconciliação diária encontrou uma divergência inesperada."
+    );
 
   const counts = {
     profiles: (
@@ -370,6 +381,9 @@ try {
       await db
         .delete(ledgerEntries)
         .where(eq(ledgerEntries.purchaseId, purchase.id));
+      await db
+        .delete(btcLiquiditySettlements)
+        .where(eq(btcLiquiditySettlements.purchaseId, purchase.id));
     }
     const ownedRedemptions = await db
       .select({ id: redemptions.id })
@@ -412,6 +426,7 @@ try {
     await db
       .delete(customerProfiles)
       .where(eq(customerProfiles.userId, userId));
+    await db.delete(customerWallets).where(eq(customerWallets.userId, userId));
     await db
       .delete(providerEvents)
       .where(like(providerEvents.idempotencyKey, `%${suffix}%`));

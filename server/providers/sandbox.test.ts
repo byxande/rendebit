@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  sandboxBinanceLiquidityProvider,
   sandboxCustodyProvider,
   sandboxKycProvider,
   sandboxPixProvider,
@@ -13,6 +14,7 @@ describe("provedores sandbox", () => {
     const kyc = await sandboxKycProvider.verifyIdentity({ userId: 7, cpfMasked: "•••.000.•••-••" });
     const pix = await sandboxPixProvider.settleCashIn({ purchaseId: 9, amountBrl: "1000.00", idempotencyKey: "pix-9" });
     const custody = await sandboxCustodyProvider.buyBitcoin({ purchaseId: 9, btcAmount: "0.00240000", idempotencyKey: "custody-9" });
+    const binanceOrder = await sandboxBinanceLiquidityProvider.buyBitcoin({ purchaseId: 9, amountBrl: "1000.00", btcAmount: "0.00240000", executionBtcBrl: "416666.67", idempotencyKey: "binance-9" });
     const executableQuote = await sandboxProfitConversionQuoteProvider.quote({ sweepId: 14, amountBrl: "1000.00", destinationAsset: "stBTC", slippageBps: 50, idempotencyKey: "quote-14" });
     const sbtcConversion = await sandboxSbtcConversionProvider.convertBtcToSbtc({ purchaseId: 9, btcAmount: "0.00240000", idempotencyKey: "sbtc-9" });
     const yieldPosition = await sandboxYieldProvider.activatePosition({ purchaseId: 9, sbtcAmount: sbtcConversion.payload.sbtcAmount, idempotencyKey: "yield-9" });
@@ -23,6 +25,8 @@ describe("provedores sandbox", () => {
     expect(kyc).toMatchObject({ externalId: "kyc-sandbox-7", status: "approved" });
     expect(pix).toMatchObject({ externalId: "pix-sandbox-9", status: "settled" });
     expect(custody).toMatchObject({ externalId: "custody-sandbox-9", status: "settled" });
+    expect(binanceOrder).toMatchObject({ externalId: "binance-btcbrl-sandbox-9", status: "settled" });
+    expect(binanceOrder.payload).toMatchObject({ symbol: "BTCBRL", status: "filled", btcAmount: "0.00240000" });
     expect(executableQuote).toMatchObject({ externalId: "profit-quote-sandbox-14", status: "active" });
     expect(executableQuote.payload.route).toBe("BRL>BTC>sBTC>stBTC");
     expect(Number(executableQuote.payload.estimatedAssetAmount)).toBeGreaterThan(0);

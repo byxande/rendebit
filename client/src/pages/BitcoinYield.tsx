@@ -529,7 +529,56 @@ function FiscalPage() {
   );
 }
 
-function ReservesPage() {
+function ReservesPage({
+  wallets,
+  settlements,
+  authenticated,
+  saving,
+  onSaveWallet,
+  onLogin,
+}: {
+  wallets: Array<{
+    id: number;
+    address: string;
+    network: "testnet" | "mainnet";
+    label: string | null;
+    isPrimary: boolean;
+  }>;
+  settlements: Array<{
+    id: number;
+    status: string;
+    provider: string;
+    btcAmount: string;
+    blockerReason: string | null;
+    stacksTxId: string | null;
+  }>;
+  authenticated: boolean;
+  saving: boolean;
+  onSaveWallet: (input: {
+    address: string;
+    network: "testnet" | "mainnet";
+    label: string;
+  }) => void;
+  onLogin: () => void;
+}) {
+  const [address, setAddress] = useState("");
+  const [network, setNetwork] = useState<"testnet" | "mainnet">("testnet");
+  const [label, setLabel] = useState("Minha carteira Stacks");
+  const primary = wallets.find(wallet => wallet.isPrimary && wallet.network === network) ?? null;
+  const latestSettlement = settlements[0] ?? null;
+
+  function saveWallet() {
+    if (!authenticated) {
+      onLogin();
+      return;
+    }
+    if (!address.trim()) {
+      toast.error("Cole o endereço público da sua carteira Stacks.");
+      return;
+    }
+    onSaveWallet({ address: address.trim(), network, label: label.trim() });
+  }
+
   const reserveItems = [
     { label: "stBTC em circulação", value: "142,8047 stBTC", detail: "Contrato do token" },
     { label: "sBTC em reservas e bonds", value: "146,6239 sBTC", detail: "Lastro verificável" },
@@ -549,6 +598,25 @@ function ReservesPage() {
         </div>
       </section>
       <section className="br-panel br-contract-card"><div><span className="br-eyebrow">ENDEREÇO DEMONSTRATIVO</span><h3>Vault segregado de clientes</h3><code>SP2NEXO...8FA2.stbtc-client-vault-v1</code></div><CopyButton value="SP2NEXO8EXAMPLE8FA2.stbtc-client-vault-v1" label="Copiar endereço" /></section>
+      <section className="br-panel br-stacks-wallet-card">
+        <div className="br-section-head">
+          <div><span className="br-eyebrow">SUA REFERÊNCIA ON-CHAIN</span><h2>Carteira Stacks pública</h2><p>Salvamos somente o endereço público para vincular sua posição à trilha Stacks. A RendeBit não recebe seed phrase, chave privada ou senha.</p></div>
+          <span className="br-help-honesty"><Network size={15} /> {primary ? "Endereço cadastrado" : "Pendente"}</span>
+        </div>
+        <div className="br-stacks-wallet-grid">
+          <div className="br-stacks-wallet-form">
+            <label><span>Rede</span><select value={network} onChange={event => setNetwork(event.target.value as "testnet" | "mainnet")}><option value="testnet">Stacks testnet</option><option value="mainnet">Stacks mainnet</option></select></label>
+            <label><span>Apelido</span><input value={label} maxLength={100} onChange={event => setLabel(event.target.value)} placeholder="Ex.: minha carteira" /></label>
+            <label className="wide"><span>Endereço público Stacks</span><input value={address} spellCheck={false} autoCapitalize="characters" onChange={event => setAddress(event.target.value.toUpperCase())} placeholder={network === "testnet" ? "ST..." : "SP..."} /></label>
+            <button className="br-primary" type="button" onClick={saveWallet} disabled={saving}>{saving ? <RefreshCw className="animate-spin" size={16} /> : <WalletCards size={16} />}{authenticated ? "Salvar endereço público" : "Entrar para cadastrar"}</button>
+          </div>
+          <div className="br-stacks-wallet-status">
+            <div><small>Carteira principal</small><code>{primary?.address ?? "Ainda não informada"}</code><span>{primary ? `${primary.label || "Carteira principal"} · ${primary.network}` : "Cadastre antes de habilitar transações Stacks no ambiente escolhido."}</span></div>
+            <div className={`br-stacks-settlement ${latestSettlement?.status === "blocked" ? "blocked" : ""}`}><b>Liquidez BTC → Stacks</b><span>{latestSettlement ? latestSettlement.status === "blocked" ? latestSettlement.blockerReason || "Aguardando carteira Stacks." : `Etapa atual: ${latestSettlement.status}` : "Nenhuma compra aguardando a trilha on-chain."}</span>{latestSettlement?.stacksTxId && <code>{latestSettlement.stacksTxId}</code>}</div>
+          </div>
+        </div>
+        <p className="br-inline-note"><ShieldCheck size={14} /> No sandbox, o endereço é registrado e a liquidez BTCBRL é simulada. Em produção, qualquer envio para a rede Stacks exigirá contrato verificado, política de assinatura e reconciliação antes da transmissão.</p>
+      </section>
     </div>
   );
 }
@@ -563,6 +631,8 @@ export default function BitcoinYield() {
   const profileQuery = trpc.onboarding.get.useQuery(undefined, { enabled: isAuthenticated });
   const pixDepositsQuery = trpc.pixDeposits.summary.useQuery(undefined, { enabled: isAuthenticated, staleTime: 5_000, refetchInterval: isAuthenticated ? 15_000 : false });
   const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated, staleTime: 5_000, refetchInterval: isAuthenticated ? 15_000 : false });
+  const walletsQuery = trpc.wallets.list.useQuery(undefined, { enabled: isAuthenticated });
+  const walletSettlementsQuery = trpc.wallets.settlements.useQuery(undefined, { enabled: isAuthenticated, refetchInterval: isAuthenticated ? 15_000 : false });
   const redemptionsQuery = trpc.redemptions.summary.useQuery(undefined, { enabled: isAuthenticated });
   const marketQuoteQuery = trpc.market.btcBrl.useQuery(undefined, { staleTime: 55_000, refetchInterval: 60_000, retry: 1 });
   const [dashboardNow, setDashboardNow] = useState(Date.now());
@@ -632,6 +702,18 @@ export default function BitcoinYield() {
   const settlePixDepositMutation = trpc.pixDeposits.simulatePayment.useMutation();
   const createQuoteMutation = trpc.purchases.createQuote.useMutation();
   const confirmPurchaseMutation = trpc.purchases.confirm.useMutation();
+  const saveStacksWalletMutation = trpc.wallets.save.useMutation({
+    onSuccess: async wallet => {
+      await Promise.all([
+        utils.wallets.list.invalidate(),
+        utils.wallets.settlements.invalidate(),
+      ]);
+      toast.success("Carteira Stacks salva", {
+        description: `${wallet.network === "testnet" ? "Testnet" : "Mainnet"} vinculada como endereço público principal.`,
+      });
+    },
+    onError: error => toast.error(error.message),
+  });
   const createRedemptionQuoteMutation = trpc.redemptions.createQuote.useMutation();
   const confirmRedemptionMutation = trpc.redemptions.confirm.useMutation();
 
@@ -983,7 +1065,7 @@ export default function BitcoinYield() {
           {section === "lotes" && <LotsPage purchases={purchases} />}
           {section === "resgate" && <RedeemPage amount={amount} setAmount={value => { setAmount(value); setRedemptionQuote(null); }} availableBtc={isAuthenticated ? redemptionsQuery.data?.availableBtc ?? 0 : 0.284215} pixDestination={profileQuery.data?.pixAccountMasked ?? ""} quote={redemptionQuote} quoteSeconds={redemptionQuoteSeconds} redemptions={redemptionsQuery.data?.redemptions ?? []} authenticated={isAuthenticated} loading={createRedemptionQuoteMutation.isPending || redemptionsQuery.isLoading} btcPriceBrl={liveBtcBrl} onQuote={() => void prepareRedemption()} />}
           {section === "fiscal" && <FiscalPage />}
-          {section === "reservas" && <ReservesPage />}
+          {section === "reservas" && <ReservesPage wallets={walletsQuery.data ?? []} settlements={walletSettlementsQuery.data ?? []} authenticated={isAuthenticated} saving={saveStacksWalletMutation.isPending} onSaveWallet={input => saveStacksWalletMutation.mutate(input)} onLogin={requestLogin} />}
           {section === "empresas" && <BusinessPage />}
           {section === "ajuda" && <HelpPage onNavigate={navigate} />}
         </div>
@@ -1047,10 +1129,10 @@ export default function BitcoinYield() {
             <div className="br-buy-chips"><button type="button" onClick={() => { setAddAmount("500,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 500</button><button type="button" onClick={() => { setAddAmount("1.000,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 1.000</button><button type="button" onClick={() => { setAddAmount("5.000,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 5.000</button></div>
             <section className="br-buy-quote"><div className="br-buy-quote-head"><span><i /> Cotação persistida</span><b className={quoteSeconds === 0 ? "expired" : ""}>{quoteSeconds === 0 ? "Atualize" : `00:${String(quoteSeconds).padStart(2, "0")}`}</b></div><div className="br-kv"><span>Referência BTC/BRL</span><b>{currency.format(serverQuote ? Number(serverQuote.referenceBtcBrl) : liveBtcBrl)}</b></div><div className="br-kv"><span>Preço de execução (spread 0,65%)</span><b>{currency.format(purchaseQuote.executionPrice)}</b></div><div className="br-kv"><span>Taxa de serviço (0,50%)</span><b>-{currency.format(purchaseQuote.serviceFee)}</b></div><div className="br-kv"><span>Valor aplicado</span><b>{currency.format(purchaseQuote.applied)}</b></div><div className="br-buy-total"><span>Você compra aproximadamente</span><strong>₿ {formatBtc(purchaseQuote.btc)}</strong><small>Referência de rendimento: ~3% a.a.</small></div></section>
             <div className="br-payment-methods" role="radiogroup" aria-label="Forma de pagamento"><button className={paymentMethod === "pix" ? "active" : ""} type="button" role="radio" aria-checked={paymentMethod === "pix"} onClick={() => setPaymentMethod("pix")}><Banknote /><span><b>Pix</b><small>Pagamento à vista</small></span><i /></button><button className={paymentMethod === "credit_card" ? "active" : ""} type="button" role="radio" aria-checked={paymentMethod === "credit_card"} onClick={() => setPaymentMethod("credit_card")}><CreditCard /><span><b>Cartão de crédito</b><small>Processado pelo Mercado Pago</small></span><i /></button></div>
-            <div className="br-mercado-pago-note"><ShieldCheck size={16} /><span>O Mercado Pago processa o pagamento em BRL. Depois da aprovação, a RendeBit executa separadamente a compra e a aplicação do BTC. Dados do cartão não passam pelo backend da RendeBit.</span></div>
+            <div className="br-mercado-pago-note"><ShieldCheck size={16} /><span>O Mercado Pago processa o pagamento em BRL. Depois da aprovação, a liquidez BTCBRL é tratada separadamente na conta institucional e a trilha Stacks só continua após os controles de rede, carteira pública e contrato. Dados do cartão não passam pelo backend da RendeBit.</span></div>
             {(!serverQuote || quoteSeconds === 0) && <button className="br-outline full" type="button" onClick={() => void regenerateServerQuote()} disabled={createQuoteMutation.isPending}><RefreshCw className={createQuoteMutation.isPending ? "animate-spin" : ""} size={15} /> Atualizar cotação</button>}
             <label className="br-risk-check"><input type="checkbox" checked={riskAccepted} onChange={(event) => setRiskAccepted(event.target.checked)} /><span>Entendi que o preço do Bitcoin varia e que o retorno de ~3% a.a. é uma estimativa variável, não uma promessa ou garantia.</span></label>
-            <details className="br-how-it-works"><summary>Como funciona por trás?</summary><p>Após a compra, a posição pode passar por conversões técnicas para os ativos de liquidez do protocolo e ser aplicada na estratégia de rendimento. Isso envolve riscos de mercado, protocolo, liquidez e contraparte. Os registros verificáveis ficam em Segurança.</p></details>
+            <details className="br-how-it-works"><summary>Como funciona por trás?</summary><p>A conta institucional usa uma fonte de liquidez BTCBRL separada. Depois, o sistema registra a carteira pública Stacks do cliente e só executa as etapas técnicas de sBTC e stBTC após os preflights de rede, contrato, saldo, assinatura e reconciliação. Isso envolve riscos de mercado, protocolo, liquidez e contraparte. Os registros verificáveis ficam em Segurança.</p></details>
             <button className="br-primary full" type="button" disabled={!riskAccepted || !serverQuote || quoteSeconds === 0 || confirmPurchaseMutation.isPending} onClick={() => void confirmPurchase()}>{confirmPurchaseMutation.isPending ? <RefreshCw className="animate-spin" size={17} /> : <ArrowRight size={17} />} {paymentMethod === "pix" ? "Continuar com Pix" : "Continuar com cartão"}</button>
             <button className="br-dialog-cancel" type="button" onClick={() => setPurchaseStep("eligibility")}>Voltar</button>
           </>}

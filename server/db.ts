@@ -2,6 +2,8 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   authEvents,
+  btcLiquiditySettlements,
+  customerWallets,
   customerProfiles,
   dailyReconciliations,
   InsertUser,
@@ -126,6 +128,115 @@ export async function getCustomerProfile(userId: number) {
   );
 }
 
+export async function listCustomerWallets(userId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(customerWallets)
+    .where(eq(customerWallets.userId, userId))
+    .orderBy(desc(customerWallets.createdAt));
+}
+
+export async function saveCustomerStacksWallet(input: {
+  userId: number;
+  address: string;
+  network: "testnet" | "mainnet";
+  label?: string | null;
+}) {
+  const db = await requireDb();
+  const address = input.address.trim();
+  if (!isValidStacksAddress(address, input.network)) {
+    throw new Error(
+      `Endereço Stacks inválido para a ${input.network === "testnet" ? "testnet" : "mainnet"}.`
+    );
+  }
+  return db.transaction(async tx => {
+    await tx
+      .update(customerWallets)
+      .set({ isPrimary: false })
+      .where(
+        and(
+          eq(customerWallets.userId, input.userId),
+          eq(customerWallets.network, input.network),
+          eq(customerWallets.status, "active")
+        )
+      );
+    await tx
+      .insert(customerWallets)
+      .values({
+        userId: input.userId,
+        address,
+        network: input.network,
+        label: input.label?.trim().slice(0, 100) || "Carteira principal",
+        isPrimary: true,
+        status: "active",
+        verifiedAt: new Date(),
+      })
+      .onDuplicateKeyUpdate({
+        set: {
+          label: input.label?.trim().slice(0, 100) || "Carteira principal",
+          isPrimary: true,
+          status: "active",
+          verifiedAt: new Date(),
+        },
+      });
+    const wallet = (
+      await tx
+        .select()
+        .from(customerWallets)
+        .where(
+          and(
+            eq(customerWallets.userId, input.userId),
+            eq(customerWallets.address, address),
+            eq(customerWallets.network, input.network)
+          )
+        )
+        .limit(1)
+    )[0];
+    if (!wallet) throw new Error("Não foi possível salvar a carteira Stacks.");
+    if (input.network === "testnet") {
+      await tx
+        .update(btcLiquiditySettlements)
+        .set({
+          customerWalletId: wallet.id,
+          status: "stacks_pending",
+          blockerReason: null,
+        })
+        .where(
+          and(
+            eq(btcLiquiditySettlements.userId, input.userId),
+            eq(btcLiquiditySettlements.network, "testnet"),
+            eq(btcLiquiditySettlements.status, "blocked")
+          )
+        );
+    }
+    return wallet;
+  });
+}
+
+export async function getPrimaryCustomerStacksWallet(
+  userId: number,
+  network: "testnet" | "mainnet" = "testnet"
+) {
+  const db = await requireDb();
+  return (
+    (
+      await db
+        .select()
+        .from(customerWallets)
+        .where(
+          and(
+            eq(customerWallets.userId, userId),
+            eq(customerWallets.network, network),
+            eq(customerWallets.status, "active"),
+            eq(customerWallets.isPrimary, true)
+          )
+        )
+        .limit(1)
+    )[0] ?? null
+  );
+}
+
 export async function upsertSandboxProfile(input: {
   userId: number;
   legalName: string;
@@ -175,6 +286,8 @@ export async function recordProviderEvent(input: {
     | "sandbox_kyc"
     | "sandbox_pix"
     | "sandbox_payments"
+    | "sandbox_binance"
+    | "binance"
     | "mercado_pago"
     | "sandbox_custody"
     | "sandbox_stacks"
@@ -626,6 +739,104 @@ export async function rejectPurchasePayment(input: {
         eq(purchases.status, "awaiting_payment")
       )
     );
+}
+
+export async function createBtcLiquiditySettlement(input: {
+  purchaseId: number;
+  userId: number;
+  liquidity: {
+    provider: "sandbox_binance" | "binance";
+    mode: "sandbox" | "test" | "production";
+    amountBrl: string;
+    btcAmount: string;
+    executionBtcBrl: string;
+    orderId: string;
+  };
+  idempotencyKey: string;
+}) {
+  const db = await requireDb();
+  const wallet = await getPrimaryCustomerStacksWallet(input.userId, "testnet");
+  const existing = (
+    await db
+      .select()
+      .from(btcLiquiditySettlements)
+      .where(eq(btcLiquiditySettlements.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
+  if (existing) {
+    if (
+      existing.userId !== input.userId ||
+      existing.purchaseId !== input.purchaseId
+    )
+      throw new Error("A chave idempotente já pertence a outra liquidação.");
+    return existing;
+  }
+  const status = wallet ? "stacks_pending" : "blocked";
+  const blockerReason = wallet
+    ? null
+    : "Cadastre uma carteira pública Stacks testnet antes de continuar a saga.";
+  const settlement = await db
+    .insert(btcLiquiditySettlements)
+    .values({
+      purchaseId: input.purchaseId,
+      userId: input.userId,
+      customerWalletId: wallet?.id ?? null,
+      provider: input.liquidity.provider,
+      mode: input.liquidity.mode,
+      network: "testnet",
+      status,
+      amountBrl: input.liquidity.amountBrl,
+      btcAmount: input.liquidity.btcAmount,
+      executionBtcBrl: input.liquidity.executionBtcBrl,
+      externalOrderId: input.liquidity.orderId,
+      blockerReason,
+      idempotencyKey: input.idempotencyKey,
+      liquiditySettledAt: new Date(),
+    })
+    .onDuplicateKeyUpdate({ set: { idempotencyKey: input.idempotencyKey } });
+  const saved = (
+    await db
+      .select()
+      .from(btcLiquiditySettlements)
+      .where(eq(btcLiquiditySettlements.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
+  if (!saved)
+    throw new Error("Não foi possível persistir a liquidação de liquidez.");
+  await recordProviderEvent({
+    provider: input.liquidity.provider,
+    eventType: "btc.liquidity.order.settled",
+    externalId: input.liquidity.orderId,
+    idempotencyKey: `${input.idempotencyKey}:provider-event`,
+    payload: {
+      purchaseId: input.purchaseId,
+      amountBrl: input.liquidity.amountBrl,
+      btcAmount: input.liquidity.btcAmount,
+      symbol: "BTCBRL",
+      orderId: input.liquidity.orderId,
+      mode: input.liquidity.mode,
+      customerWalletAddress: wallet?.address ?? null,
+      nextStep: status === "stacks_pending" ? "stacks" : "wallet_required",
+    },
+  });
+  return saved;
+}
+
+export async function listBtcLiquiditySettlements(userId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(btcLiquiditySettlements)
+    .where(eq(btcLiquiditySettlements.userId, userId))
+    .orderBy(desc(btcLiquiditySettlements.createdAt));
+}
+
+export async function listOperationalBtcLiquiditySettlements() {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(btcLiquiditySettlements)
+    .orderBy(desc(btcLiquiditySettlements.createdAt));
 }
 
 export async function settleSandboxPurchase(input: {
@@ -1166,9 +1377,12 @@ export async function claimDailyReconciliationTask(ownerUserId: number) {
         .where(eq(treasurySettings.ownerUserId, ownerUserId))
         .limit(1)
     )[0];
-    if (!settings) throw new Error("Configuração de tesouraria não encontrada.");
+    if (!settings)
+      throw new Error("Configuração de tesouraria não encontrada.");
     if (settings.dailyReconciliationTaskUid)
-      throw new Error("A reconciliação diária já está sendo configurada ou está ativa.");
+      throw new Error(
+        "A reconciliação diária já está sendo configurada ou está ativa."
+      );
     await tx
       .update(treasurySettings)
       .set({ dailyReconciliationTaskUid: "__provisioning__" })

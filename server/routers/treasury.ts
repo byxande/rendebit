@@ -16,6 +16,7 @@ import {
   listProfitSweepApprovals,
   listDailyReconciliations,
   listOperationalLedger,
+  listOperationalBtcLiquiditySettlements,
   listProfitDistributions,
   updateTreasurySettings,
   approveSandboxProfitCapitalSweep,
@@ -40,26 +41,29 @@ export const treasuryRouter = router({
     listDailyReconciliations(await getTreasuryOwnerUserId(ctx.user.id))
   ),
   ledger: adminProcedure.query(() => listOperationalLedger()),
+  btcLiquiditySettlements: adminProcedure.query(() =>
+    listOperationalBtcLiquiditySettlements()
+  ),
 
   updateSettings: adminProcedure
     .input(
       z.object({
-    organizationName: z.string().min(2).max(160),
-    stacksWalletAddress: z.string().max(80).nullable(),
-    personalProfitWalletAddress: z.string().max(80).nullable(),
-    conversionPartner: z.string().max(120),
-    conversionPartnerStatus: z.enum([
-      "not_selected",
-      "due_diligence",
-      "contracted",
-      "active",
-    ]),
-    distributionAsset: z.enum(["STX", "sBTC", "stBTC"]),
-    cadence: z.enum(["daily", "weekly", "monthly"]),
-    approvalMode: z.enum(["manual", "multisig", "automatic"]),
-    network: z.enum(["testnet", "mainnet"]),
-    taxReserveBps: z.number().int().min(0).max(5000),
-    operationalReserveBps: z.number().int().min(0).max(5000),
+        organizationName: z.string().min(2).max(160),
+        stacksWalletAddress: z.string().max(80).nullable(),
+        personalProfitWalletAddress: z.string().max(80).nullable(),
+        conversionPartner: z.string().max(120),
+        conversionPartnerStatus: z.enum([
+          "not_selected",
+          "due_diligence",
+          "contracted",
+          "active",
+        ]),
+        distributionAsset: z.enum(["STX", "sBTC", "stBTC"]),
+        cadence: z.enum(["daily", "weekly", "monthly"]),
+        approvalMode: z.enum(["manual", "multisig", "automatic"]),
+        network: z.enum(["testnet", "mainnet"]),
+        taxReserveBps: z.number().int().min(0).max(5000),
+        operationalReserveBps: z.number().int().min(0).max(5000),
       })
     )
     .mutation(async ({ ctx, input }) =>
@@ -72,8 +76,8 @@ export const treasuryRouter = router({
   closePeriod: adminProcedure
     .input(
       z.object({
-    periodKey: z.string().regex(/^\d{4}-\d{2}$/),
-    idempotencyKey: z.string().min(8).max(160),
+        periodKey: z.string().regex(/^\d{4}-\d{2}$/),
+        idempotencyKey: z.string().min(8).max(160),
       })
     )
     .mutation(async ({ ctx, input }) =>
@@ -87,12 +91,12 @@ export const treasuryRouter = router({
   approveSandbox: adminProcedure
     .input(z.object({ distributionId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
-    try {
+      try {
         return await approveSandboxDistribution(
           await getTreasuryOwnerUserId(ctx.user.id),
           input.distributionId
         );
-    } catch (error) {
+      } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message:
@@ -151,10 +155,17 @@ export const treasuryRouter = router({
               ? error.message
               : "Falha ao aprovar sweep de lucro.",
         });
-    }
+      }
     }),
   reconcileDaily: adminProcedure
-    .input(z.object({ dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }))
+    .input(
+      z.object({
+        dateKey: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       try {
         return await reconcileDailyTreasury(
@@ -189,7 +200,8 @@ export const treasuryRouter = router({
           name: `treasury-daily-reconciliation-${ownerUserId}`,
           cron: "0 0 3 * * *",
           path: "/api/scheduled/daily-reconciliation",
-          description: "Reconcilia diariamente o ledger e os sweeps da tesouraria RendeBit.",
+          description:
+            "Reconcilia diariamente o ledger e os sweeps da tesouraria RendeBit.",
         },
         sessionToken
       );

@@ -1,5 +1,6 @@
 import { calculateProfitStbtcSweep, SANDBOX_BTC_BRL } from "../finance";
 import type {
+  BtcLiquidityProvider,
   CustodyProvider,
   KycProvider,
   PixProvider,
@@ -9,7 +10,8 @@ import type {
   YieldProvider,
 } from "./types";
 
-const sandboxId = (prefix: string, stableId: number) => `${prefix}-sandbox-${stableId}`;
+const sandboxId = (prefix: string, stableId: number) =>
+  `${prefix}-sandbox-${stableId}`;
 
 export const sandboxKycProvider: KycProvider = {
   async verifyIdentity({ userId }) {
@@ -28,7 +30,12 @@ export const sandboxPixProvider: PixProvider = {
     return {
       externalId: reference,
       status: "active",
-      payload: { amountBrl, pixCopyPaste, qrCodeText: pixCopyPaste, expiresAt: expiresAt.toISOString() },
+      payload: {
+        amountBrl,
+        pixCopyPaste,
+        qrCodeText: pixCopyPaste,
+        expiresAt: expiresAt.toISOString(),
+      },
     };
   },
   async confirmCashInCharge({ depositId, amountBrl }) {
@@ -84,51 +91,75 @@ export const sandboxCustodyProvider: CustodyProvider = {
   },
 };
 
-export const sandboxProfitConversionQuoteProvider: ProfitConversionQuoteProvider = {
-  provider: "sandbox_quote",
-  async quote({ sweepId, amountBrl, slippageBps }) {
-    const expiresAt = new Date(Date.now() + 15 * 60_000);
-    const calculation = calculateProfitStbtcSweep({
-      distributableProfitBrl: Number(amountBrl),
-      referenceStbtcBrl: SANDBOX_BTC_BRL,
-      slippageBps,
-    });
-    return {
-      externalId: sandboxId("profit-quote", sweepId),
-      status: "active",
-      payload: {
-        amountBrl,
-        referenceAssetBrl: calculation.referenceAssetBrl.toFixed(2),
-        estimatedAssetAmount: calculation.estimatedAssetAmount.toFixed(8),
-        minimumAssetAmount: calculation.minimumAssetAmount.toFixed(8),
-        expiresAt: expiresAt.toISOString(),
-        route: calculation.route,
-      },
-    };
+export const sandboxBinanceLiquidityProvider: BtcLiquidityProvider = {
+  provider: "sandbox_binance",
+  mode: "sandbox",
+  async preflight() {
+    // Sandbox only: no Binance account, credential or order is contacted.
   },
-  async execute({
-    sweepId,
-    quoteExternalId,
-    amountBrl,
-    estimatedAssetAmount,
-    minimumAssetAmount,
-  }) {
-    if (!quoteExternalId.startsWith("profit-quote-sandbox-"))
-      throw new Error("Cotação sandbox desconhecida para este sweep.");
-    const transactionId = sandboxId("profit-execution", sweepId);
+  async buyBitcoin({ purchaseId, amountBrl, btcAmount, executionBtcBrl }) {
+    const orderId = sandboxId("binance-btcbrl", purchaseId);
     return {
-      externalId: transactionId,
+      externalId: orderId,
       status: "settled",
       payload: {
         amountBrl,
-        estimatedAssetAmount,
-        minimumAssetAmount,
-        route: "BRL>BTC>sBTC>stBTC",
-        transactionId,
+        btcAmount,
+        executionBtcBrl,
+        symbol: "BTCBRL",
+        orderId,
+        status: "filled",
       },
     };
   },
 };
+
+export const sandboxProfitConversionQuoteProvider: ProfitConversionQuoteProvider =
+  {
+    provider: "sandbox_quote",
+    async quote({ sweepId, amountBrl, slippageBps }) {
+      const expiresAt = new Date(Date.now() + 15 * 60_000);
+      const calculation = calculateProfitStbtcSweep({
+        distributableProfitBrl: Number(amountBrl),
+        referenceStbtcBrl: SANDBOX_BTC_BRL,
+        slippageBps,
+      });
+      return {
+        externalId: sandboxId("profit-quote", sweepId),
+        status: "active",
+        payload: {
+          amountBrl,
+          referenceAssetBrl: calculation.referenceAssetBrl.toFixed(2),
+          estimatedAssetAmount: calculation.estimatedAssetAmount.toFixed(8),
+          minimumAssetAmount: calculation.minimumAssetAmount.toFixed(8),
+          expiresAt: expiresAt.toISOString(),
+          route: calculation.route,
+        },
+      };
+    },
+    async execute({
+      sweepId,
+      quoteExternalId,
+      amountBrl,
+      estimatedAssetAmount,
+      minimumAssetAmount,
+    }) {
+      if (!quoteExternalId.startsWith("profit-quote-sandbox-"))
+        throw new Error("Cotação sandbox desconhecida para este sweep.");
+      const transactionId = sandboxId("profit-execution", sweepId);
+      return {
+        externalId: transactionId,
+        status: "settled",
+        payload: {
+          amountBrl,
+          estimatedAssetAmount,
+          minimumAssetAmount,
+          route: "BRL>BTC>sBTC>stBTC",
+          transactionId,
+        },
+      };
+    },
+  };
 
 export const sandboxSbtcConversionProvider: SbtcConversionProvider = {
   provider: "sandbox_custody",
@@ -137,7 +168,12 @@ export const sandboxSbtcConversionProvider: SbtcConversionProvider = {
     return {
       externalId: sandboxId("sbtc-conversion", purchaseId),
       status: "settled",
-      payload: { btcAmount, sbtcAmount: btcAmount, route: "BTC>sBTC", network: "sandbox" },
+      payload: {
+        btcAmount,
+        sbtcAmount: btcAmount,
+        route: "BTC>sBTC",
+        network: "sandbox",
+      },
     };
   },
 };
@@ -145,11 +181,17 @@ export const sandboxSbtcConversionProvider: SbtcConversionProvider = {
 export const sandboxYieldProvider: YieldProvider = {
   provider: "sandbox_stacks",
   network: "sandbox",
-  async activatePosition({ purchaseId, sbtcAmount }) {
+  async activatePosition({ purchaseId, sbtcAmount, customerWalletAddress }) {
     return {
       externalId: sandboxId("stacks", purchaseId),
       status: "active",
-      payload: { btcAmount: sbtcAmount, sbtcAmount, route: "BTC>sBTC>stBTC", network: "sandbox" },
+      payload: {
+        btcAmount: sbtcAmount,
+        sbtcAmount,
+        route: "BTC>sBTC>stBTC",
+        network: "sandbox",
+        customerWalletAddress,
+      },
     };
   },
   async exitPosition({ redemptionId, btcAmount }) {

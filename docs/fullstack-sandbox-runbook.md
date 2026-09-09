@@ -6,7 +6,9 @@ O projeto foi migrado de uma demonstração puramente frontend para uma aplicaç
 
 A jornada persiste o perfil com dados mascarados, simula a aprovação de KYC, cria uma cotação com validade e chave idempotente, registra a compra, produz lançamentos de ledger e salva eventos separados para Pix, custódia e ativação da estratégia. Os adaptadores de sandbox implementam contratos substituíveis por provedores reais.
 
-A confirmação agora é orquestrada em sequência: **Pix/checkout aprovado → BTC adquirido pelo custodiante → BTC convertido em sBTC → estratégia Stacks ativada → ledger e compra liquidados**. A conversão é um estágio próprio, com preflight, evento e chave idempotente; no sandbox ela é simulada 1:1, enquanto no testnet permanece bloqueada até existir um bridge/issuer verificável. Se qualquer provedor falhar, a compra é marcada como falha e não aparece como posição ativa.
+A confirmação agora é orquestrada em sequência: **Pix/checkout aprovado → liquidez BTCBRL institucional → liquidação da ordem registrada → BTC convertido em sBTC → estratégia Stacks ativada → ledger e compra liquidados**. A Binance está modelada exclusivamente como fonte de liquidez Spot BTCBRL da organização. A aplicação persiste a carteira Stacks pública do cliente em uma tabela própria e não armazena seed phrase, chave privada, senha de carteira ou credencial Binance. Quando não existe uma carteira testnet do cliente, a liquidez é registrada com bloqueador explícito e a etapa on-chain não é transmitida.
+
+No provider Stacks testnet atual, o signer operacional deposita no contrato da estratégia. O endereço público cadastrado é carregado nos eventos para vínculo e reconciliação, mas ainda não é o destino de uma transferência custodiada. Uma conta individualizada exigirá contrato, política de custódia e post-conditions específicos antes de qualquer promessa de crédito direto na carteira do cliente.
 
 A Xverse foi classificada como integração opcional de autocustódia. Sua API pode apoiar dados, RPC, portfólio, swaps e transmissão de transações Bitcoin já assinadas; o Sats Connect pode solicitar assinatura Stacks, mas exige aprovação visível do usuário. Ela não é tratada como custodiante nem como assinador server-side para o fluxo automático da RendeBit.
 
@@ -38,22 +40,24 @@ Para o ativo **stBTC**, o sistema mantém uma carteira dedicada de lucros, difer
 
 ## Modelo de dados
 
-| Tabela                   | Finalidade                                                                                                 |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `customer_profiles`      | Perfil, elegibilidade, titularidade Pix e estado do KYC                                                    |
-| `purchase_quotes`        | Cotações, taxas, expiração e idempotência                                                                  |
-| `purchases`              | Compras, liquidação e estado da estratégia de rendimento                                                   |
-| `ledger_entries`         | Trilha financeira por cliente e organização                                                                |
-| `provider_events`        | Webhooks simulados e deduplicação                                                                          |
-| `treasury_settings`      | Carteira, parceiro de conversão, rede, ativo, frequência, aprovação, reservas e identificador do heartbeat |
-| `profit_distributions`   | Fechamento mensal e repasse simulado, único por período                                                    |
-| `profit_capital_sweeps`  | Proposta segregada de lucro distribuível BRL para a conta dedicada em stBTC                                |
-| `profit_sweep_approvals` | Registro idempotente das duas aprovações por administradores distintos                                     |
-| `daily_reconciliations`  | Conferência diária de ledger, sweeps, aprovações e cotação                                                 |
+| Tabela                      | Finalidade                                                                                                 |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `customer_profiles`         | Perfil, elegibilidade, titularidade Pix e estado do KYC                                                    |
+| `customer_wallets`          | Endereço público Stacks por cliente, rede, apelido e estado da carteira principal                          |
+| `purchase_quotes`           | Cotações, taxas, expiração e idempotência                                                                  |
+| `purchases`                 | Compras, liquidação e estado da estratégia de rendimento                                                   |
+| `btc_liquidity_settlements` | Saga da ordem BTCBRL, referência Binance, carteira de destino, estado Stacks e bloqueadores                |
+| `ledger_entries`            | Trilha financeira por cliente e organização                                                                |
+| `provider_events`           | Webhooks simulados e deduplicação                                                                          |
+| `treasury_settings`         | Carteira, parceiro de conversão, rede, ativo, frequência, aprovação, reservas e identificador do heartbeat |
+| `profit_distributions`      | Fechamento mensal e repasse simulado, único por período                                                    |
+| `profit_capital_sweeps`     | Proposta segregada de lucro distribuível BRL para a conta dedicada em stBTC                                |
+| `profit_sweep_approvals`    | Registro idempotente das duas aprovações por administradores distintos                                     |
+| `daily_reconciliations`     | Conferência diária de ledger, sweeps, aprovações e cotação                                                 |
 
 ## Próxima ativação
 
-A próxima fase deve escolher e contratar os provedores. A avaliação atual classifica Bitso Brasil e Mercado Bitcoin como candidatos condicionais, Foxbit como candidato em diligência e Mercado Pago como trilho de Pix; nenhum deles deve ser ativado para conversão sem confirmação regulatória e contrato institucional. As credenciais devem entrar apenas em secrets do backend. Depois, cada adaptador em `server/providers` será substituído por um cliente real com autenticação, verificação de assinatura de webhook, retries seguros, circuit breaker e reconciliação. A passagem para produção deve ser bloqueada até existirem revisão jurídica brasileira, definição de VASP/custódia, contratos bancários, políticas LGPD/PLD-FT, runbooks de incidente e testes independentes.
+A próxima fase deve escolher e contratar os provedores. A avaliação atual inclui Binance como candidata de liquidez Spot BTCBRL, além de Bitso Brasil e Mercado Bitcoin como candidatos condicionais, Foxbit em diligência e Mercado Pago como trilho de Pix. Binance não deve receber permissão de saque automatizado; a conta deve ser institucional, com API Key de escopo mínimo, allowlist de IP e confirmação por User Data Stream e REST. Nenhum parceiro deve ser ativado sem confirmação regulatória, contrato institucional e revisão jurídica. As credenciais devem entrar apenas em secrets do backend. Depois, cada adaptador em `server/providers` será substituído por um cliente real com autenticação, verificação de eventos, retries seguros, circuit breaker e reconciliação. A passagem para produção deve ser bloqueada até existirem revisão jurídica brasileira, definição de VASP/custódia, contratos bancários, políticas LGPD/PLD-FT, runbooks de incidente e testes independentes.
 
 A marca do produto foi atualizada para **RendeBit**. A busca pública inicial não encontrou colisão evidente, mas ainda é obrigatório fazer busca de anterioridade e clearance formal no INPI antes do lançamento.
 

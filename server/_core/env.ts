@@ -10,6 +10,20 @@ export const ENV = {
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? "",
   mercadoPagoAccessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN ?? "",
   mercadoPagoWebhookSecret: process.env.MERCADO_PAGO_WEBHOOK_SECRET ?? "",
-  mercadoPagoMode: process.env.MERCADO_PAGO_MODE === "production" ? "production" as const : "test" as const,
-  paymentsProvider: process.env.PAYMENTS_PROVIDER === "mercado_pago" ? "mercado_pago" as const : "sandbox" as const,
+  mercadoPagoMode:
+    process.env.MERCADO_PAGO_MODE === "production"
+      ? ("production" as const)
+      : ("test" as const),
+  paymentsProvider:
+    process.env.PAYMENTS_PROVIDER === "mercado_pago"
+      ? ("mercado_pago" as const)
+      : ("sandbox" as const),
+  binanceApiKey: process.env.BINANCE_API_KEY ?? "",
+  binanceApiSecret: process.env.BINANCE_API_SECRET ?? "",
+  realBtcLiquidityEnabled:
+    process.env.RENDEBIT_ENABLE_REAL_BINANCE_LIQUIDITY === "true",
+  binanceMaxSlippageBps: Math.min(
+    500,
+    Math.max(0, Number(process.env.BINANCE_MAX_SLIPPAGE_BPS ?? 50) || 50)
+  ),
 };

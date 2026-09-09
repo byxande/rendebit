@@ -4,13 +4,17 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { onboardingRouter } from "./routers/onboarding";
 import { integrationsRouter } from "./routers/integrations";
+import { customerWalletsRouter } from "./routers/customerWallets";
 import { marketRouter } from "./routers/market";
 import { pixDepositsRouter } from "./routers/pixDeposits";
 import { purchasesRouter } from "./routers/purchases";
 import { redemptionsRouter } from "./routers/redemptions";
 import { treasuryRouter } from "./routers/treasury";
 import { recordAuthEvent } from "./db";
-import { normalizeSocialProvider, SOCIAL_AUTH_PROVIDERS } from "./services/socialAuth";
+import {
+  normalizeSocialProvider,
+  SOCIAL_AUTH_PROVIDERS,
+} from "./services/socialAuth";
 
 export const appRouter = router({
   system: systemRouter,
@@ -40,6 +44,7 @@ export const appRouter = router({
     }),
   }),
   integrations: integrationsRouter,
+  wallets: customerWalletsRouter,
   market: marketRouter,
   onboarding: onboardingRouter,
   pixDeposits: pixDepositsRouter,

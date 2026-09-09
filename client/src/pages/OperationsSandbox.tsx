@@ -44,6 +44,10 @@ export default function OperationsSandbox() {
   const reconciliationsQuery = trpc.treasury.reconciliations.useQuery(undefined, {
     enabled: isAdmin,
   });
+  const btcLiquidityQuery = trpc.treasury.btcLiquiditySettlements.useQuery(
+    undefined,
+    { enabled: isAdmin, refetchInterval: isAdmin ? 15_000 : false }
+  );
   const ledgerQuery = trpc.treasury.ledger.useQuery(undefined, {
     enabled: isAdmin,
   });
@@ -225,6 +229,7 @@ export default function OperationsSandbox() {
   const capitalSweeps = capitalSweepsQuery.data ?? [];
   const approvals = approvalsQuery.data ?? [];
   const reconciliations = reconciliationsQuery.data ?? [];
+  const btcLiquiditySettlements = btcLiquidityQuery.data ?? [];
   const grossRevenue = entries
     .filter(item => item.entryType === "fee_revenue" && item.currency === "BRL")
     .reduce((sum, item) => sum + Number(item.amount), 0);
@@ -378,6 +383,7 @@ export default function OperationsSandbox() {
                 onChange={event => setConversionPartner(event.target.value)}
               >
                 <option value="not_selected">Ainda não selecionado</option>
+                <option value="Binance">Binance · liquidez BTCBRL</option>
                 <option value="Bitso Brasil">Bitso Brasil</option>
                 <option value="Mercado Bitcoin">Mercado Bitcoin</option>
                 <option value="Foxbit">Foxbit</option>
@@ -494,8 +500,9 @@ export default function OperationsSandbox() {
           </p>
           <p className="br-dialog-footnote">
             <ShieldCheck size={13} /> Registrar um parceiro não libera compra
-            real. Bitso Brasil e Mercado Bitcoin seguem em diligência; API,
-            contrato institucional e validação regulatória são gates obrigatórios.
+            real. Binance, Bitso Brasil e Mercado Bitcoin seguem em diligência;
+            API, conta institucional, autorização regulatória, allowlist de IP e
+            reconciliação são gates obrigatórios.
           </p>
         </section>
 
@@ -771,6 +778,36 @@ export default function OperationsSandbox() {
         </div>
       </section>
 
+      <section className="br-panel br-table-card br-btc-liquidity-card">
+        <div className="br-section-head">
+          <div>
+            <span className="br-eyebrow">LIQUIDEZ E TRILHA ON-CHAIN</span>
+            <h2>Binance BTCBRL → Stacks</h2>
+            <p>Binance serve somente à liquidez BTCBRL institucional. O endereço público Stacks do cliente e os passos sBTC/stBTC ficam separados e auditáveis.</p>
+          </div>
+          <span className="br-help-honesty"><Bitcoin size={15} /> {btcLiquiditySettlements.length} liquidações</span>
+        </div>
+        {btcLiquiditySettlements.length === 0 ? (
+          <div className="br-ops-empty">Nenhuma compra chegou à trilha de liquidez ainda.</div>
+        ) : (
+          <div className="br-table-scroll">
+            <table>
+              <thead><tr><th>Compra</th><th>Liquidez</th><th>BTC</th><th>Rede</th><th>Próxima etapa</th><th>Referência</th></tr></thead>
+              <tbody>{btcLiquiditySettlements.slice(0, 20).map(item => (
+                <tr key={item.id}>
+                  <td>#{item.purchaseId}<span className="br-table-muted">cliente #{item.userId}</span></td>
+                  <td><b>{item.provider === "binance" ? "Binance" : "Binance sandbox"}</b><span className="br-table-muted">{currency.format(Number(item.amountBrl))}</span></td>
+                  <td className="mono">₿ {item.btcAmount}</td>
+                  <td>{item.network}</td>
+                  <td><span className={`br-ops-state ${item.status === "confirmed" ? "ready" : item.status === "blocked" || item.status === "failed" ? "warning" : ""}`}>{item.status === "stacks_pending" ? "Aguardando Stacks" : item.status === "blocked" ? "Carteira necessária" : item.status}</span><span className="br-table-muted">{item.blockerReason || item.failureReason || "Preflight Stacks antes da próxima transmissão."}</span></td>
+                  <td className="mono">{item.stacksTxId || item.externalOrderId || "—"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+        <p className="br-dialog-footnote"><ShieldCheck size={13} /> Nenhum saque Binance é automatizado. O modo real segue bloqueado sem secrets, allowlist de IP, conta institucional aprovada, execução reconciliada e política de assinatura Stacks.</p>
+      </section>
       <section className="br-panel br-reconciliation-card">
         <div className="br-section-head">
           <div>

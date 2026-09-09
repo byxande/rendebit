@@ -59,6 +59,33 @@ export const customerProfiles = mysqlTable("customer_profiles", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const customerWallets = mysqlTable(
+  "customer_wallets",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id),
+    network: mysqlEnum("network", ["testnet", "mainnet"])
+      .default("testnet")
+      .notNull(),
+    address: varchar("address", { length: 80 }).notNull(),
+    label: varchar("label", { length: 100 }),
+    isPrimary: boolean("isPrimary").default(true).notNull(),
+    status: mysqlEnum("status", ["active", "revoked"])
+      .default("active")
+      .notNull(),
+    verifiedAt: timestamp("verifiedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({
+    userNetworkAddressUnique: uniqueIndex(
+      "customer_wallet_user_network_address_unique"
+    ).on(table.userId, table.network, table.address),
+  })
+);
+
 export const pixDeposits = mysqlTable("pix_deposits", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId")
@@ -172,6 +199,56 @@ export const purchases = mysqlTable("purchases", {
   confirmedAt: timestamp("confirmedAt").defaultNow().notNull(),
   settledAt: timestamp("settledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const btcLiquiditySettlements = mysqlTable("btc_liquidity_settlements", {
+  id: int("id").autoincrement().primaryKey(),
+  purchaseId: int("purchaseId")
+    .notNull()
+    .unique()
+    .references(() => purchases.id),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id),
+  customerWalletId: int("customerWalletId").references(
+    () => customerWallets.id
+  ),
+  provider: mysqlEnum("provider", ["sandbox_binance", "binance"])
+    .default("sandbox_binance")
+    .notNull(),
+  mode: mysqlEnum("mode", ["sandbox", "test", "production"])
+    .default("sandbox")
+    .notNull(),
+  network: mysqlEnum("network", ["testnet", "mainnet"])
+    .default("testnet")
+    .notNull(),
+  status: mysqlEnum("status", [
+    "pending_liquidity",
+    "liquidity_settled",
+    "stacks_pending",
+    "stacks_submitted",
+    "confirmed",
+    "blocked",
+    "failed",
+  ])
+    .default("pending_liquidity")
+    .notNull(),
+  amountBrl: decimal("amountBrl", { precision: 18, scale: 2 }).notNull(),
+  btcAmount: decimal("btcAmount", { precision: 30, scale: 8 }).notNull(),
+  executionBtcBrl: decimal("executionBtcBrl", {
+    precision: 18,
+    scale: 2,
+  }).notNull(),
+  externalOrderId: varchar("externalOrderId", { length: 140 }),
+  stacksTxId: varchar("stacksTxId", { length: 140 }),
+  blockerReason: text("blockerReason"),
+  failureReason: text("failureReason"),
+  idempotencyKey: varchar("idempotencyKey", { length: 180 }).notNull().unique(),
+  liquiditySettledAt: timestamp("liquiditySettledAt"),
+  stacksSubmittedAt: timestamp("stacksSubmittedAt"),
+  confirmedAt: timestamp("confirmedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export const redemptionQuotes = mysqlTable("redemption_quotes", {
@@ -299,6 +376,8 @@ export const providerEvents = mysqlTable("provider_events", {
     "sandbox_kyc",
     "sandbox_pix",
     "sandbox_payments",
+    "sandbox_binance",
+    "binance",
     "mercado_pago",
     "sandbox_custody",
     "sandbox_stacks",
@@ -368,11 +447,11 @@ export const treasurySettings = mysqlTable("treasury_settings", {
 export const profitDistributions = mysqlTable(
   "profit_distributions",
   {
-  id: int("id").autoincrement().primaryKey(),
+    id: int("id").autoincrement().primaryKey(),
     ownerUserId: int("ownerUserId")
       .notNull()
       .references(() => users.id),
-  periodKey: varchar("periodKey", { length: 20 }).notNull(),
+    periodKey: varchar("periodKey", { length: 20 }).notNull(),
     grossRevenueBrl: decimal("grossRevenueBrl", {
       precision: 18,
       scale: 2,
@@ -402,7 +481,7 @@ export const profitDistributions = mysqlTable(
       precision: 30,
       scale: 8,
     }).notNull(),
-  stacksWalletAddress: varchar("stacksWalletAddress", { length: 80 }),
+    stacksWalletAddress: varchar("stacksWalletAddress", { length: 80 }),
     status: mysqlEnum("status", [
       "blocked",
       "pending_approval",
@@ -557,6 +636,9 @@ export const dailyReconciliations = mysqlTable(
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+export type CustomerWallet = typeof customerWallets.$inferSelect;
+export type BtcLiquiditySettlement =
+  typeof btcLiquiditySettlements.$inferSelect;
 export type PixDeposit = typeof pixDeposits.$inferSelect;
 export type PurchaseQuote = typeof purchaseQuotes.$inferSelect;
 export type Purchase = typeof purchases.$inferSelect;

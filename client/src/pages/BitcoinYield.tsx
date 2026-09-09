@@ -21,6 +21,7 @@ import {
   Landmark,
   Layers3,
   LockKeyhole,
+  LogOut,
   MapPin,
   Menu,
   Network,
@@ -32,6 +33,7 @@ import {
   ShieldCheck,
   Sparkles,
   TrendingUp,
+  UserRound,
   WalletCards,
   X,
   Zap,
@@ -549,7 +551,7 @@ function BusinessPage() {
 }
 
 export default function BitcoinYield() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
   const utils = trpc.useUtils();
   const profileQuery = trpc.onboarding.get.useQuery(undefined, { enabled: isAuthenticated });
   const pixDepositsQuery = trpc.pixDeposits.summary.useQuery(undefined, { enabled: isAuthenticated });
@@ -612,6 +614,41 @@ export default function BitcoinYield() {
   const confirmPurchaseMutation = trpc.purchases.confirm.useMutation();
   const createRedemptionQuoteMutation = trpc.redemptions.createQuote.useMutation();
   const confirmRedemptionMutation = trpc.redemptions.confirm.useMutation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authResult = params.get("auth");
+    const provider = params.get("provider");
+    if (!authResult) return;
+
+    if (authResult === "success") {
+      toast.success("Pronto, sua conta está conectada", {
+        description: provider === "apple"
+          ? "Você entrou com seu Apple ID. Bem-vindo à RendeBit!"
+          : "Você entrou com Google/Gmail. Bem-vindo à RendeBit!",
+      });
+    } else if (authResult === "provider-mismatch") {
+      toast.error("O acesso escolhido foi diferente", {
+        description: `Tente novamente e, no portal seguro, escolha ${provider === "apple" ? "Apple" : "Google"}.`,
+      });
+      setLoginOpen(true);
+    } else if (authResult === "provider-unsupported") {
+      toast.error("Use Google ou Apple para entrar", {
+        description: "Esses são os dois métodos aceitos pela RendeBit neste momento.",
+      });
+      setLoginOpen(true);
+    } else {
+      toast.error("Não conseguimos concluir seu acesso", {
+        description: "Nada foi alterado. Você pode tentar novamente com calma.",
+      });
+      setLoginOpen(true);
+    }
+
+    params.delete("auth");
+    params.delete("provider");
+    const cleanQuery = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
+  }, []);
 
   useEffect(() => {
     const livePurchases = purchasesQuery.data;
@@ -689,6 +726,20 @@ export default function BitcoinYield() {
 
   function requestLogin() {
     setLoginOpen(true);
+  }
+
+  async function signOut() {
+    try {
+      await logout();
+      setLoginOpen(false);
+      toast.success("Você saiu da sua conta", {
+        description: "Quando quiser voltar, é só entrar novamente com Google ou Apple.",
+      });
+    } catch {
+      toast.error("Não conseguimos encerrar a sessão agora", {
+        description: "Tente de novo em instantes.",
+      });
+    }
   }
 
   async function createPixDeposit() {
@@ -855,18 +906,18 @@ export default function BitcoinYield() {
       <header className="br-mobile-header">
         <button className="br-mobile-menu" type="button" onClick={() => setMobileOpen((open) => !open)} aria-label="Abrir menu">{mobileOpen ? <X /> : <Menu />}</button>
         <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>RENDEBIT</b><small>BITCOIN EM REAIS</small></div></div>
-        <button className="br-avatar" type="button">AB</button>
+        <button className="br-avatar" type="button" onClick={requestLogin} aria-label={isAuthenticated ? "Abrir dados da conta" : "Entrar na conta"}>{user?.name?.slice(0, 2).toUpperCase() || "AB"}</button>
       </header>
       <aside className={`br-sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="br-brand"><div className="br-brand-mark"><Bitcoin /></div><div><b>RENDEBIT</b><small>BITCOIN EM REAIS</small></div></div>
-        <div className="br-profile"><div className="br-avatar">{user?.name?.slice(0, 2).toUpperCase() || "AB"}</div><div><b>Olá, {user?.name?.split(" ")[0] || "Alexandre"}</b><span>{isAuthenticated ? loginProviderLabel : "Modo de leitura"} <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></div>
+        <button className="br-profile" type="button" onClick={requestLogin}><div className="br-avatar">{user?.name?.slice(0, 2).toUpperCase() || "AB"}</div><div><b>Olá, {user?.name?.split(" ")[0] || "Alexandre"}</b><span>{isAuthenticated ? loginProviderLabel : "Modo de leitura"} <BadgeCheck size={13} /></span></div><ChevronDown size={16} /></button>
         <nav>{navItems.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => navigate(id)} type="button"><Icon size={19} /><span>{label}</span>{id === "empresas" && <em>B2B</em>}</button>)}</nav>
         <div className="br-sidebar-security"><ShieldCheck /><div><b>Feita para brasileiros</b><span>CPF, Pix, BRL e atendimento em português.</span></div></div>
         <div className="br-sidebar-footer"><button type="button" onClick={() => toast.success("Pode contar com a gente", { description: "O atendimento em português será conectado na próxima etapa." })}>Fale com a gente</button>{user?.role === "admin" && <button type="button" onClick={() => { window.location.href = "/operacao"; }}>Operação</button>}<span>v0.3 Brasil · sandbox</span></div>
       </aside>
 
       <main className="br-main">
-        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={() => isAuthenticated ? toast.success("Conta e dados sincronizados com o sandbox.") : requestLogin()}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? "Conta conectada" : "Entrar"} <ChevronDown size={14} /></button></div></div>
+        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={requestLogin}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? loginProviderLabel : "Entrar"} <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
           {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN DO JEITO BRASILEIRO</span><h1>Acumule BTC.<br /><em>Receba rendimentos em reais.</em></h1><p>Uma experiência feita exclusivamente para residentes no Brasil. Comece com Pix ou cartão, acompanhe tudo em reais e, quando quiser, peça o resgate via Pix. A referência atual de rendimento é de <b>~3% a.a.</b></p></div><div className="br-trust-row"><span><BadgeCheck /> Exclusiva para residentes no Brasil</span><span><ShieldCheck /> Seu dinheiro separado</span><span><Sparkles /> Simples e em português</span></div></section><BrazilFirstStrip /><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} onSimulate={() => navigate("simulador")} btcPriceBrl={liveBtcBrl} quoteSource={marketQuoteQuery.data?.source ?? "Referência temporária"} quoteTime={marketQuoteTime} quoteStale={marketQuoteQuery.data?.stale ?? true} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Você cuida da sua vida. A RendeBit simplifica o caminho.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Comece em reais</h3><p>Use Pix ou cartão, como você já faz no dia a dia.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe com clareza</h3><p>Veja seu Bitcoin e o rendimento estimado sempre em BRL.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Receba via Pix</h3><p>Confira o valor líquido e mande para sua conta verificada.</p></div></div></section></div>}
           {section === "depositar" && <PixDepositPage deposits={(pixDepositsQuery.data?.deposits ?? []) as PixDepositRecord[]} availableBrl={pixDepositsQuery.data?.availableBrl ?? 0} amount={pixDepositAmount} setAmount={setPixDepositAmount} authenticated={isAuthenticated} loading={createPixDepositMutation.isPending || settlePixDepositMutation.isPending || pixDepositsQuery.isLoading} onCreate={() => void createPixDeposit()} onPay={depositId => void settlePixDeposit(depositId)} onLogin={requestLogin} />}
@@ -884,13 +935,25 @@ export default function BitcoinYield() {
 
       <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
         <DialogContent className="br-confirm-dialog br-login-dialog">
-          <div className="br-login-shield"><LockKeyhole /></div>
-          <DialogHeader><DialogTitle>Que bom ter você por aqui</DialogTitle><DialogDescription>Entre com Google ou Apple para cuidar do seu Bitcoin em uma experiência feita para brasileiros. Sua senha fica sempre no portal oficial.</DialogDescription></DialogHeader>
-          <div className="br-social-login">
-            <button type="button" onClick={() => { setLoginOpen(false); startLogin(); }}><span className="br-google-mark">G</span><b>Continuar com Google</b><small>Contas Gmail e Google Workspace</small><ArrowRight size={16} /></button>
-            <button type="button" onClick={() => { setLoginOpen(false); startLogin(); }}><span className="br-apple-mark">A</span><b>Continuar com Apple</b><small>Entrar com Apple ID</small><ArrowRight size={16} /></button>
-          </div>
-            <div className="br-login-note"><ShieldCheck size={15} /><span>Seu acesso é protegido. A RendeBit recebe somente os dados básicos que você autorizar e nunca vê sua senha.</span></div>
+          {isAuthenticated ? <>
+            <div className="br-login-shield"><UserRound /></div>
+            <DialogHeader><DialogTitle>Sua conta RendeBit</DialogTitle><DialogDescription>Está tudo certo por aqui. Confira como você entrou e os dados básicos vinculados à sua sessão.</DialogDescription></DialogHeader>
+            <div className="br-account-detail">
+              <div className={`br-provider-mark ${user?.loginMethod === "apple" ? "apple" : "google"}`}>{user?.loginMethod === "apple" ? "A" : "G"}</div>
+              <div><span>Conectada com</span><b>{loginProviderLabel}</b><small>{user?.email || "E-mail protegido pelo provedor"}</small></div>
+              <BadgeCheck />
+            </div>
+            <div className="br-session-detail"><LockKeyhole size={15} /><span>Sessão protegida por cookie seguro e renovada somente após uma nova entrada.</span></div>
+            <button className="br-signout-button" type="button" onClick={() => void signOut()} disabled={authLoading}><LogOut size={16} /> {authLoading ? "Saindo…" : "Sair desta conta"}</button>
+          </> : <>
+            <div className="br-login-shield"><LockKeyhole /></div>
+            <DialogHeader><DialogTitle>Que bom ter você por aqui</DialogTitle><DialogDescription>Escolha Google/Gmail ou Apple ID. Na próxima tela, confirme a mesma opção no portal seguro.</DialogDescription></DialogHeader>
+            <div className="br-social-login">
+              <button type="button" onClick={() => { setLoginOpen(false); startLogin("google"); }}><span className="br-google-mark">G</span><b>Entrar com Google</b><small>Gmail ou Google Workspace</small><ArrowRight size={16} /></button>
+              <button type="button" onClick={() => { setLoginOpen(false); startLogin("apple"); }}><span className="br-apple-mark">A</span><b>Entrar com Apple ID</b><small>Use “Continuar com Apple” no portal</small><ArrowRight size={16} /></button>
+            </div>
+            <div className="br-login-note"><ShieldCheck size={15} /><span>A RendeBit não recebe nem guarda sua senha. O acesso acontece no portal oficial e voltamos apenas com nome, e-mail autorizado e identificador da conta.</span></div>
+          </>}
         </DialogContent>
       </Dialog>
 
@@ -977,7 +1040,7 @@ function HelpPage({ onNavigate }: { onNavigate: (section: SectionId) => void }) 
     {
       category: "Primeiros passos",
       question: "Posso entrar com Gmail ou Apple?",
-      answer: "Sim. A entrada usa o portal seguro com Google — incluindo Gmail e Google Workspace — ou Apple. A RendeBit recebe apenas os dados básicos autorizados e nunca vê sua senha.",
+      answer: "Sim. Escolha Google/Gmail ou Apple ID na RendeBit e confirme a mesma opção no portal seguro. A senha fica com o provedor: recebemos apenas nome, e-mail autorizado e um identificador da conta. A sessão dura até 30 dias e você pode sair quando quiser.",
     },
     {
       category: "Depósitos",

@@ -77,7 +77,7 @@ export default function OperationsSandbox() {
   });
 
   if (loading) return <div className="br-ops-gate"><Loader2 className="animate-spin" /> Carregando ambiente seguro…</div>;
-  if (!isAuthenticated) return <div className="br-ops-gate"><KeyRound /><h2>Entre para acessar a operação sandbox</h2><p>O painel usa autenticação e separa dados por usuário.</p><button className="br-primary" type="button" onClick={() => startLogin()}>Entrar na conta <ArrowRight size={16} /></button></div>;
+  if (!isAuthenticated) return <div className="br-ops-gate"><KeyRound /><h2>Entre para acessar a operação sandbox</h2><p>O painel usa autenticação e separa dados por usuário.</p><button className="br-primary" type="button" onClick={() => startLogin("google")}>Entrar com Google <ArrowRight size={16} /></button></div>;
   if (!isAdmin) return <div className="br-ops-gate"><ShieldCheck /><h2>Acesso restrito</h2><p>Somente o administrador da organização pode configurar ou aprovar repasses.</p></div>;
 
   const settings = settingsQuery.data;

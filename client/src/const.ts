@@ -1,4 +1,9 @@
-import { OAUTH_STATE_COOKIE, encodeOAuthState } from "@shared/const";
+import {
+  OAUTH_STATE_COOKIE,
+  buildManagedOAuthUrl,
+  encodeOAuthState,
+  type SocialAuthProvider,
+} from "@shared/const";
 
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
@@ -12,20 +17,23 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 // call would desync it from an in-flight login and the callback would reject it
 // with "invalid oauth state". It returns void by design, so there is no URL to
 // stash across renders.
-export const startLogin = () => {
+export const startLogin = (requestedProvider?: SocialAuthProvider) => {
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
   const appId = import.meta.env.VITE_APP_ID;
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
 
   const nonce = crypto.randomUUID();
   document.cookie = `${OAUTH_STATE_COOKIE}=${nonce}; Path=/; Max-Age=600; SameSite=None; Secure`;
-  const state = encodeOAuthState({ redirectUri, nonce });
+  const state = encodeOAuthState({ redirectUri, nonce, requestedProvider });
 
-  const url = new URL(`${oauthPortalUrl}/app-auth`);
-  url.searchParams.set("appId", appId);
-  url.searchParams.set("redirectUri", redirectUri);
-  url.searchParams.set("state", state);
-  url.searchParams.set("type", "signIn");
-
-  window.location.href = url.toString();
+  // The managed portal owns the Google/Apple credentials and consent screens.
+  // forceLogin skips a previously selected Manus account and shows the actual
+  // provider choices so the customer can use the method requested in RendeBit.
+  window.location.href = buildManagedOAuthUrl({
+    portalUrl: oauthPortalUrl,
+    appId,
+    redirectUri,
+    state,
+    requestedProvider,
+  });
 };

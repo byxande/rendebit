@@ -1,9 +1,10 @@
-import { COOKIE_NAME, ONE_YEAR_MS, OAUTH_STATE_COOKIE, decodeOAuthState } from "@shared/const";
+import { COOKIE_NAME, OAUTH_STATE_COOKIE, SOCIAL_SESSION_MS, decodeOAuthState } from "@shared/const";
 import { parse as parseCookieHeader } from "cookie";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import { authRedirect, resolveSocialProvider, validateSocialProvider } from "../services/socialAuth";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -23,7 +24,7 @@ export function registerOAuthRoutes(app: Express) {
     // CSRF guard: the nonce in `state` must match the one-time cookie that
     // startLogin set in the browser that began this login. An attacker can
     // forge `state`, but cannot plant this cookie in the victim's browser.
-    const { nonce } = decodeOAuthState(state);
+    const { nonce, requestedProvider } = decodeOAuthState(state);
     const expectedNonce = parseCookieHeader(req.headers.cookie ?? "")[OAUTH_STATE_COOKIE];
     if (!nonce || nonce !== expectedNonce) {
       res.status(403).json({ error: "invalid oauth state" });
@@ -40,26 +41,51 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
+      const resolvedProvider = resolveSocialProvider(
+        (userInfo as { platforms?: unknown }).platforms,
+        userInfo.loginMethod ?? userInfo.platform
+      );
+      const providerCheck = validateSocialProvider({
+        requested: requestedProvider,
+        resolved: resolvedProvider,
+      });
+      if (!providerCheck.ok) {
+        res.redirect(302, authRedirect(
+          providerCheck.reason === "provider_mismatch" ? "provider-mismatch" : "provider-unsupported",
+          requestedProvider
+        ));
+        return;
+      }
+
       await db.upsertUser({
         openId: userInfo.openId,
         name: userInfo.name || null,
         email: userInfo.email ?? null,
-        loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
+        loginMethod: providerCheck.provider,
         lastSignedIn: new Date(),
       });
 
+      const storedUser = await db.getUserByOpenId(userInfo.openId);
+      if (storedUser) {
+        await db.recordAuthEvent({
+          userId: storedUser.id,
+          provider: providerCheck.provider,
+          eventType: "sign_in",
+        });
+      }
+
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",
-        expiresInMs: ONE_YEAR_MS,
+        expiresInMs: SOCIAL_SESSION_MS,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: SOCIAL_SESSION_MS });
 
-      res.redirect(302, "/");
+      res.redirect(302, authRedirect("success", providerCheck.provider));
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
-      res.status(500).json({ error: "OAuth callback failed" });
+      res.redirect(302, authRedirect("failed"));
     }
   });
 }

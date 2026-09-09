@@ -1,6 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
+  authEvents,
   customerProfiles,
   InsertUser,
   ledgerEntries,
@@ -75,6 +76,16 @@ export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
   return (await db.select().from(users).where(eq(users.openId, openId)).limit(1))[0];
+}
+
+export async function recordAuthEvent(input: {
+  userId: number;
+  provider: "google" | "apple";
+  eventType: "sign_in" | "sign_out";
+}) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(authEvents).values(input);
 }
 
 export async function getCustomerProfile(userId: number) {

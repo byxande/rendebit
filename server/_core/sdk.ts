@@ -6,6 +6,7 @@ import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
+import { resolveSocialProvider } from "../services/socialAuth";
 import { ENV } from "./env";
 import type {
   ExchangeTokenRequest,
@@ -94,6 +95,8 @@ class SDKServer {
     platforms: unknown,
     fallback: string | null | undefined
   ): string | null {
+    const socialProvider = resolveSocialProvider(platforms, fallback);
+    if (socialProvider) return socialProvider;
     if (fallback && fallback.length > 0) return fallback;
     if (!Array.isArray(platforms) || platforms.length === 0) return null;
     const set = new Set<string>(
@@ -214,7 +217,8 @@ class SDKServer {
       if (
         !isNonEmptyString(openId) ||
         !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
+        !isNonEmptyString(name) ||
+        appId !== ENV.appId
       ) {
         console.warn("[Auth] Session payload missing required fields");
         return null;

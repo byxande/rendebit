@@ -1,5 +1,6 @@
 export const COOKIE_NAME = "app_session_id";
 export const ONE_YEAR_MS = 1000 * 60 * 60 * 24 * 365;
+export const SOCIAL_SESSION_MS = 1000 * 60 * 60 * 24 * 30;
 export const AXIOS_TIMEOUT_MS = 30_000;
 export const UNAUTHED_ERR_MSG = 'Please login (10001)';
 export const NOT_ADMIN_ERR_MSG = 'You do not have required permission (10002)';
@@ -12,7 +13,12 @@ export const OAUTH_STATE_COOKIE = "__Host-oauth_state";
 
 // `state` carries the callback redirect URI (used at token exchange) plus the
 // CSRF nonce. Defined here so the client encoder and server decoder never drift.
-export type OAuthState = { redirectUri: string; nonce?: string };
+export type SocialAuthProvider = "google" | "apple";
+export type OAuthState = {
+  redirectUri: string;
+  nonce?: string;
+  requestedProvider?: SocialAuthProvider;
+};
 
 export const encodeOAuthState = (state: OAuthState): string =>
   btoa(JSON.stringify(state));
@@ -35,3 +41,19 @@ export const decodeOAuthState = (state: string): OAuthState => {
   }
   return { redirectUri: decoded };
 };
+
+export function buildManagedOAuthUrl(input: {
+  portalUrl: string;
+  appId: string;
+  redirectUri: string;
+  state: string;
+  requestedProvider?: SocialAuthProvider;
+}) {
+  const url = new URL(`${input.portalUrl.replace(/\/$/, "")}/app-auth`);
+  url.searchParams.set("appId", input.appId);
+  url.searchParams.set("redirectUri", input.redirectUri);
+  url.searchParams.set("state", input.state);
+  url.searchParams.set("type", "signIn");
+  if (input.requestedProvider) url.searchParams.set("forceLogin", "true");
+  return url.toString();
+}

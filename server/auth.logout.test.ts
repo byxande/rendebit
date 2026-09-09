@@ -42,6 +42,17 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
 }
 
 describe("auth.logout", () => {
+  it("expõe somente Google e Apple como métodos de entrada", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(caller.auth.providers()).resolves.toEqual({
+      mode: "managed_oauth",
+      providers: ["google", "apple"],
+      passwordStoredByRendeBit: false,
+    });
+  });
+
   it("clears the session cookie and reports success", async () => {
     const { ctx, clearedCookies } = createAuthContext();
     const caller = appRouter.createCaller(ctx);

@@ -1,4 +1,5 @@
 import {
+  Activity,
   ArrowDownToLine,
   ArrowRight,
   BadgeCheck,
@@ -36,7 +37,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -51,7 +52,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-type SectionId = "inicio" | "depositar" | "rendimento" | "simulador" | "lotes" | "resgate" | "fiscal" | "reservas" | "empresas" | "ajuda";
+const BtcMarketChart = lazy(() => import("./BtcMarketChart"));
+
+type SectionId = "inicio" | "depositar" | "rendimento" | "mercado" | "simulador" | "lotes" | "resgate" | "fiscal" | "reservas" | "empresas" | "ajuda";
 
 type NavItem = {
   id: SectionId;
@@ -106,6 +109,7 @@ const navItems: NavItem[] = [
   { id: "inicio", label: "Visão geral", icon: Home },
   { id: "depositar", label: "Depositar via Pix", icon: ArrowDownToLine },
   { id: "rendimento", label: "Meus rendimentos", icon: TrendingUp },
+  { id: "mercado", label: "Mercado BTC", icon: Activity },
   { id: "simulador", label: "Simular o futuro", icon: PieChart },
   { id: "lotes", label: "Meus aportes", icon: Layers3 },
   { id: "resgate", label: "Receber via Pix", icon: QrCode },
@@ -867,13 +871,14 @@ export default function BitcoinYield() {
           {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN DO JEITO BRASILEIRO</span><h1>Acumule BTC.<br /><em>Receba rendimentos em reais.</em></h1><p>Uma experiência feita exclusivamente para residentes no Brasil. Comece com Pix ou cartão, acompanhe tudo em reais e, quando quiser, peça o resgate via Pix. A referência atual de rendimento é de <b>~3% a.a.</b></p></div><div className="br-trust-row"><span><BadgeCheck /> Exclusiva para residentes no Brasil</span><span><ShieldCheck /> Seu dinheiro separado</span><span><Sparkles /> Simples e em português</span></div></section><BrazilFirstStrip /><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} onSimulate={() => navigate("simulador")} btcPriceBrl={liveBtcBrl} quoteSource={marketQuoteQuery.data?.source ?? "Referência temporária"} quoteTime={marketQuoteTime} quoteStale={marketQuoteQuery.data?.stale ?? true} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Você cuida da sua vida. A RendeBit simplifica o caminho.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Comece em reais</h3><p>Use Pix ou cartão, como você já faz no dia a dia.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe com clareza</h3><p>Veja seu Bitcoin e o rendimento estimado sempre em BRL.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Receba via Pix</h3><p>Confira o valor líquido e mande para sua conta verificada.</p></div></div></section></div>}
           {section === "depositar" && <PixDepositPage deposits={(pixDepositsQuery.data?.deposits ?? []) as PixDepositRecord[]} availableBrl={pixDepositsQuery.data?.availableBrl ?? 0} amount={pixDepositAmount} setAmount={setPixDepositAmount} authenticated={isAuthenticated} loading={createPixDepositMutation.isPending || settlePixDepositMutation.isPending || pixDepositsQuery.isLoading} onCreate={() => void createPixDeposit()} onPay={depositId => void settlePixDeposit(depositId)} onLogin={requestLogin} />}
           {section === "rendimento" && <YieldPage btcPriceBrl={liveBtcBrl} />}
+          {section === "mercado" && <Suspense fallback={<section className="br-panel btc-chart-loading"><RefreshCw className="spinning" /><b>Abrindo o mercado para você…</b></section>}><BtcMarketChart /></Suspense>}
           {section === "simulador" && <FutureCalculator />}
           {section === "lotes" && <LotsPage purchases={purchases} />}
           {section === "resgate" && <RedeemPage amount={amount} setAmount={value => { setAmount(value); setRedemptionQuote(null); }} availableBtc={isAuthenticated ? redemptionsQuery.data?.availableBtc ?? 0 : 0.284215} pixDestination={profileQuery.data?.pixAccountMasked ?? ""} quote={redemptionQuote} quoteSeconds={redemptionQuoteSeconds} redemptions={redemptionsQuery.data?.redemptions ?? []} authenticated={isAuthenticated} loading={createRedemptionQuoteMutation.isPending || redemptionsQuery.isLoading} btcPriceBrl={liveBtcBrl} onQuote={() => void prepareRedemption()} />}
           {section === "fiscal" && <FiscalPage />}
           {section === "reservas" && <ReservesPage />}
           {section === "empresas" && <BusinessPage />}
-          {section === "ajuda" && <HelpPage />}
+          {section === "ajuda" && <HelpPage onNavigate={navigate} />}
         </div>
       </main>
 
@@ -937,7 +942,7 @@ export default function BitcoinYield() {
   );
 }
 
-function HelpPage() {
+function HelpPage({ onNavigate }: { onNavigate: (section: SectionId) => void }) {
   const faqs = [
     {
       category: "Primeiros passos",
@@ -958,6 +963,16 @@ function HelpPage() {
       category: "Primeiros passos",
       question: "De onde vem a cotação do Bitcoin em reais?",
       answer: "A RendeBit busca o preço BTC/BRL ao vivo na Coinbase e usa o CoinGecko como segunda fonte se houver instabilidade. O painel mostra a origem e o horário da atualização. Se as fontes estiverem fora do ar, avisamos quando o valor exibido for apenas a última referência disponível.",
+    },
+    {
+      category: "Mercado",
+      question: "Como eu leio o gráfico do Bitcoin?",
+      answer: "Escolha 24 horas, 7 dias, 30 dias, 90 dias, 1 ano, 10 anos ou Total. A porcentagem compara a primeira cotação com a última no período. Os cartões mostram também o menor e o maior preço. Passe o dedo ou o mouse sobre a linha para conferir um ponto específico.",
+    },
+    {
+      category: "Mercado",
+      question: "O gráfico mostra o rendimento da estratégia?",
+      answer: "Não. Ele mostra somente quanto o preço do Bitcoin variou em reais. O rendimento estimado da estratégia, hoje com referência de aproximadamente 3% ao ano, aparece separado para você não confundir retorno do protocolo com alta ou queda do BTC.",
     },
     {
       category: "Primeiros passos",
@@ -1034,6 +1049,11 @@ function HelpPage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Todas");
   const [open, setOpen] = useState<string | null>(faqs[2].question);
+  const shortcuts = [
+    { icon: Sparkles, title: "Quero começar", text: "Entenda conta, cadastro e sua primeira compra.", category: "Primeiros passos", question: "Posso começar sem ter Bitcoin?" },
+    { icon: ShieldCheck, title: "Quero me sentir seguro", text: "Veja como pensamos em custódia e separação de patrimônio.", category: "Segurança", question: "Meu dinheiro está seguro?" },
+    { icon: QrCode, title: "Quero receber via Pix", text: "Saiba quando pedir e quanto chega na sua conta.", category: "Resgates", question: "Posso resgatar quando quiser?" },
+  ];
   const normalized = query.trim().toLowerCase();
   const filtered = faqs.filter((faq) => {
     const matchesCategory = category === "Todas" || faq.category === category;
@@ -1041,20 +1061,27 @@ function HelpPage() {
     return matchesCategory && matchesQuery;
   });
 
+  function openShortcut(item: (typeof shortcuts)[number]) {
+    setQuery("");
+    setCategory(item.category);
+    setOpen(item.question);
+  }
+
   return (
     <div className="br-stack">
       <section className="br-help-hero">
         <div className="br-help-hero-copy">
           <span className="br-eyebrow light">CENTRAL DE AJUDA</span>
-          <h1>Pode perguntar. A gente explica com calma.</h1>
-          <p>Bitcoin não precisa ser um bicho de sete cabeças. Aqui você encontra respostas diretas, em português, sem letrinhas escondidas e sem palavras difíceis.</p>
-          <label className="br-help-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Busque uma dúvida, como “resgate”" aria-label="Buscar na central de ajuda" />{query && <button type="button" onClick={() => setQuery("")} aria-label="Limpar busca"><X size={15} /></button>}</label>
+          <h1>Chegou com uma dúvida? Vamos juntos.</h1>
+          <p>Encontre respostas curtas, exemplos simples e caminhos diretos para resolver o que você precisa. Tudo em português e sem economês.</p>
+          <label className="br-help-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Digite sua dúvida: Pix, rendimento, segurança…" aria-label="Buscar na central de ajuda" />{query && <button type="button" onClick={() => setQuery("")} aria-label="Limpar busca"><X size={15} /></button>}</label>
         </div>
         <div className="br-help-orbit"><HelpCircle size={45} /><span>Conte com<br />a gente.</span></div>
       </section>
+      <section className="br-help-shortcuts"><div className="br-help-shortcuts-head"><div><span className="br-eyebrow">ATALHOS PARA VOCÊ</span><h2>Por onde quer começar?</h2></div><button type="button" onClick={() => onNavigate("mercado")}>Ver gráfico do Bitcoin <ArrowRight size={15} /></button></div><div className="br-help-shortcut-grid">{shortcuts.map(({ icon: Icon, ...item }) => <button type="button" key={item.title} onClick={() => openShortcut({ icon: Icon, ...item })}><span><Icon size={20} /></span><div><b>{item.title}</b><small>{item.text}</small></div><ArrowRight size={16} /></button>)}</div></section>
       <div className="br-help-layout">
-        <aside className="br-help-categories"><span className="br-eyebrow">NAVEGAR POR TEMA</span>{categories.map((item) => <button className={category === item ? "active" : ""} type="button" key={item} onClick={() => setCategory(item)}>{item}<span>{item === "Todas" ? faqs.length : faqs.filter((faq) => faq.category === item).length}</span></button>)}</aside>
-        <section className="br-help-list"><div className="br-help-list-head"><div><span className="br-eyebrow">PERGUNTAS FREQUENTES</span><h2>{filtered.length} {filtered.length === 1 ? "resposta encontrada" : "respostas encontradas"}</h2></div><span className="br-help-honesty"><ShieldCheck size={15} /> Sem promessa escondida</span></div>{filtered.length === 0 ? <div className="br-panel br-help-empty"><HelpCircle /><h3>Não encontramos essa resposta ainda.</h3><p>Tente usar palavras como Pix, segurança, rendimento ou impostos.</p><button type="button" className="br-outline" onClick={() => { setQuery(""); setCategory("Todas"); }}>Ver todas as perguntas</button></div> : <div className="br-faq-stack">{filtered.map((faq) => { const isOpen = open === faq.question; return <article className={`br-faq ${isOpen ? "open" : ""}`} key={faq.question}><button type="button" className="br-faq-trigger" onClick={() => setOpen(isOpen ? null : faq.question)}><span><small>{faq.category}</small><b>{faq.question}</b></span><span className="br-faq-plus">{isOpen ? "−" : "+"}</span></button>{isOpen && <div className="br-faq-answer"><p>{faq.answer}</p>{faq.question === "Meu dinheiro está seguro?" && <button type="button" className="br-text-action" onClick={() => toast.info("A área Segurança mostra o fluxo de custódia e a prova pública das reservas.")}>Ver como a segurança funciona <ArrowRight size={15} /></button>}</div>}</article>; })}</div>}</section>
+        <aside className="br-help-categories"><span className="br-eyebrow">ESCOLHA UM ASSUNTO</span>{categories.map((item) => <button className={category === item ? "active" : ""} type="button" key={item} onClick={() => setCategory(item)}>{item}<span>{item === "Todas" ? faqs.length : faqs.filter((faq) => faq.category === item).length}</span></button>)}</aside>
+        <section className="br-help-list"><div className="br-help-list-head"><div><span className="br-eyebrow">RESPOSTAS DIRETAS</span><h2>{filtered.length} {filtered.length === 1 ? "resposta para você" : "respostas para você"}</h2></div><span className="br-help-honesty"><HelpCircle size={15} /> Explicado com clareza</span></div>{filtered.length === 0 ? <div className="br-panel br-help-empty"><HelpCircle /><h3>Ainda não achamos essa resposta.</h3><p>Tente usar palavras como Pix, segurança, rendimento ou impostos. Se preferir, fale com a gente.</p><button type="button" className="br-outline" onClick={() => { setQuery(""); setCategory("Todas"); }}>Ver todas as perguntas</button></div> : <div className="br-faq-stack">{filtered.map((faq) => { const isOpen = open === faq.question; return <article className={`br-faq ${isOpen ? "open" : ""}`} key={faq.question}><button type="button" className="br-faq-trigger" onClick={() => setOpen(isOpen ? null : faq.question)} aria-expanded={isOpen}><span><small>{faq.category}</small><b>{faq.question}</b></span><span className="br-faq-plus">{isOpen ? "−" : "+"}</span></button>{isOpen && <div className="br-faq-answer"><p>{faq.answer}</p>{faq.question === "Meu dinheiro está seguro?" && <button type="button" className="br-text-action" onClick={() => onNavigate("reservas")}>Ver como a segurança funciona <ArrowRight size={15} /></button>}{faq.question === "De onde vem a cotação do Bitcoin em reais?" && <button type="button" className="br-text-action" onClick={() => onNavigate("mercado")}>Abrir o gráfico do Bitcoin <ArrowRight size={15} /></button>}</div>}</article>; })}</div>}</section>
       </div>
       <section className="br-panel br-help-contact"><div className="br-help-contact-icon"><MessageCircleIcon /></div><div><span className="br-eyebrow">AINDA COM DÚVIDA?</span><h2>Fale com a gente, do seu jeito.</h2><p>Nosso atendimento será em português e sem pressa. A equipe pode explicar o produto, mas nunca vai prometer retorno nem pedir sua senha.</p></div><button className="br-primary" type="button" onClick={() => toast.success("Estamos por aqui!", { description: "O atendimento em português será conectado na próxima etapa." })}>Conversar com a equipe <ArrowRight size={16} /></button></section>
     </div>

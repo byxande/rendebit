@@ -1259,3 +1259,89 @@ h1 em { color: #caff4a; font-style: normal; }
 @keyframes live-quote-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .future-live-price .spinning { animation: none; } }
 @media (max-width: 650px) { .future-live-price { grid-template-columns: auto minmax(0, 1fr) auto; } .future-live-price > button { width: 32px; height: 32px; } }
+
+/* BTC market history */
+.btc-market-page { --market-up: #287553; --market-down: #bd4d3f; }
+.btc-market-hero { background: radial-gradient(circle at 84% 12%, rgba(247,147,26,.25), transparent 22rem), linear-gradient(135deg,#3a2a20,#241b16); box-shadow: 0 18px 45px rgba(58,40,25,.18); }
+.btc-market-card { padding: 26px; overflow: hidden; }
+.btc-market-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; }
+.btc-market-price { display: grid; gap: 4px; }
+.btc-market-price > span { display: flex; align-items: center; gap: 7px; color: #a65a0a; font: 700 9px "IBM Plex Mono", monospace; letter-spacing: .1em; }
+.btc-market-price > strong { margin-top: 6px; color: #2f251e; font: 600 clamp(32px,4vw,52px)/1 "Space Grotesk", sans-serif; letter-spacing: -.055em; }
+.btc-market-price > small { color: #988574; font-size: 9px; }
+.btc-market-change { min-width: 180px; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 13px; }
+.btc-market-change.positive { color: var(--market-up); background: #e8f5ee; }
+.btc-market-change.negative { color: var(--market-down); background: #fceae6; }
+.btc-market-change > svg { width: 22px; }
+.btc-market-change div { display: grid; gap: 3px; }
+.btc-market-change strong { font: 700 16px "Space Grotesk", sans-serif; }
+.btc-market-change span { font-size: 8px; }
+.btc-periods { display: flex; gap: 6px; margin: 24px 0 8px; overflow-x: auto; padding-bottom: 3px; scrollbar-width: none; }
+.btc-periods::-webkit-scrollbar { display: none; }
+.btc-periods button { min-height: 35px; flex: 0 0 auto; padding: 0 13px; border: 1px solid #e4d8c8; border-radius: 9px; color: #806f61; background: #fffaf3; font-size: 9px; font-weight: 700; transition: transform 150ms cubic-bezier(.23,1,.32,1), color 150ms ease, background 150ms ease, border-color 150ms ease; }
+.btc-periods button:hover { color: #a75508; border-color: #efbd83; }
+.btc-periods button:active { transform: scale(.97); }
+.btc-periods button.active { color: #fff9ef; border-color: #d8760a; background: #d8760a; box-shadow: 0 5px 14px rgba(215,117,9,.16); }
+.btc-chart-wrap { width: 100%; height: 370px; margin-top: 10px; }
+.btc-chart-tooltip { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid #e1d2bf; border-radius: 10px; color: #726153; background: rgba(255,250,242,.97); box-shadow: 0 12px 28px rgba(58,40,25,.12); }
+.btc-chart-tooltip span { font-size: 8px; }
+.btc-chart-tooltip b { color: #332820; font: 700 12px "IBM Plex Mono", monospace; }
+.btc-chart-loading { min-height: 370px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #9b6d36; text-align: center; }
+.btc-chart-loading > svg { color: #df7b0c; }
+.btc-chart-loading b { color: #4b392b; font-size: 12px; }
+.btc-chart-loading span { color: #948071; font-size: 9px; }
+.btc-chart-loading.error .br-outline { margin-top: 8px; }
+.btc-market-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; padding-top: 16px; border-top: 1px solid #eadfce; }
+.btc-market-stats div { display: grid; gap: 5px; padding: 12px; border-radius: 11px; background: #faf2e6; }
+.btc-market-stats span { color: #907d6d; font-size: 8px; }
+.btc-market-stats b { color: #403228; font: 700 11px "IBM Plex Mono", monospace; }
+.btc-market-source { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 9px; margin-top: 10px; padding: 10px 12px; border-radius: 10px; color: #836f60; background: #f7ecde; font-size: 8px; line-height: 1.5; }
+.btc-market-source > svg { color: #b96109; }
+.btc-market-source button { width: 31px; height: 31px; display: grid; place-items: center; border: 1px solid #e4d4c1; border-radius: 8px; color: #a65a0a; background: #fffaf2; }
+.btc-market-source button:active { transform: scale(.97); }
+.btc-market-source button:disabled { opacity: .55; }
+.btc-market-source .spinning, .btc-chart-loading .spinning { animation: live-quote-spin .8s linear infinite; }
+.btc-market-explainer { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.btc-market-explainer article { display: flex; align-items: flex-start; gap: 13px; padding: 18px; }
+.btc-market-explainer article > svg { flex: 0 0 auto; color: #c66b0a; }
+.btc-market-explainer article div { display: grid; gap: 5px; }
+.btc-market-explainer span { color: #b46a20; font: 700 7px "IBM Plex Mono", monospace; letter-spacing: .11em; }
+.btc-market-explainer h3 { color: #3d3027; font: 700 14px "Space Grotesk", sans-serif; }
+.btc-market-explainer p { color: #8d796a; font-size: 9px; line-height: 1.55; }
+
+/* Help center guided shortcuts */
+.br-help-shortcuts { display: grid; gap: 13px; }
+.br-help-shortcuts-head { display: flex; align-items: end; justify-content: space-between; gap: 15px; }
+.br-help-shortcuts-head h2 { margin-top: 5px; color: #332820; font: 700 22px "Space Grotesk", sans-serif; letter-spacing: -.025em; }
+.br-help-shortcuts-head > button { display: flex; align-items: center; gap: 6px; border: 0; color: #a65508; background: transparent; font-size: 9px; font-weight: 700; }
+.br-help-shortcut-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.br-help-shortcut-grid > button { min-width: 0; display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 11px; padding: 16px; border: 1px solid #e5d8c7; border-radius: 14px; color: #9d5c19; background: #fffaf3; text-align: left; box-shadow: 0 7px 23px rgba(72,47,28,.04); transition: transform 160ms cubic-bezier(.23,1,.32,1), border-color 160ms ease, box-shadow 160ms ease; }
+.br-help-shortcut-grid > button:hover { transform: translateY(-2px); border-color: #efbd83; box-shadow: 0 11px 27px rgba(72,47,28,.08); }
+.br-help-shortcut-grid > button:active { transform: scale(.98); }
+.br-help-shortcut-grid > button > span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; color: #b76009; background: #fbe7ca; }
+.br-help-shortcut-grid > button > div { min-width: 0; display: grid; gap: 4px; }
+.br-help-shortcut-grid b { color: #43352a; font-size: 11px; }
+.br-help-shortcut-grid small { color: #948172; font-size: 8px; line-height: 1.45; }
+.br-help-categories button.active { color: #9d5007; background: #fae8ce; }
+.br-help-categories button:hover { color: #a75a0b; background: #fff1dc; }
+.br-faq.open { border-color: #edc79a; }
+.br-faq-plus { color: #a95809; border-color: #ead6bb; background: #fff2df; }
+.br-faq-trigger small { color: #a65b0b; }
+.br-help-honesty { color: #9b530b; background: #fbe9cf; }
+@media (max-width: 820px) { .br-help-shortcut-grid { grid-template-columns: 1fr; } }
+@media (max-width: 700px) {
+  .btc-market-card { padding: 18px 14px; }
+  .btc-market-head { align-items: flex-start; flex-direction: column; }
+  .btc-market-change { width: 100%; min-width: 0; }
+  .btc-chart-wrap { height: 300px; margin-left: -8px; width: calc(100% + 8px); }
+  .btc-market-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .btc-market-explainer { grid-template-columns: 1fr; }
+  .br-help-shortcuts-head { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 430px) { .btc-periods button { padding: 0 11px; } .btc-market-price > strong { font-size: 34px; } }
+@media (prefers-reduced-motion: reduce) { .btc-market-source .spinning, .btc-chart-loading .spinning { animation: none; } }
+
+.btc-market-hero h1 { color: #fff8ee !important; }
+.btc-market-hero p { color: #d2c1b1 !important; }
+.btc-market-hero .br-eyebrow { color: #f2aa4d !important; }
+.btc-market-hero .br-big-icon { color: #c66b0a; background: #fff8ee; }

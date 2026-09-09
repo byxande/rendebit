@@ -1242,3 +1242,20 @@ h1 em { color: #caff4a; font-style: normal; }
   .future-option-row.compact { grid-template-columns: repeat(3,1fr); }
   .future-scenario-grid article > strong { font-size: 23px; }
 }
+
+/* Live BTC/BRL quote */
+.future-live-price { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+.future-live-price b { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.future-live-price em { display: inline-flex; align-items: center; border: 1px solid rgba(46, 125, 87, .25); border-radius: 999px; padding: 3px 7px; color: #2f7656; background: rgba(224, 242, 231, .8); font: 700 8px/1 "IBM Plex Mono", monospace; letter-spacing: .08em; font-style: normal; }
+.future-live-price em::before { content: ""; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; background: #38a169; box-shadow: 0 0 0 3px rgba(56, 161, 105, .12); }
+.future-live-price em.stale { color: #8a5a17; border-color: rgba(184, 121, 26, .28); background: #fff2dc; }
+.future-live-price em.stale::before { background: #d38a1c; box-shadow: 0 0 0 3px rgba(211, 138, 28, .12); }
+.future-live-price > button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #eadac6; border-radius: 11px; color: #a85c08; background: #fffaf2; transition: transform 160ms cubic-bezier(.23, 1, .32, 1), background 160ms cubic-bezier(.23, 1, .32, 1); }
+.future-live-price > button:hover { background: #fff0d9; }
+.future-live-price > button:active { transform: scale(.96); }
+.future-live-price > button:disabled { opacity: .55; cursor: wait; }
+.future-live-price > button svg { width: 15px; }
+.future-live-price .spinning { animation: live-quote-spin .8s linear infinite; }
+@keyframes live-quote-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .future-live-price .spinning { animation: none; } }
+@media (max-width: 650px) { .future-live-price { grid-template-columns: auto minmax(0, 1fr) auto; } .future-live-price > button { width: 32px; height: 32px; } }

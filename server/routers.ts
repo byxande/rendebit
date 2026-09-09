@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { onboardingRouter } from "./routers/onboarding";
 import { integrationsRouter } from "./routers/integrations";
+import { marketRouter } from "./routers/market";
 import { pixDepositsRouter } from "./routers/pixDeposits";
 import { purchasesRouter } from "./routers/purchases";
 import { redemptionsRouter } from "./routers/redemptions";
@@ -20,6 +21,7 @@ export const appRouter = router({
     }),
   }),
   integrations: integrationsRouter,
+  market: marketRouter,
   onboarding: onboardingRouter,
   pixDeposits: pixDepositsRouter,
   purchases: purchasesRouter,

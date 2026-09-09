@@ -1,11 +1,12 @@
-import { ArrowRight, Bitcoin, CalendarDays, Info, SlidersHorizontal, Sparkles, TrendingUp, WalletCards } from "lucide-react";
+import { ArrowRight, Bitcoin, CalendarDays, Info, RefreshCw, SlidersHorizontal, Sparkles, TrendingUp, WalletCards } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FUTURE_SCENARIOS, projectFuture, type ProjectionPoint } from "@/lib/futureProjection";
+import { trpc } from "@/lib/trpc";
 
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const currencyPrecise = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const btcFormat = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 6, maximumFractionDigits: 6 });
-const CURRENT_BTC_BRL = 421_930;
+const FALLBACK_BTC_BRL = 421_930;
 const PROTOCOL_YIELD = 0.03;
 
 function brlInput(value: number) {
@@ -51,13 +52,16 @@ export default function FutureCalculator() {
   const [monthlyValue, setMonthlyValue] = useState("500,00");
   const [years, setYears] = useState(5);
   const [btcAnnualChange, setBtcAnnualChange] = useState(0);
+  const btcQuote = trpc.market.btcBrl.useQuery(undefined, { staleTime: 55_000, refetchInterval: 60_000, retry: 1 });
+  const currentBtcBrl = btcQuote.data?.priceBrl ?? FALLBACK_BTC_BRL;
+  const quoteTime = btcQuote.data ? new Date(btcQuote.data.marketUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null;
 
   const initialBrl = parseBrl(initialValue);
   const monthlyBrl = parseBrl(monthlyValue);
-  const points = useMemo(() => projectFuture({ initialBrl, monthlyBrl, years, protocolAnnualYield: PROTOCOL_YIELD, btcAnnualChange: btcAnnualChange / 100, currentBtcBrl: CURRENT_BTC_BRL }), [initialBrl, monthlyBrl, years, btcAnnualChange]);
+  const points = useMemo(() => projectFuture({ initialBrl, monthlyBrl, years, protocolAnnualYield: PROTOCOL_YIELD, btcAnnualChange: btcAnnualChange / 100, currentBtcBrl }), [initialBrl, monthlyBrl, years, btcAnnualChange, currentBtcBrl]);
   const final = points.at(-1)!;
   const earnings = final.projectedValueBrl - final.contributedBrl;
-  const scenarioResults = FUTURE_SCENARIOS.map(scenario => ({ ...scenario, final: projectFuture({ initialBrl, monthlyBrl, years, protocolAnnualYield: PROTOCOL_YIELD, btcAnnualChange: scenario.btcAnnualChange, currentBtcBrl: CURRENT_BTC_BRL }).at(-1)! }));
+  const scenarioResults = FUTURE_SCENARIOS.map(scenario => ({ ...scenario, final: projectFuture({ initialBrl, monthlyBrl, years, protocolAnnualYield: PROTOCOL_YIELD, btcAnnualChange: scenario.btcAnnualChange, currentBtcBrl }).at(-1)! }));
   const maxScenario = Math.max(1, ...scenarioResults.map(item => item.final.projectedValueBrl));
 
   return (
@@ -74,7 +78,7 @@ export default function FutureCalculator() {
           <label><span>Quanto pretende colocar por mês?</span><div className="future-money-input"><b>R$</b><input value={monthlyValue} onChange={event => setMonthlyValue(event.target.value)} inputMode="decimal" aria-label="Aporte mensal em reais" /></div></label>
           <div className="future-control-group"><span>Por quanto tempo?</span><div className="future-option-row">{[1, 3, 5, 10].map(option => <button className={years === option ? "active" : ""} type="button" key={option} onClick={() => setYears(option)}>{option} {option === 1 ? "ano" : "anos"}</button>)}</div></div>
           <div className="future-control-group"><div className="future-slider-label"><span>Cenário anual do Bitcoin</span><b>{btcAnnualChange > 0 ? "+" : ""}{btcAnnualChange}%</b></div><input className="future-slider" type="range" min="-30" max="50" step="1" value={btcAnnualChange} onChange={event => setBtcAnnualChange(Number(event.target.value))} aria-label="Variação anual estimada do preço do Bitcoin" /><div className="future-slider-axis"><span>−30%</span><span>0%</span><span>+50%</span></div><div className="future-option-row compact">{FUTURE_SCENARIOS.map(scenario => <button type="button" key={scenario.id} className={btcAnnualChange === scenario.btcAnnualChange * 100 ? "active" : ""} onClick={() => setBtcAnnualChange(scenario.btcAnnualChange * 100)}>{scenario.btcAnnualChange > 0 ? "+" : ""}{scenario.btcAnnualChange * 100}%</button>)}</div></div>
-          <div className="future-reference"><Bitcoin /><div><span>Referência usada na simulação</span><b>BTC a {currencyPrecise.format(CURRENT_BTC_BRL)}</b><small>Rendimento nativo estimado em ~3% a.a.</small></div></div>
+          <div className="future-reference future-live-price"><Bitcoin /><div><span>Referência usada na simulação</span><b>BTC a {currencyPrecise.format(currentBtcBrl)} <em className={btcQuote.data?.stale ? "stale" : "live"}>{btcQuote.data ? btcQuote.data.stale ? "ÚLTIMO VALOR" : "AO VIVO" : "TEMPORÁRIA"}</em></b><small>{btcQuote.isLoading ? "Buscando a cotação ao vivo..." : btcQuote.data ? `${btcQuote.data.source} · atualizada às ${quoteTime}` : "Cotação ao vivo indisponível no momento"}</small><small>Rendimento nativo estimado em ~3% a.a.</small></div><button type="button" onClick={() => void btcQuote.refetch()} disabled={btcQuote.isFetching} aria-label="Atualizar cotação BTC em reais"><RefreshCw className={btcQuote.isFetching ? "spinning" : ""} /></button></div>
         </section>
 
         <section className="future-result-card">
@@ -104,7 +108,7 @@ export default function FutureCalculator() {
         <article className="br-panel"><Bitcoin /><span>Efeito do preço do BTC</span><strong className={final.marketEffectBrl >= 0 ? "positive" : "negative"}>{final.marketEffectBrl >= 0 ? "+" : ""}{currency.format(final.marketEffectBrl)}</strong><p>Cenário escolhido: {btcAnnualChange > 0 ? "+" : ""}{btcAnnualChange}% ao ano.</p></article>
       </section>
 
-      <details className="br-panel future-assumptions"><summary>Ver premissas e riscos da simulação</summary><div><p>Esta calculadora é educativa. Ela mantém a taxa da estratégia em 3% a.a. e aplica a variação escolhida ao preço do Bitcoin. Aportes são convertidos mensalmente pela cotação projetada, e o rendimento é composto mês a mês.</p><p>Custos de compra, spread, taxas, impostos, liquidez, interrupções e mudanças de protocolo não entram nesta projeção. Os resultados podem ser maiores ou menores e não representam promessa de retorno.</p><p><b>Data-base da referência BTC/BRL:</b> 08/09/2026, valor demonstrativo de {currencyPrecise.format(CURRENT_BTC_BRL)}.</p></div></details>
+      <details className="br-panel future-assumptions"><summary>Ver premissas e riscos da simulação</summary><div><p>Esta calculadora é educativa. Ela mantém a taxa da estratégia em 3% a.a. e aplica a variação escolhida ao preço do Bitcoin. Aportes são convertidos mensalmente pela cotação projetada, e o rendimento é composto mês a mês.</p><p>Custos de compra, spread, taxas, impostos, liquidez, interrupções e mudanças de protocolo não entram nesta projeção. Os resultados podem ser maiores ou menores e não representam promessa de retorno.</p><p><b>Referência BTC/BRL:</b> {btcQuote.data ? `${currencyPrecise.format(currentBtcBrl)}, consultada na ${btcQuote.data.source} às ${quoteTime}.` : `${currencyPrecise.format(FALLBACK_BTC_BRL)}, usada temporariamente enquanto a cotação ao vivo não responde.`}</p></div></details>
     </div>
   );
 }

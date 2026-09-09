@@ -11,6 +11,7 @@ import { ENV } from "../_core/env";
 import { protectedProcedure, router } from "../_core/trpc";
 import { confirmPurchaseWorkflow } from "../services/purchaseOrchestrator";
 import { assertBrazilianCustomer } from "../services/brazilEligibility";
+import { getBtcBrlQuote } from "../services/btcBrlQuote";
 
 export const purchasesRouter = router({
   list: protectedProcedure.query(({ ctx }) => listPurchases(ctx.user.id)),
@@ -26,7 +27,8 @@ export const purchasesRouter = router({
     } catch (error) {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: error instanceof Error ? error.message : "Conclua seu cadastro brasileiro antes de cotar." });
     }
-    const quote = calculatePurchaseQuote(input.amountBrl);
+    const marketQuote = await getBtcBrlQuote();
+    const quote = calculatePurchaseQuote(input.amountBrl, marketQuote.priceBrl);
     return createPurchaseQuote({
       userId: ctx.user.id,
       quote,

@@ -11,6 +11,7 @@ import { calculateRedemptionQuote } from "../finance";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { confirmRedemptionWorkflow } from "../services/redemptionOrchestrator";
 import { assertBrazilianCustomer } from "../services/brazilEligibility";
+import { getBtcBrlQuote } from "../services/btcBrlQuote";
 
 export const redemptionsRouter = router({
   summary: protectedProcedure.query(async ({ ctx }) => ({
@@ -27,7 +28,8 @@ export const redemptionsRouter = router({
     try {
       const profile = await getCustomerProfile(ctx.user.id);
       assertBrazilianCustomer(profile, { requirePix: true });
-      const quote = calculateRedemptionQuote(input.btcAmount);
+      const marketQuote = await getBtcBrlQuote();
+      const quote = calculateRedemptionQuote(input.btcAmount, marketQuote.priceBrl);
       const stored = await createRedemptionQuote({
         userId: ctx.user.id,
         quote,

@@ -47,6 +47,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import RendeBitFooter from "@/components/RendeBitFooter";
 import FutureCalculator from "./FutureCalculator";
+import BusinessSolutions from "./BusinessSolutions";
 import {
   Dialog,
   DialogContent,
@@ -533,22 +534,7 @@ function ReservesPage() {
 }
 
 function BusinessPage() {
-  return (
-    <div className="br-stack">
-      <section className="br-business-hero"><div><span className="br-eyebrow light">RENDEBIT PARA EMPRESAS BRASILEIRAS</span><h1>Uma experiência em Bitcoin pronta para a sua marca.</h1><p>Infraestrutura white-label em português, com Pix, valores em BRL, trilha por cliente e jornadas pensadas para o mercado brasileiro.</p><div className="br-business-actions"><button className="br-primary light" type="button" onClick={() => toast.success("Que bom ter seu interesse!", { description: "A solicitação de demonstração foi registrada no sandbox." })}>Quero conhecer <ArrowRight /></button><button className="br-secondary light" type="button" onClick={() => toast.info("A documentação da API entra na próxima etapa do projeto.")}>Ver documentação</button></div></div><div className="br-api-visual"><div className="br-code-head"><span /><span /><span /><b>POST /v1/quotes/pix</b></div><pre>{`{
-  "asset": "stBTC",
-  "amount": "0.025",
-  "settlement": "BRL_PIX",
-  "customer": "verified"
-}`}</pre><div className="br-api-result"><Check /> Cotação criada em 184ms</div></div></section>
-      <div className="br-b2b-grid">
-        <div className="br-panel br-b2b-card"><div className="br-feature-icon lime"><Zap /></div><h3>API de rendimento</h3><p>Saldos, lotes, taxa stBTC/sBTC e eventos de protocolo normalizados.</p><span>REST + webhooks</span></div>
-        <div className="br-panel br-b2b-card"><div className="br-feature-icon cyan"><QrCode /></div><h3>Orquestração Pix</h3><p>Cotação, liquidação e conciliação com parceiros adequados ao fluxo brasileiro.</p><span>BRL settlement</span></div>
-        <div className="br-panel br-b2b-card"><div className="br-feature-icon violet"><Gauge /></div><h3>Painel white-label</h3><p>Marca, domínio, limites, taxas e jornadas configuráveis para cada distribuidor.</p><span>Go-live modular</span></div>
-      </div>
-      <section className="br-panel br-partner-strip"><div><span className="br-eyebrow">PRONTO PARA INTEGRAR</span><h2>Seu produto. Nossa infraestrutura Bitcoin.</h2></div><div className="br-partner-types"><span><Building2 /> Fintechs</span><span><CircleDollarSign /> Exchanges</span><span><Landmark /> Tesourarias</span></div><button className="br-outline" type="button" onClick={() => toast.success("Contato comercial demonstrativo iniciado")}>Falar com especialista</button></section>
-    </div>
-  );
+  return <BusinessSolutions />;
 }
 
 export default function BitcoinYield() {

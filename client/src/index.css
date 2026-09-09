@@ -1695,9 +1695,12 @@ h1 em { color: #caff4a; font-style: normal; }
 .br-profit-account-grid b { color: #2a211b; font: 600 12px "Space Grotesk", sans-serif; overflow-wrap: anywhere; }
 .br-profit-account-grid span, .br-table-muted { color: #8c735f; font-size: 10px; line-height: 1.45; }
 .br-table-muted { display: block; margin-top: 4px; max-width: 190px; }
+.br-reconciliation-card { display: grid; gap: 14px; }
+.br-reconciliation-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 600px) {
   .br-pix-pending { align-items: flex-start; }
   .br-pix-proof-bar small { display: none; }
   .br-pix-history-heading { align-items: flex-start; }
   .br-profit-account-grid { grid-template-columns: 1fr; }
+  .br-reconciliation-actions { width: 100%; justify-content: flex-start; }
 }

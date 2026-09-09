@@ -329,6 +329,20 @@ export const treasurySettings = mysqlTable("treasury_settings", {
   personalProfitWalletAddress: varchar("personalProfitWalletAddress", {
     length: 80,
   }),
+  conversionPartner: varchar("conversionPartner", { length: 120 })
+    .default("not_selected")
+    .notNull(),
+  conversionPartnerStatus: mysqlEnum("conversionPartnerStatus", [
+    "not_selected",
+    "due_diligence",
+    "contracted",
+    "active",
+  ])
+    .default("not_selected")
+    .notNull(),
+  dailyReconciliationTaskUid: varchar("dailyReconciliationTaskUid", {
+    length: 65,
+  }),
   distributionAsset: mysqlEnum("distributionAsset", ["STX", "sBTC", "stBTC"])
     .default("sBTC")
     .notNull(),
@@ -447,6 +461,20 @@ export const profitCapitalSweeps = mysqlTable("profit_capital_sweeps", {
     precision: 30,
     scale: 8,
   }).notNull(),
+  quoteProvider: varchar("quoteProvider", { length: 60 })
+    .default("sandbox_quote")
+    .notNull(),
+  quoteExternalId: varchar("quoteExternalId", { length: 140 }),
+  quoteStatus: mysqlEnum("quoteStatus", [
+    "active",
+    "expired",
+    "consumed",
+    "rejected",
+  ])
+    .default("active")
+    .notNull(),
+  quoteExpiresAt: timestamp("quoteExpiresAt"),
+  approvalRequired: int("approvalRequired").default(2).notNull(),
   destinationWalletAddress: varchar("destinationWalletAddress", { length: 80 }),
   network: mysqlEnum("network", ["testnet", "mainnet"])
     .default("testnet")
@@ -469,6 +497,64 @@ export const profitCapitalSweeps = mysqlTable("profit_capital_sweeps", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const profitSweepApprovals = mysqlTable(
+  "profit_sweep_approvals",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    sweepId: int("sweepId")
+      .notNull()
+      .references(() => profitCapitalSweeps.id),
+    approverUserId: int("approverUserId")
+      .notNull()
+      .references(() => users.id),
+    approvalSequence: int("approvalSequence").notNull(),
+    decision: mysqlEnum("decision", ["approved", "rejected"])
+      .default("approved")
+      .notNull(),
+    comment: text("comment"),
+    idempotencyKey: varchar("idempotencyKey", { length: 180 })
+      .notNull()
+      .unique(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    sweepApproverUnique: uniqueIndex("profit_sweep_approver_unique").on(
+      table.sweepId,
+      table.approverUserId
+    ),
+  })
+);
+
+export const dailyReconciliations = mysqlTable(
+  "daily_reconciliations",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerUserId: int("ownerUserId")
+      .notNull()
+      .references(() => users.id),
+    dateKey: varchar("dateKey", { length: 10 }).notNull(),
+    status: mysqlEnum("status", ["balanced", "attention", "failed"])
+      .default("attention")
+      .notNull(),
+    totalLedgerEntries: int("totalLedgerEntries").default(0).notNull(),
+    pendingSweepCount: int("pendingSweepCount").default(0).notNull(),
+    approvedSweepCount: int("approvedSweepCount").default(0).notNull(),
+    currencySummary: text("currencySummary").notNull(),
+    exceptions: text("exceptions"),
+    idempotencyKey: varchar("idempotencyKey", { length: 180 })
+      .notNull()
+      .unique(),
+    reconciledAt: timestamp("reconciledAt").defaultNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    ownerDateUnique: uniqueIndex("daily_reconciliation_owner_date_unique").on(
+      table.ownerUserId,
+      table.dateKey
+    ),
+  })
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type PixDeposit = typeof pixDeposits.$inferSelect;
@@ -479,3 +565,5 @@ export type Redemption = typeof redemptions.$inferSelect;
 export type TreasurySettings = typeof treasurySettings.$inferSelect;
 export type ProfitDistribution = typeof profitDistributions.$inferSelect;
 export type ProfitCapitalSweep = typeof profitCapitalSweeps.$inferSelect;
+export type ProfitSweepApproval = typeof profitSweepApprovals.$inferSelect;
+export type DailyReconciliation = typeof dailyReconciliations.$inferSelect;

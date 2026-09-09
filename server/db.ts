@@ -1,13 +1,15 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   authEvents,
   customerProfiles,
+  dailyReconciliations,
   InsertUser,
   ledgerEntries,
   pixDeposits,
   profitCapitalSweeps,
   profitDistributions,
+  profitSweepApprovals,
   providerEvents,
   purchaseQuotes,
   purchases,
@@ -23,6 +25,7 @@ import {
   estimateDistributionAsset,
   isValidStacksAddress,
 } from "./finance";
+import { sandboxProfitConversionQuoteProvider } from "./providers/sandbox";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -85,6 +88,21 @@ export async function getUserByOpenId(openId: string) {
   )[0];
 }
 
+export async function getTreasuryOwnerUserId(fallbackUserId: number) {
+  const db = await requireDb();
+  if (ENV.ownerOpenId) {
+    const owner = await getUserByOpenId(ENV.ownerOpenId);
+    if (owner?.id) return owner.id;
+  }
+  const existing = (
+    await db
+      .select({ ownerUserId: treasurySettings.ownerUserId })
+      .from(treasurySettings)
+      .limit(1)
+  )[0];
+  return existing?.ownerUserId ?? fallbackUserId;
+}
+
 export async function recordAuthEvent(input: {
   userId: number;
   provider: "google" | "apple";
@@ -120,17 +138,17 @@ export async function upsertSandboxProfile(input: {
   await db
     .insert(customerProfiles)
     .values({
-    ...input,
-    country: "BR",
-    verificationStatus: "pending",
+      ...input,
+      country: "BR",
+      verificationStatus: "pending",
     })
     .onDuplicateKeyUpdate({
       set: {
-    legalName: input.legalName,
-    cpfMasked: input.cpfMasked,
-    pixBank: input.pixBank,
-    pixAccountMasked: input.pixAccountMasked,
-    pixOwnershipConfirmed: input.pixOwnershipConfirmed,
+        legalName: input.legalName,
+        cpfMasked: input.cpfMasked,
+        pixBank: input.pixBank,
+        pixAccountMasked: input.pixAccountMasked,
+        pixOwnershipConfirmed: input.pixOwnershipConfirmed,
       },
     });
   return getCustomerProfile(input.userId);
@@ -144,9 +162,9 @@ export async function verifySandboxProfile(
   await db
     .update(customerProfiles)
     .set({
-    verificationStatus: "verified",
-    providerReference,
-    verifiedAt: new Date(),
+      verificationStatus: "verified",
+      providerReference,
+      verifiedAt: new Date(),
     })
     .where(eq(customerProfiles.userId, userId));
   return getCustomerProfile(userId);
@@ -178,15 +196,15 @@ export async function recordProviderEvent(input: {
   await db
     .insert(providerEvents)
     .values({
-    ...input,
-    signatureVerified: true,
-    status: "processed",
-    payload: JSON.stringify(input.payload),
-    processedAt: new Date(),
+      ...input,
+      signatureVerified: true,
+      status: "processed",
+      payload: JSON.stringify(input.payload),
+      processedAt: new Date(),
     })
     .onDuplicateKeyUpdate({
-    set: { idempotencyKey: input.idempotencyKey },
-  });
+      set: { idempotencyKey: input.idempotencyKey },
+    });
   return (
     await db
       .select()
@@ -257,10 +275,10 @@ export async function attachPixDepositCharge(input: {
   await db
     .update(pixDeposits)
     .set({
-    providerReference: input.providerReference,
-    pixCopyPaste: input.pixCopyPaste,
-    qrCodeText: input.qrCodeText,
-    status: "awaiting_payment",
+      providerReference: input.providerReference,
+      pixCopyPaste: input.pixCopyPaste,
+      qrCodeText: input.qrCodeText,
+      status: "awaiting_payment",
     })
     .where(
       and(
@@ -320,14 +338,14 @@ export async function settlePixDeposit(input: {
     await tx
       .insert(ledgerEntries)
       .values({
-      userId: input.userId,
-      pixDepositId: deposit.id,
-      entryType: "pix_deposit",
-      direction: "credit",
-      account: "customer_brl_available",
-      currency: "BRL",
-      amount: deposit.amountBrl,
-      idempotencyKey: `${input.idempotencyKey}:brl-credit`,
+        userId: input.userId,
+        pixDepositId: deposit.id,
+        entryType: "pix_deposit",
+        direction: "credit",
+        account: "customer_brl_available",
+        currency: "BRL",
+        amount: deposit.amountBrl,
+        idempotencyKey: `${input.idempotencyKey}:brl-credit`,
         metadata: JSON.stringify({
           endToEndId: input.endToEndId,
           mode: "sandbox",
@@ -505,9 +523,9 @@ export async function attachPurchasePayment(input: {
   await db
     .update(purchases)
     .set({
-    paymentReference: input.paymentReference,
-    paymentStatus: input.paymentStatus,
-    checkoutUrl: input.checkoutUrl,
+      paymentReference: input.paymentReference,
+      paymentStatus: input.paymentStatus,
+      checkoutUrl: input.checkoutUrl,
       status:
         input.paymentStatus === "approved" ? "processing" : "awaiting_payment",
     })
@@ -575,9 +593,9 @@ export async function approvePurchasePayment(input: {
     await tx
       .update(purchases)
       .set({
-      paymentReference: input.paymentReference,
-      paymentStatus: "approved",
-      status: "processing",
+        paymentReference: input.paymentReference,
+        paymentStatus: "approved",
+        status: "processing",
       })
       .where(eq(purchases.id, input.purchaseId));
     return (
@@ -598,9 +616,9 @@ export async function rejectPurchasePayment(input: {
   await db
     .update(purchases)
     .set({
-    paymentReference: input.paymentReference,
-    paymentStatus: "rejected",
-    status: "failed",
+      paymentReference: input.paymentReference,
+      paymentStatus: "rejected",
+      status: "failed",
     })
     .where(
       and(
@@ -1076,8 +1094,8 @@ export async function failSandboxRedemption(
   await db
     .update(redemptions)
     .set({
-    status: manualReview ? "manual_review" : "failed",
-    failureReason: reason.slice(0, 2_000),
+      status: manualReview ? "manual_review" : "failed",
+      failureReason: reason.slice(0, 2_000),
     })
     .where(
       and(
@@ -1122,11 +1140,78 @@ export async function getTreasurySettings(ownerUserId: number) {
   )[0];
 }
 
+export async function setDailyReconciliationTaskUid(
+  ownerUserId: number,
+  taskUid: string
+) {
+  const db = await requireDb();
+  await getTreasurySettings(ownerUserId);
+  await db
+    .update(treasurySettings)
+    .set({ dailyReconciliationTaskUid: taskUid })
+    .where(eq(treasurySettings.ownerUserId, ownerUserId));
+  return getTreasurySettings(ownerUserId);
+}
+
+export async function claimDailyReconciliationTask(ownerUserId: number) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT id FROM treasury_settings WHERE ownerUserId = ${ownerUserId} FOR UPDATE`
+    );
+    const settings = (
+      await tx
+        .select()
+        .from(treasurySettings)
+        .where(eq(treasurySettings.ownerUserId, ownerUserId))
+        .limit(1)
+    )[0];
+    if (!settings) throw new Error("Configuração de tesouraria não encontrada.");
+    if (settings.dailyReconciliationTaskUid)
+      throw new Error("A reconciliação diária já está sendo configurada ou está ativa.");
+    await tx
+      .update(treasurySettings)
+      .set({ dailyReconciliationTaskUid: "__provisioning__" })
+      .where(eq(treasurySettings.ownerUserId, ownerUserId));
+    return settings;
+  });
+}
+
+export async function clearDailyReconciliationTaskClaim(ownerUserId: number) {
+  const db = await requireDb();
+  await db
+    .update(treasurySettings)
+    .set({ dailyReconciliationTaskUid: null })
+    .where(
+      and(
+        eq(treasurySettings.ownerUserId, ownerUserId),
+        eq(treasurySettings.dailyReconciliationTaskUid, "__provisioning__")
+      )
+    );
+}
+
+export async function getTreasurySettingsByReconciliationTask(taskUid: string) {
+  const db = await requireDb();
+  return (
+    await db
+      .select()
+      .from(treasurySettings)
+      .where(eq(treasurySettings.dailyReconciliationTaskUid, taskUid))
+      .limit(1)
+  )[0];
+}
+
 export async function updateTreasurySettings(input: {
   ownerUserId: number;
   organizationName: string;
   stacksWalletAddress: string | null;
   personalProfitWalletAddress: string | null;
+  conversionPartner: string;
+  conversionPartnerStatus:
+    | "not_selected"
+    | "due_diligence"
+    | "contracted"
+    | "active";
   distributionAsset: "STX" | "sBTC" | "stBTC";
   cadence: "daily" | "weekly" | "monthly";
   approvalMode: "manual" | "multisig" | "automatic";
@@ -1158,20 +1243,35 @@ export async function updateTreasurySettings(input: {
       "A conta de lucros stBTC precisa usar uma carteira diferente da carteira operacional."
     );
   }
+  if (
+    input.conversionPartner === "not_selected" &&
+    input.conversionPartnerStatus !== "not_selected"
+  )
+    throw new Error("Selecione um parceiro antes de avançar a diligência.");
+  if (
+    input.conversionPartner === "Mercado Pago" &&
+    input.conversionPartnerStatus === "active"
+  )
+    throw new Error(
+      "Mercado Pago está limitado ao trilho Pix e não pode executar BRL → BTC."
+    );
   await db
     .update(treasurySettings)
     .set({
-    organizationName: input.organizationName,
+      organizationName: input.organizationName,
       stacksWalletAddress,
       personalProfitWalletAddress,
-    distributionAsset: input.distributionAsset,
-    cadence: input.cadence,
-    approvalMode: input.approvalMode,
-    network: input.network,
-    taxReserveBps: input.taxReserveBps,
-    operationalReserveBps: input.operationalReserveBps,
-    distributionShareBps: 10000,
-    status: walletIsValid ? "ready" : "draft",
+      conversionPartner:
+        input.conversionPartner.trim().slice(0, 120) || "not_selected",
+      conversionPartnerStatus: input.conversionPartnerStatus,
+      distributionAsset: input.distributionAsset,
+      cadence: input.cadence,
+      approvalMode: input.approvalMode,
+      network: input.network,
+      taxReserveBps: input.taxReserveBps,
+      operationalReserveBps: input.operationalReserveBps,
+      distributionShareBps: 10000,
+      status: walletIsValid ? "ready" : "draft",
     })
     .where(eq(treasurySettings.ownerUserId, input.ownerUserId));
   return getTreasurySettings(input.ownerUserId);
@@ -1278,19 +1378,9 @@ export async function approveSandboxDistribution(
   )[0];
   if (!distribution) throw new Error("Distribuição não encontrada.");
   if (distribution.distributionAsset === "stBTC") {
-    const sweep = await createProfitCapitalSweep(
-      ownerUserId,
-      distributionId,
-      `profit-sweep:${distributionId}`
+    throw new Error(
+      "Sweeps stBTC exigem duas aprovações administrativas distintas."
     );
-    await approveSandboxProfitCapitalSweep(ownerUserId, sweep.id);
-    return (
-      await db
-        .select()
-        .from(profitDistributions)
-        .where(eq(profitDistributions.id, distributionId))
-        .limit(1)
-    )[0];
   }
   if (distribution.status === "blocked")
     throw new Error("Configure uma carteira Stacks válida antes de aprovar.");
@@ -1347,22 +1437,6 @@ export async function createProfitCapitalSweep(
     await tx.execute(
       sql`SELECT id FROM profit_distributions WHERE id = ${distributionId} FOR UPDATE`
     );
-    const existing =
-      (
-        await tx
-          .select()
-          .from(profitCapitalSweeps)
-          .where(eq(profitCapitalSweeps.profitDistributionId, distributionId))
-          .limit(1)
-      )[0] ??
-      (
-        await tx
-          .select()
-          .from(profitCapitalSweeps)
-          .where(eq(profitCapitalSweeps.idempotencyKey, idempotencyKey))
-          .limit(1)
-      )[0];
-    if (existing) return existing;
     const distribution = (
       await tx
         .select()
@@ -1376,6 +1450,32 @@ export async function createProfitCapitalSweep(
         .limit(1)
     )[0];
     if (!distribution) throw new Error("Fechamento de lucro não encontrado.");
+    const existing =
+      (
+        await tx
+          .select()
+          .from(profitCapitalSweeps)
+          .where(
+            and(
+              eq(profitCapitalSweeps.profitDistributionId, distributionId),
+              eq(profitCapitalSweeps.ownerUserId, ownerUserId)
+            )
+          )
+          .limit(1)
+      )[0] ??
+      (
+        await tx
+          .select()
+          .from(profitCapitalSweeps)
+          .where(
+            and(
+              eq(profitCapitalSweeps.idempotencyKey, idempotencyKey),
+              eq(profitCapitalSweeps.ownerUserId, ownerUserId)
+            )
+          )
+          .limit(1)
+      )[0];
+    if (existing) return existing;
     if (distribution.distributionAsset !== "stBTC")
       throw new Error(
         "A conta pessoal de lucros exige stBTC como ativo de destino."
@@ -1405,14 +1505,26 @@ export async function createProfitCapitalSweep(
       settings.network === "testnet"
         ? "pending_approval"
         : "blocked";
+    const executableQuote = await sandboxProfitConversionQuoteProvider.quote({
+      sweepId: distribution.id,
+      amountBrl: calculation.sourceAmountBrl.toFixed(2),
+      destinationAsset: "stBTC",
+      slippageBps: calculation.slippageBps,
+      idempotencyKey: `${idempotencyKey}:quote`,
+    });
     await tx.insert(profitCapitalSweeps).values({
       ownerUserId,
       profitDistributionId: distribution.id,
-      sourceAmountBrl: calculation.sourceAmountBrl.toFixed(2),
-      referenceAssetBrl: calculation.referenceAssetBrl.toFixed(2),
+      sourceAmountBrl: executableQuote.payload.amountBrl,
+      referenceAssetBrl: executableQuote.payload.referenceAssetBrl,
       slippageBps: calculation.slippageBps,
-      estimatedAssetAmount: calculation.estimatedAssetAmount.toFixed(8),
-      minimumAssetAmount: calculation.minimumAssetAmount.toFixed(8),
+      estimatedAssetAmount: executableQuote.payload.estimatedAssetAmount,
+      minimumAssetAmount: executableQuote.payload.minimumAssetAmount,
+      quoteProvider: sandboxProfitConversionQuoteProvider.provider,
+      quoteExternalId: executableQuote.externalId,
+      quoteStatus: "active",
+      quoteExpiresAt: new Date(executableQuote.payload.expiresAt),
+      approvalRequired: 2,
       destinationWalletAddress,
       network: settings?.network ?? "testnet",
       status,
@@ -1431,10 +1543,13 @@ export async function createProfitCapitalSweep(
 
 export async function approveSandboxProfitCapitalSweep(
   ownerUserId: number,
-  sweepId: number
+  sweepId: number,
+  approverUserId: number,
+  comment: string | null,
+  idempotencyKey: string
 ) {
   const db = await requireDb();
-  const completed = await db.transaction(async tx => {
+  const result = await db.transaction(async tx => {
     await tx.execute(
       sql`SELECT id FROM profit_capital_sweeps WHERE id = ${sweepId} FOR UPDATE`
     );
@@ -1454,10 +1569,83 @@ export async function approveSandboxProfitCapitalSweep(
     if (sweep.status === "blocked")
       throw new Error(sweep.blockerReason || "Sweep bloqueado por segurança.");
     if (sweep.status === "simulated_sent") return sweep;
-    const transactionId = `sandbox-stbtc-profit-${sweep.id}`;
+    if (sweep.quoteStatus !== "active")
+      throw new Error("A cotação executável não está mais ativa.");
+    if (!sweep.quoteExpiresAt || sweep.quoteExpiresAt.getTime() <= Date.now()) {
+      await tx
+        .update(profitCapitalSweeps)
+        .set({
+          quoteStatus: "expired",
+          status: "blocked",
+          blockerReason: "A cotação executável expirou antes da aprovação.",
+        })
+        .where(eq(profitCapitalSweeps.id, sweep.id));
+      return (
+        await tx
+          .select()
+          .from(profitCapitalSweeps)
+          .where(eq(profitCapitalSweeps.id, sweep.id))
+          .limit(1)
+      )[0];
+    }
+    const existingApproval = (
+      await tx
+        .select()
+        .from(profitSweepApprovals)
+        .where(eq(profitSweepApprovals.idempotencyKey, idempotencyKey))
+        .limit(1)
+    )[0];
+    if (existingApproval) {
+      if (
+        existingApproval.sweepId !== sweep.id ||
+        existingApproval.approverUserId !== approverUserId
+      )
+        throw new Error("A chave idempotente já foi usada em outro contexto.");
+      return sweep;
+    }
+    const approvals = await tx
+      .select()
+      .from(profitSweepApprovals)
+      .where(eq(profitSweepApprovals.sweepId, sweep.id));
+    if (approvals.length > 0 && approverUserId === sweep.ownerUserId)
+      throw new Error(
+        "A segunda aprovação precisa ser feita por outro administrador."
+      );
+    if (approvals.some(item => item.approverUserId === approverUserId))
+      throw new Error("Este administrador já aprovou este sweep.");
+    const approvalSequence =
+      approvals.filter(item => item.decision === "approved").length + 1;
+    await tx.insert(profitSweepApprovals).values({
+      sweepId: sweep.id,
+      approverUserId,
+      approvalSequence,
+      decision: "approved",
+      comment: comment?.trim().slice(0, 500) || null,
+      idempotencyKey,
+    });
+    if (approvalSequence < sweep.approvalRequired) return sweep;
+
+    if (!sweep.quoteExternalId)
+      throw new Error("O sweep não possui identificador de cotação.");
+    if (sweep.quoteProvider !== "sandbox_quote")
+      throw new Error("O executor institucional ainda não está configurado.");
+    const execution = await sandboxProfitConversionQuoteProvider.execute({
+      sweepId: sweep.id,
+      quoteExternalId: sweep.quoteExternalId,
+      amountBrl: sweep.sourceAmountBrl,
+      estimatedAssetAmount: sweep.estimatedAssetAmount,
+      minimumAssetAmount: sweep.minimumAssetAmount,
+      idempotencyKey: `${sweep.idempotencyKey}:execute`,
+    });
+    const transactionId = execution.payload.transactionId;
     await tx
       .update(profitCapitalSweeps)
-      .set({ status: "simulated_sent", transactionId, approvedAt: new Date() })
+      .set({
+        status: "simulated_sent",
+        quoteStatus: "consumed",
+        transactionId,
+        approvedAt: new Date(),
+      })
       .where(eq(profitCapitalSweeps.id, sweep.id));
     await tx
       .update(profitDistributions)
@@ -1503,27 +1691,26 @@ export async function approveSandboxProfitCapitalSweep(
         .where(eq(profitCapitalSweeps.id, sweep.id))
         .limit(1)
     )[0];
-    });
-  if (completed) {
+  });
+  if (result?.status === "simulated_sent") {
     await recordProviderEvent({
       provider: "sandbox_stacks",
       eventType: "profit.stbtc_sweep.simulated",
-      externalId:
-        completed.transactionId ?? `sandbox-stbtc-profit-${completed.id}`,
-      idempotencyKey: `${completed.idempotencyKey}:event`,
+      externalId: result.transactionId ?? `sandbox-stbtc-profit-${result.id}`,
+      idempotencyKey: `${result.idempotencyKey}:event`,
       payload: {
-        sweepId: completed.id,
-        sourceAmountBrl: completed.sourceAmountBrl,
-        estimatedAssetAmount: completed.estimatedAssetAmount,
-        minimumAssetAmount: completed.minimumAssetAmount,
-        destinationWalletAddress: completed.destinationWalletAddress,
-        route: completed.route,
-        network: completed.network,
+        sweepId: result.id,
+        sourceAmountBrl: result.sourceAmountBrl,
+        estimatedAssetAmount: result.estimatedAssetAmount,
+        minimumAssetAmount: result.minimumAssetAmount,
+        destinationWalletAddress: result.destinationWalletAddress,
+        route: result.route,
+        network: result.network,
         mode: "sandbox",
       },
-  });
+    });
   }
-  return completed;
+  return result;
 }
 
 export async function listProfitCapitalSweeps(ownerUserId: number) {
@@ -1533,6 +1720,170 @@ export async function listProfitCapitalSweeps(ownerUserId: number) {
     .from(profitCapitalSweeps)
     .where(eq(profitCapitalSweeps.ownerUserId, ownerUserId))
     .orderBy(desc(profitCapitalSweeps.createdAt));
+}
+
+export async function listProfitSweepApprovals(ownerUserId: number) {
+  const db = await requireDb();
+  const ownerSweeps = await db
+    .select({ id: profitCapitalSweeps.id })
+    .from(profitCapitalSweeps)
+    .where(eq(profitCapitalSweeps.ownerUserId, ownerUserId));
+  if (ownerSweeps.length === 0) return [];
+  return db
+    .select()
+    .from(profitSweepApprovals)
+    .where(
+      inArray(
+        profitSweepApprovals.sweepId,
+        ownerSweeps.map(item => item.id)
+      )
+    )
+    .orderBy(desc(profitSweepApprovals.createdAt));
+}
+
+export async function reconcileDailyTreasury(
+  ownerUserId: number,
+  dateKey: string
+) {
+  const db = await requireDb();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey))
+    throw new Error("Data de reconciliação inválida.");
+
+  return db.transaction(async tx => {
+    const allLedger = await tx.select().from(ledgerEntries);
+    const sweeps = await tx
+      .select()
+      .from(profitCapitalSweeps)
+      .where(eq(profitCapitalSweeps.ownerUserId, ownerUserId));
+    const ownerSweepIds = sweeps.map(item => item.id);
+    const approvals = ownerSweepIds.length
+      ? await tx
+          .select()
+          .from(profitSweepApprovals)
+          .where(inArray(profitSweepApprovals.sweepId, ownerSweepIds))
+      : [];
+    const treasuryAccounts = new Set([
+      "organization_fee_revenue",
+      "organization_redemption_fee",
+      "protocol_redemption_cost",
+      "organization_distributable_profit",
+      "owner_personal_profit_stbtc",
+      "tax_reserve",
+      "operational_reserve",
+    ]);
+    const ledger = allLedger.filter(
+      entry =>
+        treasuryAccounts.has(entry.account) &&
+        entry.createdAt.toISOString().slice(0, 10) === dateKey
+    );
+    const dailySweeps = sweeps.filter(
+      sweep => sweep.createdAt.toISOString().slice(0, 10) === dateKey
+    );
+    const currencySummary = ledger.reduce<
+      Record<string, { debit: number; credit: number; net: number }>
+    >((summary, entry) => {
+      const row = summary[entry.currency] ?? { debit: 0, credit: 0, net: 0 };
+      const amount = Number(entry.amount);
+      if (entry.direction === "debit") row.debit += amount;
+      else row.credit += amount;
+      row.net = row.credit - row.debit;
+      summary[entry.currency] = row;
+      return summary;
+    }, {});
+    const exceptions: string[] = [];
+    const pendingSweepCount = dailySweeps.filter(
+      sweep => sweep.status === "pending_approval" || sweep.status === "blocked"
+    ).length;
+    const approvedSweepCount = dailySweeps.filter(
+      sweep => sweep.status === "simulated_sent"
+    ).length;
+    for (const sweep of dailySweeps) {
+      const sweepApprovals = approvals.filter(
+        item => item.sweepId === sweep.id
+      );
+      if (
+        sweep.status === "pending_approval" &&
+        sweepApprovals.length < sweep.approvalRequired
+      )
+        exceptions.push(
+          `Sweep #${sweep.id} aguardando ${sweep.approvalRequired - sweepApprovals.length} aprovação(ões).`
+        );
+      if (sweep.status === "simulated_sent") {
+        const relatedLedger = allLedger.filter(entry =>
+          entry.idempotencyKey.startsWith(`profit-sweep:${sweep.id}:`)
+        );
+        const debit = relatedLedger.find(
+          entry =>
+            entry.direction === "debit" &&
+            entry.account === sweep.sourceAccount &&
+            entry.currency === "BRL" &&
+            Number(entry.amount) === Number(sweep.sourceAmountBrl)
+        );
+        const credit = relatedLedger.find(
+          entry =>
+            entry.direction === "credit" &&
+            entry.account === sweep.destinationAccount &&
+            entry.currency === "stBTC" &&
+            Number(entry.amount) === Number(sweep.estimatedAssetAmount)
+        );
+        if (relatedLedger.length !== 2 || !debit || !credit)
+          exceptions.push(
+            `Sweep #${sweep.id} sem os dois lançamentos esperados no ledger.`
+          );
+      }
+      if (
+        sweep.quoteStatus === "active" &&
+        sweep.quoteExpiresAt &&
+        sweep.quoteExpiresAt.getTime() <= Date.now()
+      )
+        exceptions.push(`Sweep #${sweep.id} possui cotação ativa expirada.`);
+    }
+    const status: "balanced" | "attention" =
+      exceptions.length === 0 ? "balanced" : "attention";
+    const idempotencyKey = `daily-reconciliation:${ownerUserId}:${dateKey}`;
+    const values = {
+      ownerUserId,
+      dateKey,
+      status,
+      totalLedgerEntries: ledger.length,
+      pendingSweepCount,
+      approvedSweepCount,
+      currencySummary: JSON.stringify(currencySummary),
+      exceptions: exceptions.length ? JSON.stringify(exceptions) : null,
+      idempotencyKey,
+      reconciledAt: new Date(),
+    };
+    await tx
+      .insert(dailyReconciliations)
+      .values(values)
+      .onDuplicateKeyUpdate({
+        set: {
+          status,
+          totalLedgerEntries: ledger.length,
+          pendingSweepCount,
+          approvedSweepCount,
+          currencySummary: JSON.stringify(currencySummary),
+          exceptions: exceptions.length ? JSON.stringify(exceptions) : null,
+          reconciledAt: values.reconciledAt,
+        },
+      });
+    return (
+      await tx
+        .select()
+        .from(dailyReconciliations)
+        .where(eq(dailyReconciliations.idempotencyKey, idempotencyKey))
+        .limit(1)
+    )[0];
+  });
+}
+
+export async function listDailyReconciliations(ownerUserId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(dailyReconciliations)
+    .where(eq(dailyReconciliations.ownerUserId, ownerUserId))
+    .orderBy(desc(dailyReconciliations.reconciledAt));
 }
 
 export async function listProfitDistributions(ownerUserId: number) {

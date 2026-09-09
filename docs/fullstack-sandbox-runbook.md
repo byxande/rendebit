@@ -12,17 +12,17 @@ A Xverse foi classificada como integração opcional de autocustódia. Sua API p
 
 ## Controles implementados
 
-| Controle | Implementação atual | Condição para produção |
-| ------------------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Autenticação | OAuth e procedimentos protegidos | Revisar política de sessão e recuperação de conta |
-| KYC | Adaptador determinístico, dados mascarados e webhook idempotente | Contrato e credenciais de MetaMap, Veriff ou parceiro escolhido; LGPD e retenção |
-| Titularidade Pix | Declaração persistida no sandbox | Validação pelo parceiro bancário e comparação de CPF/nome do titular |
-| Cotação | Preço de referência sandbox, spread, taxa e expiração | Feed assinado, tolerância de slippage e auditoria de execução |
-| Compra e custódia | Evento simulado de compra BTC | Custodiante contratado, contas segregadas e política de reconciliação |
-| BTC → sBTC → stBTC | Evento simulado com rota registrada no backend | Bridge sBTC, StackingDAO, limites, liquidez, monitoramento e plano de contingência |
-| Ledger | Lançamentos persistentes com chaves idempotentes | Partidas dobradas, reconciliação diária e trilha de auditoria imutável |
-| Lucro | Receita realizada menos custos e reservas | Regra contábil/jurídica aprovada e integração com contabilidade |
-| Repasse | Somente simulado e sujeito a aprovação administrativa | Cofre de chaves ou multisig; limites; dupla aprovação; observabilidade |
+| Controle           | Implementação atual                                                                              | Condição para produção                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Autenticação       | OAuth e procedimentos protegidos                                                                 | Revisar política de sessão e recuperação de conta                                  |
+| KYC                | Adaptador determinístico, dados mascarados e webhook idempotente                                 | Contrato e credenciais de MetaMap, Veriff ou parceiro escolhido; LGPD e retenção   |
+| Titularidade Pix   | Declaração persistida no sandbox                                                                 | Validação pelo parceiro bancário e comparação de CPF/nome do titular               |
+| Cotação            | RFQ sandbox de stBTC com ID externo, validade, mínimo de slippage e consumo na segunda aprovação | Cotação institucional assinada, política de reprice e auditoria de execução        |
+| Compra e custódia  | Evento simulado de compra BTC                                                                    | Custodiante contratado, contas segregadas e política de reconciliação              |
+| BTC → sBTC → stBTC | Evento simulado com rota registrada no backend                                                   | Bridge sBTC, StackingDAO, limites, liquidez, monitoramento e plano de contingência |
+| Ledger             | Lançamentos persistentes com chaves idempotentes e reconciliação diária interna                  | Partidas dobradas, reconciliação independente e trilha de auditoria imutável       |
+| Lucro              | Receita realizada menos custos e reservas                                                        | Regra contábil/jurídica aprovada e integração com contabilidade                    |
+| Repasse            | Somente simulado, RFQ ativa e duas aprovações administrativas distintas                          | Cofre de chaves ou multisig; limites; dupla aprovação; observabilidade             |
 
 ## Política de lucro
 
@@ -32,24 +32,28 @@ O sistema interpreta “todo lucro” como **100% do lucro distribuível**, e n�
 
 A carteira organizacional recebe apenas o ativo configurado — STX, sBTC ou stBTC — após o fechamento do período. A interface solicita somente o endereço público e valida checksum e rede. O sandbox nunca solicita seed phrase, chave privada ou assinatura. Uma ativação real deverá usar um cofre de chaves ou uma carteira multisig e manter aprovação manual como padrão inicial.
 
-Para o ativo **stBTC**, o sistema passou a manter uma carteira dedicada de lucros, diferente da carteira operacional. O fluxo registra uma proposta de sweep `BRL → BTC → sBTC → stBTC` que parte exclusivamente de `organization_distributable_profit_brl` e credita `owner_personal_profit_stbtc`; inclui cotação de referência, mínimo protegido por slippage, carteira de destino, rede, bloqueador e chave idempotente. A aprovação no sandbox cria somente lançamentos de ledger correlacionados. Mainnet, bridge real, assinatura e broadcast permanecem bloqueados. A metodologia detalhada está em `docs/metodologia-fluxo-capitais-lucros-stbtc.md`.
+O modelo atual de tesouraria é **mono-organização**: há uma única organização econômica e os lançamentos de receita e custo são reconciliados apenas nas contas organizacionais nomeadas. Uma versão white-label multiempresa deverá introduzir `organizationId`, associação explícita de administradores e contas de ledger por organização antes de permitir qualquer segregação entre empresas.
+
+Para o ativo **stBTC**, o sistema mantém uma carteira dedicada de lucros, diferente da carteira operacional. O fluxo registra uma proposta de sweep `BRL → BTC → sBTC → stBTC` que parte exclusivamente de `organization_distributable_profit_brl` e credita `owner_personal_profit_stbtc`; inclui RFQ sandbox com identificador externo e validade de 15 minutos, mínimo protegido por slippage, carteira de destino, rede, bloqueador e chave idempotente. A primeira aprovação mantém o sweep pendente; a segunda deve ser de outro administrador e consome a RFQ para gerar os lançamentos correlacionados no ledger sandbox. A tabela `daily_reconciliations` confere diariamente os registros e está preparada para um heartbeat autenticado às 03:00 UTC depois da publicação. Mainnet, bridge real, assinatura e broadcast permanecem bloqueados. A metodologia detalhada está em `docs/metodologia-fluxo-capitais-lucros-stbtc.md` e a avaliação de parceiros em `docs/pesquisa-parceiros-brl-btc-2026-09-09.md`.
 
 ## Modelo de dados
 
-| Tabela | Finalidade |
-| ----------------------- | --------------------------------------------------------------------------- |
-| `customer_profiles` | Perfil, elegibilidade, titularidade Pix e estado do KYC |
-| `purchase_quotes` | Cotações, taxas, expiração e idempotência |
-| `purchases` | Compras, liquidação e estado da estratégia de rendimento |
-| `ledger_entries` | Trilha financeira por cliente e organização |
-| `provider_events` | Webhooks simulados e deduplicação |
-| `treasury_settings` | Carteira, rede, ativo, frequência, aprovação e reservas |
-| `profit_distributions` | Fechamento mensal e repasse simulado, único por período |
-| `profit_capital_sweeps` | Proposta segregada de lucro distribuível BRL para a conta dedicada em stBTC |
+| Tabela                   | Finalidade                                                                                                 |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `customer_profiles`      | Perfil, elegibilidade, titularidade Pix e estado do KYC                                                    |
+| `purchase_quotes`        | Cotações, taxas, expiração e idempotência                                                                  |
+| `purchases`              | Compras, liquidação e estado da estratégia de rendimento                                                   |
+| `ledger_entries`         | Trilha financeira por cliente e organização                                                                |
+| `provider_events`        | Webhooks simulados e deduplicação                                                                          |
+| `treasury_settings`      | Carteira, parceiro de conversão, rede, ativo, frequência, aprovação, reservas e identificador do heartbeat |
+| `profit_distributions`   | Fechamento mensal e repasse simulado, único por período                                                    |
+| `profit_capital_sweeps`  | Proposta segregada de lucro distribuível BRL para a conta dedicada em stBTC                                |
+| `profit_sweep_approvals` | Registro idempotente das duas aprovações por administradores distintos                                     |
+| `daily_reconciliations`  | Conferência diária de ledger, sweeps, aprovações e cotação                                                 |
 
 ## Próxima ativação
 
-A próxima fase deve escolher e contratar os provedores. As credenciais devem entrar apenas em secrets do backend. Depois, cada adaptador em `server/providers` será substituído por um cliente real com autenticação, verificação de assinatura de webhook, retries seguros, circuit breaker e reconciliação. A passagem para produção deve ser bloqueada até existirem revisão jurídica brasileira, definição de VASP/custódia, contratos bancários, políticas LGPD/PLD-FT, runbooks de incidente e testes independentes.
+A próxima fase deve escolher e contratar os provedores. A avaliação atual classifica Bitso Brasil e Mercado Bitcoin como candidatos condicionais, Foxbit como candidato em diligência e Mercado Pago como trilho de Pix; nenhum deles deve ser ativado para conversão sem confirmação regulatória e contrato institucional. As credenciais devem entrar apenas em secrets do backend. Depois, cada adaptador em `server/providers` será substituído por um cliente real com autenticação, verificação de assinatura de webhook, retries seguros, circuit breaker e reconciliação. A passagem para produção deve ser bloqueada até existirem revisão jurídica brasileira, definição de VASP/custódia, contratos bancários, políticas LGPD/PLD-FT, runbooks de incidente e testes independentes.
 
 A marca do produto foi atualizada para **RendeBit**. A busca pública inicial não encontrou colisão evidente, mas ainda é obrigatório fazer busca de anterioridade e clearance formal no INPI antes do lançamento.
 

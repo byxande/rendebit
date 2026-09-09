@@ -1,10 +1,12 @@
 import { eq, like } from "drizzle-orm";
 import {
   customerProfiles,
+  dailyReconciliations,
   ledgerEntries,
   pixDeposits,
   profitCapitalSweeps,
   profitDistributions,
+  profitSweepApprovals,
   providerEvents,
   purchaseQuotes,
   purchases,
@@ -23,6 +25,7 @@ import {
   getDb,
   recordProviderEvent,
   approveSandboxProfitCapitalSweep,
+  reconcileDailyTreasury,
   updateTreasurySettings,
   upsertSandboxProfile,
   verifySandboxProfile,
@@ -44,6 +47,7 @@ if (!db) throw new Error("DATABASE_URL não disponível.");
 const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const openId = `sandbox-verifier-${suffix}`;
 let userId: number | null = null;
+let approvalUserId: number | null = null;
 
 try {
   await db
@@ -54,6 +58,18 @@ try {
   )[0];
   if (!user) throw new Error("Usuário de verificação não foi criado.");
   userId = user.id;
+  await db
+    .insert(users)
+    .values({ openId: `sandbox-second-approver-${suffix}`, name: "Segundo aprovador", role: "admin" });
+  const secondApprover = (
+    await db
+      .select()
+      .from(users)
+      .where(eq(users.openId, `sandbox-second-approver-${suffix}`))
+      .limit(1)
+  )[0];
+  if (!secondApprover) throw new Error("Segundo aprovador não foi criado.");
+  approvalUserId = secondApprover.id;
 
   await upsertSandboxProfile({
     userId,
@@ -168,6 +184,8 @@ try {
     organizationName: "Organização de verificação",
     stacksWalletAddress: "ST000000000000000000002AMW42H",
     personalProfitWalletAddress: "SN3VMHXEN64ZZF71JQ5VESXDWTR301XTTXGF4J8F1",
+    conversionPartner: "not_selected",
+    conversionPartnerStatus: "not_selected",
     distributionAsset: "stBTC",
     cadence: "monthly",
     approvalMode: "manual",
@@ -203,12 +221,30 @@ try {
     firstSweep.status !== "pending_approval"
   )
     throw new Error("Proposta de sweep stBTC falhou.");
+  const firstApproval = await approveSandboxProfitCapitalSweep(
+    userId,
+    firstSweep.id,
+    userId,
+    "Primeira aprovação no sandbox.",
+    `sweep-approval-${suffix}-one`
+  );
+  if (firstApproval.status !== "pending_approval")
+    throw new Error("Primeira aprovação não manteve o sweep pendente.");
   const approvedSweep = await approveSandboxProfitCapitalSweep(
     userId,
-    firstSweep.id
+    firstSweep.id,
+    approvalUserId,
+    "Segunda aprovação no sandbox.",
+    `sweep-approval-${suffix}-two`
   );
-  if (approvedSweep.status !== "simulated_sent")
-    throw new Error("Aprovação do sweep stBTC não foi registrada.");
+  if (approvedSweep.status !== "simulated_sent" || approvedSweep.quoteStatus !== "consumed")
+    throw new Error("Dupla aprovação ou consumo de cotação do sweep falhou.");
+  const reconciliation = await reconcileDailyTreasury(
+    userId,
+    new Date().toISOString().slice(0, 10)
+  );
+  if (reconciliation.status !== "balanced")
+    throw new Error("Reconciliação diária encontrou uma divergência inesperada.");
 
   const counts = {
     profiles: (
@@ -285,6 +321,18 @@ try {
         .from(profitCapitalSweeps)
         .where(eq(profitCapitalSweeps.ownerUserId, userId))
     ).length,
+    sweepApprovals: (
+      await db
+        .select()
+        .from(profitSweepApprovals)
+        .where(eq(profitSweepApprovals.sweepId, firstSweep.id))
+    ).length,
+    dailyReconciliations: (
+      await db
+        .select()
+        .from(dailyReconciliations)
+        .where(eq(dailyReconciliations.ownerUserId, userId))
+    ).length,
   };
   if (counts.pixProviderEvents !== 2)
     throw new Error("Trilha de eventos Pix incompleta.");
@@ -294,6 +342,10 @@ try {
     throw new Error("Evento auditável do sweep stBTC ausente.");
   if (counts.profitSweeps !== 1)
     throw new Error("Conta de lucros stBTC não foi persistida.");
+  if (counts.sweepApprovals !== 2)
+    throw new Error("Trilha de dupla aprovação do sweep está incompleta.");
+  if (counts.dailyReconciliations !== 1)
+    throw new Error("Reconciliação diária não foi persistida.");
   console.log(
     JSON.stringify({ ok: true, counts, status: approvedSweep.status }, null, 2)
   );
@@ -329,6 +381,18 @@ try {
         .where(eq(ledgerEntries.redemptionId, redemption.id));
     }
     await db.delete(ledgerEntries).where(eq(ledgerEntries.userId, userId));
+    const ownedSweeps = await db
+      .select({ id: profitCapitalSweeps.id })
+      .from(profitCapitalSweeps)
+      .where(eq(profitCapitalSweeps.ownerUserId, userId));
+    for (const sweep of ownedSweeps) {
+      await db
+        .delete(profitSweepApprovals)
+        .where(eq(profitSweepApprovals.sweepId, sweep.id));
+    }
+    await db
+      .delete(dailyReconciliations)
+      .where(eq(dailyReconciliations.ownerUserId, userId));
     await db
       .delete(profitCapitalSweeps)
       .where(eq(profitCapitalSweeps.ownerUserId, userId));
@@ -352,6 +416,9 @@ try {
       .delete(providerEvents)
       .where(like(providerEvents.idempotencyKey, `%${suffix}%`));
     await db.delete(users).where(eq(users.id, userId));
+  }
+  if (approvalUserId !== null) {
+    await db.delete(users).where(eq(users.id, approvalUserId));
   }
 }
 

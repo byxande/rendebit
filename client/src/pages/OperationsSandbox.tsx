@@ -38,6 +38,12 @@ export default function OperationsSandbox() {
   const capitalSweepsQuery = trpc.treasury.capitalSweeps.useQuery(undefined, {
     enabled: isAdmin,
   });
+  const approvalsQuery = trpc.treasury.approvals.useQuery(undefined, {
+    enabled: isAdmin,
+  });
+  const reconciliationsQuery = trpc.treasury.reconciliations.useQuery(undefined, {
+    enabled: isAdmin,
+  });
   const ledgerQuery = trpc.treasury.ledger.useQuery(undefined, {
     enabled: isAdmin,
   });
@@ -60,6 +66,10 @@ export default function OperationsSandbox() {
   );
   const [wallet, setWallet] = useState("");
   const [profitWallet, setProfitWallet] = useState("");
+  const [conversionPartner, setConversionPartner] = useState("not_selected");
+  const [conversionPartnerStatus, setConversionPartnerStatus] = useState<
+    "not_selected" | "due_diligence" | "contracted" | "active"
+  >("not_selected");
   const [asset, setAsset] = useState<"STX" | "sBTC" | "stBTC">("sBTC");
   const [network, setNetwork] = useState<"testnet" | "mainnet">("testnet");
   const [cadence, setCadence] = useState<"daily" | "weekly" | "monthly">(
@@ -77,6 +87,8 @@ export default function OperationsSandbox() {
     setOrganizationName(settings.organizationName);
     setWallet(settings.stacksWalletAddress ?? "");
     setProfitWallet(settings.personalProfitWalletAddress ?? "");
+    setConversionPartner(settings.conversionPartner);
+    setConversionPartnerStatus(settings.conversionPartnerStatus);
     setAsset(settings.distributionAsset);
     setNetwork(settings.network);
     setCadence(settings.cadence);
@@ -120,19 +132,57 @@ export default function OperationsSandbox() {
     onError: error => toast.error(error.message),
   });
   const approveSweep = trpc.treasury.approveStbtcSweep.useMutation({
-    onSuccess: async () => {
+    onSuccess: async data => {
       await Promise.all([
         utils.treasury.distributions.invalidate(),
         utils.treasury.capitalSweeps.invalidate(),
+        utils.treasury.approvals.invalidate(),
         utils.treasury.ledger.invalidate(),
       ]);
-      toast.success("Sweep stBTC simulado registrado", {
-        description:
-          "A conta de lucros foi atualizada somente no ledger sandbox; nenhuma transação on-chain real foi enviada.",
-      });
+      toast.success(
+        data.status === "blocked"
+          ? "Sweep bloqueado por cotação expirada"
+          : data.status === "simulated_sent"
+          ? "Sweep stBTC simulado registrado"
+          : "Primeira aprovação registrada",
+        {
+          description:
+            data.status === "blocked"
+              ? "Gere uma nova proposta com uma cotação válida antes de revisar novamente."
+              : data.status === "simulated_sent"
+              ? "A conta de lucros foi atualizada somente no ledger sandbox; nenhuma transação on-chain real foi enviada."
+              : "Uma segunda aprovação, de outro administrador, ainda é necessária.",
+        }
+      );
     },
     onError: error => toast.error(error.message),
   });
+  const reconcileDaily = trpc.treasury.reconcileDaily.useMutation({
+    onSuccess: async data => {
+      await utils.treasury.reconciliations.invalidate();
+      toast.success(
+        data.status === "balanced"
+          ? "Reconciliação diária sem divergências"
+          : "Reconciliação concluída com atenção",
+        {
+          description: data.exceptions
+            ? "Há itens para revisar antes de qualquer liquidação real."
+            : "Ledger e sweeps conferidos no sandbox.",
+        }
+      );
+    },
+    onError: error => toast.error(error.message),
+  });
+  const enableDailyReconciliation =
+    trpc.treasury.enableDailyReconciliation.useMutation({
+      onSuccess: async () => {
+        await utils.treasury.settings.invalidate();
+        toast.success("Reconciliação diária automática ativada", {
+          description: "O heartbeat confere o ledger todos os dias às 03:00 UTC.",
+        });
+      },
+      onError: error => toast.error(error.message),
+    });
 
   if (loading)
     return (
@@ -173,6 +223,8 @@ export default function OperationsSandbox() {
   const redemptions = redemptionsQuery.data ?? [];
   const distributions = distributionsQuery.data ?? [];
   const capitalSweeps = capitalSweepsQuery.data ?? [];
+  const approvals = approvalsQuery.data ?? [];
+  const reconciliations = reconciliationsQuery.data ?? [];
   const grossRevenue = entries
     .filter(item => item.entryType === "fee_revenue" && item.currency === "BRL")
     .reduce((sum, item) => sum + Number(item.amount), 0);
@@ -190,6 +242,8 @@ export default function OperationsSandbox() {
       organizationName,
       stacksWalletAddress: wallet.trim() || null,
       personalProfitWalletAddress: profitWallet.trim() || null,
+      conversionPartner,
+      conversionPartnerStatus,
       distributionAsset: asset,
       cadence,
       approvalMode,
@@ -318,6 +372,35 @@ export default function OperationsSandbox() {
               />
             </label>
             <label>
+              <span>Parceiro BRL → BTC</span>
+              <select
+                value={conversionPartner}
+                onChange={event => setConversionPartner(event.target.value)}
+              >
+                <option value="not_selected">Ainda não selecionado</option>
+                <option value="Bitso Brasil">Bitso Brasil</option>
+                <option value="Mercado Bitcoin">Mercado Bitcoin</option>
+                <option value="Foxbit">Foxbit</option>
+                <option value="Mercado Pago">Mercado Pago · somente Pix</option>
+              </select>
+            </label>
+            <label>
+              <span>Status da diligência</span>
+              <select
+                value={conversionPartnerStatus}
+                onChange={event =>
+                  setConversionPartnerStatus(
+                    event.target.value as typeof conversionPartnerStatus
+                  )
+                }
+              >
+                <option value="not_selected">Não iniciado</option>
+                <option value="due_diligence">Em diligência</option>
+                <option value="contracted">Contrato assinado</option>
+                <option value="active">Ativo em produção</option>
+              </select>
+            </label>
+            <label>
               <span>Rede</span>
               <select
                 value={network}
@@ -408,6 +491,11 @@ export default function OperationsSandbox() {
             <KeyRound size={13} /> Use uma carteira pública dedicada, diferente
             da operacional. Assinatura real deverá usar cofre de chaves ou
             multisig no backend.
+          </p>
+          <p className="br-dialog-footnote">
+            <ShieldCheck size={13} /> Registrar um parceiro não libera compra
+            real. Bitso Brasil e Mercado Bitcoin seguem em diligência; API,
+            contrato institucional e validação regulatória são gates obrigatórios.
           </p>
         </section>
 
@@ -532,10 +620,18 @@ export default function OperationsSandbox() {
                             className="br-small-action"
                             type="button"
                             onClick={() =>
-                              approveSweep.mutate({ sweepId: sweep.id })
+                              approveSweep.mutate({
+                                sweepId: sweep.id,
+                                comment: "Aprovação administrativa registrada no sandbox.",
+                                idempotencyKey: `sweep-approval-${sweep.id}-${item.id}-${user?.id ?? "admin"}`,
+                              })
                             }
                           >
-                            Aprovar sweep
+                            {approvals.filter(
+                              approval => approval.sweepId === sweep.id
+                            ).length === 0
+                              ? "Registrar 1ª aprovação"
+                              : "Registrar 2ª aprovação"}
                           </button>
                         ) : item.status === "pending_approval" &&
                           !sweep &&
@@ -612,6 +708,8 @@ export default function OperationsSandbox() {
                   <th>Origem BRL</th>
                   <th>Estimativa</th>
                   <th>Mínimo protegido</th>
+                  <th>Cotação</th>
+                  <th>Aprovações</th>
                   <th>Rede</th>
                   <th>Status</th>
                 </tr>
@@ -625,6 +723,21 @@ export default function OperationsSandbox() {
                     </td>
                     <td className="mono">{item.estimatedAssetAmount} stBTC</td>
                     <td className="mono">{item.minimumAssetAmount} stBTC</td>
+                    <td>
+                      <b>{item.quoteStatus === "consumed" ? "Consumida" : item.quoteStatus === "active" ? "Ativa" : "Expirada"}</b>
+                      <small className="br-table-muted">
+                        {item.quoteExpiresAt
+                          ? new Date(item.quoteExpiresAt).toLocaleTimeString("pt-BR")
+                          : "Sem validade"}
+                      </small>
+                    </td>
+                    <td>
+                      <b>
+                        {approvals.filter(approval => approval.sweepId === item.id).length}/
+                        {item.approvalRequired}
+                      </b>
+                      <small className="br-table-muted">Administradores distintos</small>
+                    </td>
                     <td>{item.network}</td>
                     <td>
                       <span
@@ -656,6 +769,90 @@ export default function OperationsSandbox() {
             multisig, dupla aprovação e reconciliação independente.
           </p>
         </div>
+      </section>
+
+      <section className="br-panel br-reconciliation-card">
+        <div className="br-section-head">
+          <div>
+            <span className="br-eyebrow">CONTROLE DIÁRIO</span>
+            <h2>Reconciliação diária</h2>
+          </div>
+          <div className="br-reconciliation-actions">
+            {!settings?.dailyReconciliationTaskUid ? (
+              <button
+                className="br-small-action"
+                type="button"
+                onClick={() => enableDailyReconciliation.mutate()}
+                disabled={enableDailyReconciliation.isPending}
+              >
+                {enableDailyReconciliation.isPending ? (
+                  <Loader2 className="animate-spin" size={15} />
+                ) : (
+                  <ShieldCheck size={15} />
+                )}
+                Ativar diariamente
+              </button>
+            ) : (
+              <span className="br-ops-state ready">Diária ativada</span>
+            )}
+            <button
+              className="br-outline"
+              type="button"
+              onClick={() => reconcileDaily.mutate({})}
+              disabled={reconcileDaily.isPending}
+            >
+              {reconcileDaily.isPending ? (
+                <Loader2 className="animate-spin" size={15} />
+              ) : (
+                <RefreshCw size={15} />
+              )}
+              Conferir hoje
+            </button>
+          </div>
+        </div>
+        <p className="br-dialog-footnote">
+          Confere lançamentos do dia, aprovações, cotação ativa e os dois lados
+          do ledger do sweep. Uma divergência impede qualquer evolução para
+          produção.
+        </p>
+        {reconciliations.length === 0 ? (
+          <div className="br-ops-empty">Nenhuma reconciliação executada ainda.</div>
+        ) : (
+          <div className="br-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Status</th>
+                  <th>Lançamentos</th>
+                  <th>Sweeps</th>
+                  <th>Divergências</th>
+                  <th>Conferido em</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reconciliations.slice(0, 10).map(item => (
+                  <tr key={item.id}>
+                    <td className="mono">{item.dateKey}</td>
+                    <td>
+                      <span
+                        className={`br-ops-state ${item.status === "balanced" ? "ready" : ""}`}
+                      >
+                        {item.status === "balanced" ? "Sem divergências" : "Atenção"}
+                      </span>
+                    </td>
+                    <td>{item.totalLedgerEntries}</td>
+                    <td>
+                      {item.approvedSweepCount} aprovados · {item.pendingSweepCount} pendentes
+                    </td>
+                    <td>{item.exceptions ? "Revisar" : "—"}</td>
+                    <td>{new Date(item.reconciledAt).toLocaleString("pt-BR")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="br-panel br-table-card">

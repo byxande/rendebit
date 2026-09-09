@@ -9,6 +9,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { registerMercadoPagoWebhook } from "../webhooks/mercadoPago";
+import { runDailyReconciliationHeartbeat } from "../scheduled/dailyReconciliation";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -38,6 +39,7 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerMercadoPagoWebhook(app);
+  app.post("/api/scheduled/daily-reconciliation", runDailyReconciliationHeartbeat);
   // tRPC API
   app.use(
     "/api/trpc",

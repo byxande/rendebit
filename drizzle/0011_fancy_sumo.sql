@@ -1,0 +1,1 @@
+ALTER TABLE `treasury_settings` ADD `dailyReconciliationTaskUid` varchar(65);

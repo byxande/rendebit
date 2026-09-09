@@ -6,6 +6,38 @@ export type ProviderResult<T> = {
 
 export type PurchasePaymentMethod = "pix" | "credit_card";
 
+export interface ProfitConversionQuoteProvider {
+  provider: "sandbox_quote" | "institutional_exchange";
+  quote(input: {
+    sweepId: number;
+    amountBrl: string;
+    destinationAsset: "stBTC";
+    slippageBps: number;
+    idempotencyKey: string;
+  }): Promise<ProviderResult<{
+    amountBrl: string;
+    referenceAssetBrl: string;
+    estimatedAssetAmount: string;
+    minimumAssetAmount: string;
+    expiresAt: string;
+    route: "BRL>BTC>sBTC>stBTC";
+  }>>;
+  execute(input: {
+    sweepId: number;
+    quoteExternalId: string;
+    amountBrl: string;
+    estimatedAssetAmount: string;
+    minimumAssetAmount: string;
+    idempotencyKey: string;
+  }): Promise<ProviderResult<{
+    amountBrl: string;
+    estimatedAssetAmount: string;
+    minimumAssetAmount: string;
+    route: "BRL>BTC>sBTC>stBTC";
+    transactionId: string;
+  }>>;
+}
+
 export interface KycProvider {
   verifyIdentity(input: { userId: number; cpfMasked: string }): Promise<ProviderResult<{ taxStatus: "regular" }>>;
 }

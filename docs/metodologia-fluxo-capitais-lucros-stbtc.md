@@ -8,7 +8,7 @@
 
 A RendeBit passa a tratar o lucro da organização como um fluxo independente do capital de clientes. A nova **conta pessoal de lucros em stBTC** é uma conta contábil e operacional dedicada do administrador ou da organização, registrada como `owner_personal_profit_stbtc`. Ela recebe apenas o lucro distribuível depois do fechamento do período, das reservas e de uma aprovação explícita. Ela nunca recebe depósitos Pix de clientes, posições de clientes, saldo reservado para resgates ou capital que ainda não foi conciliado.
 
-O fluxo é persistido como uma proposta de capital (`profit_capital_sweeps`) e usa a rota conceitual **BRL → BTC → sBTC → stBTC**. O sistema registra valor em reais, cotação de referência, limite mínimo protegido por slippage, carteira pública de destino, rede e trilha idempotente. No ambiente atual, a aprovação produz somente lançamentos de ledger sandbox. Ela não assina nem transmite transações Stacks.
+O fluxo é persistido como uma proposta de capital (`profit_capital_sweeps`) e usa a rota conceitual **BRL → BTC → sBTC → stBTC**. O sistema registra valor em reais, cotação executável sandbox com identificador externo e validade, limite mínimo protegido por slippage, carteira pública de destino, rede e trilha idempotente. No ambiente atual, duas aprovações administrativas distintas produzem somente lançamentos de ledger sandbox. O sistema não assina nem transmite transações Stacks.
 
 ## Princípio de segregação
 
@@ -46,17 +46,19 @@ O fechamento usa lançamentos realizados no período `AAAA-MM`. O cálculo não 
 
 Cada fechamento pode originar uma única proposta, protegida por unicidade do fechamento e chave idempotente. A proposta registra a origem, o destino e as condições de execução antes de qualquer aprovação.
 
-| Campo registrado           | Finalidade de controle                                                             |
-| -------------------------- | ---------------------------------------------------------------------------------- |
-| `sourceAmountBrl`          | Valor máximo originado exclusivamente do lucro distribuível.                       |
-| `referenceAssetBrl`        | Cotação usada para estimar stBTC; no sandbox é uma referência, não uma execução.   |
-| `estimatedAssetAmount`     | Quantidade indicativa de stBTC.                                                    |
-| `minimumAssetAmount`       | Piso calculado após o slippage configurado.                                        |
-| `route`                    | Rota explícita `BRL>BTC>sBTC>stBTC`.                                               |
-| `destinationWalletAddress` | Endereço público da carteira dedicada de lucros.                                   |
-| `network`                  | Rede em que a proposta foi criada. Mainnet continua bloqueada.                     |
-| `blockerReason`            | Motivo legível quando a proposta não pode prosseguir.                              |
-| `transactionId`            | Identificador sandbox; em produção deverá ser o identificador on-chain conciliado. |
+| Campo registrado           | Finalidade de controle                                                              |
+| -------------------------- | ----------------------------------------------------------------------------------- |
+| `sourceAmountBrl`          | Valor máximo originado exclusivamente do lucro distribuível.                        |
+| `referenceAssetBrl`        | Cotação usada para estimar stBTC; no sandbox representa uma RFQ demonstrativa.      |
+| `quoteExternalId`          | Identificador externo da RFQ sandbox; deve mapear a cotação do parceiro contratado. |
+| `quoteExpiresAt`           | Momento de expiração da cotação; a execução é bloqueada após esse prazo.            |
+| `estimatedAssetAmount`     | Quantidade indicativa de stBTC.                                                     |
+| `minimumAssetAmount`       | Piso calculado após o slippage configurado.                                         |
+| `route`                    | Rota explícita `BRL>BTC>sBTC>stBTC`.                                                |
+| `destinationWalletAddress` | Endereço público da carteira dedicada de lucros.                                    |
+| `network`                  | Rede em que a proposta foi criada. Mainnet continua bloqueada.                      |
+| `blockerReason`            | Motivo legível quando a proposta não pode prosseguir.                               |
+| `transactionId`            | Identificador sandbox; em produção deverá ser o identificador on-chain conciliado.  |
 
 A carteira dedicada é configurada separadamente da carteira operacional. O backend rejeita a mesma carteira nos dois campos, pois a conta de lucros precisa permanecer segregada da tesouraria usada em operação. A interface aceita somente endereço público e valida a rede selecionada. Ela não solicita seed phrase, chave privada ou assinatura local.
 
@@ -71,7 +73,13 @@ A proposta tem quatro estados simples. O desenho evita execução automática e 
 | `simulated_sent`   | O ledger registrou a saída do lucro em BRL e a entrada em stBTC da conta dedicada.  | Auditoria e reconciliação; não há broadcast real. |
 | `cancelled`        | Estado reservado para cancelamento auditável futuro.                                | Nenhuma execução.                                 |
 
-A aprovação sandbox cria dois lançamentos correlacionados: débito de `organization_distributable_profit_brl` em BRL e crédito de `owner_personal_profit_stbtc` em stBTC. Ambos compartilham o identificador do sweep e incluem a rota, a carteira pública, o mínimo protegido e o identificador sandbox nos metadados.
+A primeira aprovação persiste em `profit_sweep_approvals` e mantém a proposta pendente. A segunda precisa ser registrada por outro administrador e só é aceita quando a RFQ permanece ativa. A execução sandbox consome a cotação e cria dois lançamentos correlacionados: débito de `organization_distributable_profit_brl` em BRL e crédito de `owner_personal_profit_stbtc` em stBTC. Ambos compartilham o identificador do sweep e incluem a rota, a carteira pública, o mínimo protegido e o identificador sandbox nos metadados.
+
+## Reconciliação diária
+
+A tabela `daily_reconciliations` persiste um registro idempotente por organização e data. A conferência verifica lançamentos do dia, aprovações pendentes, validade da cotação e a presença dos dois lançamentos esperados em sweeps concluídos. O ambiente publicado poderá ativar um heartbeat diário às 03:00 UTC, autenticado pelo identificador persistido em `treasury_settings`.
+
+Esse controle ainda é interno ao ledger sandbox. A reconciliação independente exigida em produção deve confrontar o ledger da RendeBit com extratos bancários, eventos e extratos de custódia do parceiro, além das confirmações on-chain.
 
 ## Limite entre sandbox, testnet e produção
 
@@ -99,7 +107,7 @@ A ativação de uma transferência real para a conta dedicada permanece bloquead
 
 ## Implementação entregue
 
-O backend inclui a tabela `profit_capital_sweeps`, uma carteira pública dedicada `personalProfitWalletAddress`, cálculo determinístico de slippage, rotas administrativas protegidas para propor e aprovar o sweep e lançamentos de ledger correlacionados. O painel operacional apresenta a origem, a rota, o destino, o valor estimado, o mínimo protegido, a rede e os bloqueadores. A verificação ponta a ponta cria um fechamento, propõe o sweep, aprova a simulação e remove os dados temporários.
+O backend inclui as tabelas `profit_capital_sweeps`, `profit_sweep_approvals` e `daily_reconciliations`, uma carteira pública dedicada `personalProfitWalletAddress`, cálculo determinístico de slippage, RFQ sandbox com validade, rotas administrativas protegidas para propor e aprovar o sweep e lançamentos de ledger correlacionados. O painel operacional apresenta a origem, a rota, o destino, o valor estimado, o mínimo protegido, a cotação, o número de aprovações, a rede e os bloqueadores. A verificação ponta a ponta cria um fechamento, propõe o sweep, registra duas aprovações distintas, executa a reconciliação e remove os dados temporários.
 
 ## References
 

@@ -1,4 +1,13 @@
-import type { CustodyProvider, KycProvider, PixProvider, PurchasePaymentProvider, SbtcConversionProvider, YieldProvider } from "./types";
+import { calculateProfitStbtcSweep, SANDBOX_BTC_BRL } from "../finance";
+import type {
+  CustodyProvider,
+  KycProvider,
+  PixProvider,
+  ProfitConversionQuoteProvider,
+  PurchasePaymentProvider,
+  SbtcConversionProvider,
+  YieldProvider,
+} from "./types";
 
 const sandboxId = (prefix: string, stableId: number) => `${prefix}-sandbox-${stableId}`;
 
@@ -71,6 +80,52 @@ export const sandboxCustodyProvider: CustodyProvider = {
       externalId: sandboxId("sell", redemptionId),
       status: "settled",
       payload: { btcAmount, grossBrl },
+    };
+  },
+};
+
+export const sandboxProfitConversionQuoteProvider: ProfitConversionQuoteProvider = {
+  provider: "sandbox_quote",
+  async quote({ sweepId, amountBrl, slippageBps }) {
+    const expiresAt = new Date(Date.now() + 15 * 60_000);
+    const calculation = calculateProfitStbtcSweep({
+      distributableProfitBrl: Number(amountBrl),
+      referenceStbtcBrl: SANDBOX_BTC_BRL,
+      slippageBps,
+    });
+    return {
+      externalId: sandboxId("profit-quote", sweepId),
+      status: "active",
+      payload: {
+        amountBrl,
+        referenceAssetBrl: calculation.referenceAssetBrl.toFixed(2),
+        estimatedAssetAmount: calculation.estimatedAssetAmount.toFixed(8),
+        minimumAssetAmount: calculation.minimumAssetAmount.toFixed(8),
+        expiresAt: expiresAt.toISOString(),
+        route: calculation.route,
+      },
+    };
+  },
+  async execute({
+    sweepId,
+    quoteExternalId,
+    amountBrl,
+    estimatedAssetAmount,
+    minimumAssetAmount,
+  }) {
+    if (!quoteExternalId.startsWith("profit-quote-sandbox-"))
+      throw new Error("Cotação sandbox desconhecida para este sweep.");
+    const transactionId = sandboxId("profit-execution", sweepId);
+    return {
+      externalId: transactionId,
+      status: "settled",
+      payload: {
+        amountBrl,
+        estimatedAssetAmount,
+        minimumAssetAmount,
+        route: "BRL>BTC>sBTC>stBTC",
+        transactionId,
+      },
     };
   },
 };

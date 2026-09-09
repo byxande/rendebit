@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPixReceiptPdf } from "../client/src/pages/BitcoinYield";
+import { createPixReceiptPdf } from "../client/src/lib/pixReceipt";
 
 describe("comprovante Pix demonstrativo", () => {
   it("gera um PDF com valor, status e referências do depósito", async () => {

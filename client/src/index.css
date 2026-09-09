@@ -1667,3 +1667,7 @@ h1 em { color: #caff4a; font-style: normal; }
 @media (prefers-reduced-motion: reduce) {
   .br-business-tab-content, .br-business-tabs button, .br-business-feature { animation: none; transition: none; }
 }
+
+/* Pix brand mark used in deposit actions */
+.br-pix-logo { display: inline-block; width: 30px; height: 14px; object-fit: contain; filter: brightness(0); }
+.br-primary.light .br-pix-logo { width: 32px; height: 15px; }

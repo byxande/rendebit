@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/dialog";
 
 const BtcMarketChart = lazy(() => import("./BtcMarketChart"));
+const PIX_LOGO_SRC = "/manus-storage/pix-logo_757c6551.svg";
 
 type SectionId = "inicio" | "depositar" | "rendimento" | "mercado" | "simulador" | "lotes" | "resgate" | "fiscal" | "reservas" | "empresas" | "ajuda";
 
@@ -251,7 +252,7 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney, onSimulate, btcPriceBrl
             <span className="br-positive">+0,74% em 90 dias</span>
           </div>
           <div className="br-balance-actions">
-            <button type="button" className="br-primary light" onClick={onDeposit}>Colocar reais via Pix <ArrowDownToLine size={17} /></button>
+            <button type="button" className="br-primary light" onClick={onDeposit}><img className="br-pix-logo" src={PIX_LOGO_SRC} alt="" aria-hidden="true" /> Colocar reais via Pix <ArrowDownToLine size={17} /></button>
             <button type="button" className="br-secondary light" onClick={onAddMoney}>Comprar Bitcoin</button>
             <button type="button" className="br-secondary light" onClick={onRedeem}>Receber via Pix</button>
           </div>
@@ -471,7 +472,7 @@ function PixDepositPage({ deposits, availableBrl, amount, setAmount, authenticat
           <div className="br-amount-field"><span>R$</span><input inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} aria-label="Valor do depósito Pix" /></div>
           <div className="br-buy-chips"><button type="button" onClick={() => setAmount("100,00")}>R$ 100</button><button type="button" onClick={() => setAmount("500,00")}>R$ 500</button><button type="button" onClick={() => setAmount("1.000,00")}>R$ 1.000</button></div>
           <div className="br-pix-rules"><span><Check /> Crédito somente após confirmação</span><span><Check /> Cobrança válida por 15 minutos</span><span><Check /> Sem taxa no sandbox</span></div>
-          <button className="br-primary full" type="button" onClick={onCreate} disabled={loading || parseBrl(amount) < 10 || parseBrl(amount) > 1_000_000}><QrCode size={17} /> {loading ? "Gerando…" : "Gerar QR Code Pix"}</button>
+          <button className="br-primary full" type="button" onClick={onCreate} disabled={loading || parseBrl(amount) < 10 || parseBrl(amount) > 1_000_000}><img className="br-pix-logo" src={PIX_LOGO_SRC} alt="" aria-hidden="true" /> {loading ? "Gerando…" : "Gerar QR Code Pix"}</button>
           <p className="br-dialog-footnote"><ShieldCheck size={13} /> Em produção, a titularidade e a assinatura do webhook serão verificadas pelo parceiro Pix.</p>
         </section>
 

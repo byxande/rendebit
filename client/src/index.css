@@ -1671,3 +1671,22 @@ h1 em { color: #caff4a; font-style: normal; }
 /* Pix brand mark used in deposit actions */
 .br-pix-logo { display: inline-block; width: 30px; height: 14px; object-fit: contain; filter: brightness(0); }
 .br-primary.light .br-pix-logo { width: 32px; height: 15px; }
+.br-pix-brand { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 48px; height: 25px; padding: 4px 7px; border: 1px solid #e6c99f; border-radius: 7px; background: #fff7ea; }
+.br-pix-brand img { display: block; width: 42px; height: 15px; object-fit: contain; filter: brightness(0); }
+.br-pix-brand.compact { min-width: 42px; height: 22px; padding: 3px 5px; border-radius: 6px; }
+.br-pix-brand.compact img { width: 34px; height: 12px; }
+.br-pix-pending { display: flex; align-items: center; gap: 9px; margin-top: 12px; padding: 9px 10px; border: 1px solid rgba(247, 147, 26, .38); border-radius: 11px; color: #f4dbc2; background: rgba(247, 147, 26, .10); }
+.br-pix-pending > div { display: grid; min-width: 0; gap: 2px; flex: 1; }
+.br-pix-pending strong { overflow: hidden; color: #ffd28f; font: 600 10px "Space Grotesk", sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.br-pix-pending span { overflow: hidden; color: #cbb7a5; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.br-pix-pending > button { display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid rgba(247, 147, 26, .40); border-radius: 50%; color: #ffc471; background: transparent; cursor: pointer; }
+.br-pix-pending > button:hover { color: #2c1d10; background: var(--br-orange); }
+.br-pix-proof-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #eadfce; color: #8b684b; font: 600 10px "Space Grotesk", sans-serif; }
+.br-pix-proof-bar small { margin-left: auto; color: #b69272; font: 8px "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; }
+.br-pix-history-heading { display: flex; align-items: center; gap: 10px; }
+.br-pix-history-heading > div { display: grid; gap: 2px; }
+@media (max-width: 600px) {
+  .br-pix-pending { align-items: flex-start; }
+  .br-pix-proof-bar small { display: none; }
+  .br-pix-history-heading { align-items: flex-start; }
+}

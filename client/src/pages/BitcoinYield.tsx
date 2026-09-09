@@ -216,6 +216,10 @@ function DemoPill() {
   return <span className="br-demo-pill"><Sparkles size={13} /> Brasil · Ambiente demonstrativo</span>;
 }
 
+function PixBrand({ compact = false }: { compact?: boolean }) {
+  return <span className={`br-pix-brand${compact ? " compact" : ""}`}><img src={PIX_LOGO_SRC} alt="Logo Pix" /></span>;
+}
+
 function BrazilFirstStrip() {
   return (
     <section className="br-brazil-strip">
@@ -230,7 +234,7 @@ function BrazilFirstStrip() {
   );
 }
 
-function YieldSummary({ onRedeem, onDeposit, onAddMoney, onSimulate, btcPriceBrl, quoteSource, quoteTime, quoteStale }: { onRedeem: () => void; onDeposit: () => void; onAddMoney: () => void; onSimulate: () => void; btcPriceBrl: number; quoteSource: string; quoteTime: string | null; quoteStale: boolean }) {
+function YieldSummary({ onRedeem, onDeposit, onAddMoney, onSimulate, btcPriceBrl, quoteSource, quoteTime, quoteStale, pendingPixDeposit }: { onRedeem: () => void; onDeposit: () => void; onAddMoney: () => void; onSimulate: () => void; btcPriceBrl: number; quoteSource: string; quoteTime: string | null; quoteStale: boolean; pendingPixDeposit: { amountBrl: string } | null }) {
   const currentValue = DEMO_BTC_BALANCE * btcPriceBrl;
   const initialValue = currentValue * wealthPattern[0].factor;
   const wealthGain = currentValue - initialValue;
@@ -252,10 +256,11 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney, onSimulate, btcPriceBrl
             <span className="br-positive">+0,74% em 90 dias</span>
           </div>
           <div className="br-balance-actions">
-            <button type="button" className="br-primary light" onClick={onDeposit}><img className="br-pix-logo" src={PIX_LOGO_SRC} alt="" aria-hidden="true" /> Colocar reais via Pix <ArrowDownToLine size={17} /></button>
+            <button type="button" className="br-primary light" onClick={onDeposit} aria-label="Abrir depósito Pix"><img className="br-pix-logo" src={PIX_LOGO_SRC} alt="" aria-hidden="true" /> Pix <ArrowDownToLine size={17} /></button>
             <button type="button" className="br-secondary light" onClick={onAddMoney}>Comprar Bitcoin</button>
             <button type="button" className="br-secondary light" onClick={onRedeem}>Receber via Pix</button>
           </div>
+          {pendingPixDeposit && <div className="br-pix-pending" role="status" aria-live="polite"><PixBrand compact /><div><strong>Pix aguardando pagamento</strong><span>{currency.format(Number(pendingPixDeposit.amountBrl))} · QR Code aberto</span></div><button type="button" onClick={onDeposit} aria-label="Acompanhar Pix aguardando pagamento"><ArrowRight size={15} /></button></div>}
         </div>
 
         <div className="br-yield-card br-panel">
@@ -453,7 +458,7 @@ function PixDepositPage({ deposits, availableBrl, amount, setAmount, authenticat
 
   const statusLabel: Record<PixDepositRecord["status"], string> = {
     created: "Criado",
-    awaiting_payment: "Aguardando Pix",
+    awaiting_payment: "Pix aguardando pagamento",
     paid: "Saldo disponível",
     expired: "Expirado",
     cancelled: "Cancelado",
@@ -478,6 +483,7 @@ function PixDepositPage({ deposits, availableBrl, amount, setAmount, authenticat
 
         <section className="br-panel br-pix-charge">
           {!active ? <div className="br-pix-empty"><QrCode /><h3>Nenhuma cobrança aberta</h3><p>Escolha um valor para gerar um QR Code demonstrativo.</p></div> : <>
+            <div className="br-pix-proof-bar"><PixBrand compact /><span>Comprovante Pix sandbox</span><small>RendeBit</small></div>
             <div className="br-pix-charge-head"><div><span className="br-eyebrow">COBRANÇA ATIVA</span><h2>{currency.format(Number(active.amountBrl))}</h2></div><span className={`br-pix-timer ${secondsLeft === 0 ? "expired" : ""}`}>{secondsLeft > 0 ? `${String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:${String(secondsLeft % 60).padStart(2, "0")}` : "Expirada"}</span></div>
             {qrDataUrl && <img className="br-pix-qr" src={qrDataUrl} alt="QR Code da cobrança Pix sandbox" />}
             <div className="br-pix-code"><span>Pix Copia e Cola</span><code>{active.pixCopyPaste}</code><CopyButton value={active.pixCopyPaste ?? ""} label="Copiar código" /></div>
@@ -487,7 +493,7 @@ function PixDepositPage({ deposits, availableBrl, amount, setAmount, authenticat
         </section>
       </div>
 
-      <section className="br-panel br-table-card br-pix-history"><div className="br-section-head"><div><span className="br-eyebrow">HISTÓRICO PIX</span><h2>Depósitos e conciliação</h2></div><span className="br-help-honesty"><ReceiptText size={15} /> {deposits.length} registros</span></div>{deposits.length === 0 ? <div className="br-ops-empty">Nenhum depósito Pix registrado.</div> : <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Valor</th><th>Status</th><th>Referência</th><th>Confirmação</th></tr></thead><tbody>{deposits.map(item => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString("pt-BR")}</td><td><b>{currency.format(Number(item.amountBrl))}</b></td><td><span className={`br-status ${item.status === "paid" ? "" : "warning"}`}><i /> {item.status === "awaiting_payment" && new Date(item.expiresAt).getTime() <= now ? "Expirado" : statusLabel[item.status]}</span></td><td className="mono">{item.providerReference ?? "—"}</td><td className="mono">{item.endToEndId ?? "—"}</td></tr>)}</tbody></table></div>}</section>
+      <section className="br-panel br-table-card br-pix-history"><div className="br-section-head"><div className="br-pix-history-heading"><PixBrand compact /><div><span className="br-eyebrow">HISTÓRICO PIX</span><h2>Depósitos e conciliação</h2></div></div><span className="br-help-honesty"><ReceiptText size={15} /> {deposits.length} registros</span></div>{deposits.length === 0 ? <div className="br-ops-empty">Nenhum depósito Pix registrado.</div> : <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Valor</th><th>Status Pix</th><th>Referência</th><th>Confirmação</th></tr></thead><tbody>{deposits.map(item => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString("pt-BR")}</td><td><b>{currency.format(Number(item.amountBrl))}</b></td><td><span className={`br-status ${item.status === "paid" ? "" : "warning"}`}><i /> {item.status === "awaiting_payment" && new Date(item.expiresAt).getTime() <= now ? "Expirado" : statusLabel[item.status]}</span></td><td className="mono">{item.providerReference ?? "—"}</td><td className="mono">{item.endToEndId ?? "—"}</td></tr>)}</tbody></table></div>}</section>
     </div>
   );
 }
@@ -546,6 +552,13 @@ export default function BitcoinYield() {
   const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated });
   const redemptionsQuery = trpc.redemptions.summary.useQuery(undefined, { enabled: isAuthenticated });
   const marketQuoteQuery = trpc.market.btcBrl.useQuery(undefined, { staleTime: 55_000, refetchInterval: 60_000, retry: 1 });
+  const [dashboardNow, setDashboardNow] = useState(Date.now());
+  const hasAwaitingPix = Boolean(pixDepositsQuery.data?.deposits.some(item => item.status === "awaiting_payment" && new Date(item.expiresAt).getTime() > dashboardNow));
+  useEffect(() => {
+    if (!hasAwaitingPix) return;
+    const timer = window.setInterval(() => setDashboardNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [hasAwaitingPix]);
   const [section, setSection] = useState<SectionId>(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
     return navItems.some(item => item.id === requested) ? requested as SectionId : "inicio";
@@ -577,6 +590,9 @@ export default function BitcoinYield() {
   const activeLabel = useMemo(() => navItems.find((item) => item.id === section)?.label ?? "Visão geral", [section]);
   const loginProviderLabel = user?.loginMethod?.toLowerCase().includes("apple") ? "Conta Apple" : user?.loginMethod?.toLowerCase().includes("google") ? "Conta Google" : "Conta autenticada";
   const liveBtcBrl = marketQuoteQuery.data?.priceBrl ?? FALLBACK_BTC_BRL;
+  const pendingPixDeposit = isAuthenticated
+    ? pixDepositsQuery.data?.deposits.find(item => item.status === "awaiting_payment" && new Date(item.expiresAt).getTime() > dashboardNow) ?? null
+    : null;
   const marketQuoteTime = marketQuoteQuery.data ? new Date(marketQuoteQuery.data.marketUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null;
   const localPurchaseQuote = useMemo(() => {
     const amountInBrl = parseBrl(addAmount);
@@ -907,7 +923,7 @@ export default function BitcoinYield() {
       <main className="br-main">
         <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={requestLogin}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? loginProviderLabel : "Entrar"} <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN DO JEITO BRASILEIRO</span><h1>Acumule BTC.<br /><em>Receba rendimentos em reais.</em></h1><p>Uma experiência feita exclusivamente para residentes no Brasil. Comece com Pix ou cartão, acompanhe tudo em reais e, quando quiser, peça o resgate via Pix. A referência atual de rendimento é de <b>~3% a.a.</b></p></div><div className="br-trust-row"><span><BadgeCheck /> Exclusiva para residentes no Brasil</span><span><ShieldCheck /> Seu dinheiro separado</span><span><Sparkles /> Simples e em português</span></div></section><BrazilFirstStrip /><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} onSimulate={() => navigate("simulador")} btcPriceBrl={liveBtcBrl} quoteSource={marketQuoteQuery.data?.source ?? "Referência temporária"} quoteTime={marketQuoteTime} quoteStale={marketQuoteQuery.data?.stale ?? true} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Você cuida da sua vida. A RendeBit simplifica o caminho.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Comece em reais</h3><p>Use Pix ou cartão, como você já faz no dia a dia.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe com clareza</h3><p>Veja seu Bitcoin e o rendimento estimado sempre em BRL.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Receba via Pix</h3><p>Confira o valor líquido e mande para sua conta verificada.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN DO JEITO BRASILEIRO</span><h1>Acumule BTC.<br /><em>Receba rendimentos em reais.</em></h1><p>Uma experiência feita exclusivamente para residentes no Brasil. Comece com Pix ou cartão, acompanhe tudo em reais e, quando quiser, peça o resgate via Pix. A referência atual de rendimento é de <b>~3% a.a.</b></p></div><div className="br-trust-row"><span><BadgeCheck /> Exclusiva para residentes no Brasil</span><span><ShieldCheck /> Seu dinheiro separado</span><span><Sparkles /> Simples e em português</span></div></section><BrazilFirstStrip /><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} onSimulate={() => navigate("simulador")} btcPriceBrl={liveBtcBrl} quoteSource={marketQuoteQuery.data?.source ?? "Referência temporária"} quoteTime={marketQuoteTime} quoteStale={marketQuoteQuery.data?.stale ?? true} pendingPixDeposit={pendingPixDeposit} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Você cuida da sua vida. A RendeBit simplifica o caminho.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Comece em reais</h3><p>Use Pix ou cartão, como você já faz no dia a dia.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe com clareza</h3><p>Veja seu Bitcoin e o rendimento estimado sempre em BRL.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Receba via Pix</h3><p>Confira o valor líquido e mande para sua conta verificada.</p></div></div></section></div>}
           {section === "depositar" && <PixDepositPage deposits={(pixDepositsQuery.data?.deposits ?? []) as PixDepositRecord[]} availableBrl={pixDepositsQuery.data?.availableBrl ?? 0} amount={pixDepositAmount} setAmount={setPixDepositAmount} authenticated={isAuthenticated} loading={createPixDepositMutation.isPending || settlePixDepositMutation.isPending || pixDepositsQuery.isLoading} onCreate={() => void createPixDeposit()} onPay={depositId => void settlePixDeposit(depositId)} onLogin={requestLogin} />}
           {section === "rendimento" && <YieldPage btcPriceBrl={liveBtcBrl} />}
           {section === "mercado" && <Suspense fallback={<section className="br-panel btc-chart-loading"><RefreshCw className="spinning" /><b>Abrindo o mercado para você…</b></section>}><BtcMarketChart /></Suspense>}

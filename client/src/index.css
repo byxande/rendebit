@@ -1150,3 +1150,95 @@ h1 em { color: #caff4a; font-style: normal; }
   .br-brazil-icon { width: 40px; height: 40px; }
   .br-brazil-chips { grid-column: auto; padding-left: 0; }
 }
+
+/* Future gains calculator */
+.future-page { --future-positive: #19745a; --future-negative: #b64c3e; }
+.future-hero { background: radial-gradient(circle at 82% 30%, rgba(247,147,26,.20), transparent 18rem), #fffaf2; }
+.future-layout { display: grid; grid-template-columns: minmax(300px, .82fr) minmax(360px, 1.18fr); gap: 18px; align-items: stretch; }
+.future-controls { padding: 23px; display: grid; gap: 18px; }
+.future-panel-title { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.future-panel-title h2 { margin-top: 7px; font: 600 24px/1.05 "Space Grotesk", sans-serif; letter-spacing: -.035em; color: #2a211b; }
+.future-panel-title > svg { color: #cf6e08; }
+.future-controls > label, .future-control-group { display: grid; gap: 8px; color: #6c5b4e; font-size: 11px; font-weight: 700; }
+.future-money-input { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 13px; border: 1px solid #dfd0bd; border-radius: 12px; background: #fffaf3; transition: border-color .18s, box-shadow .18s; }
+.future-money-input:focus-within { border-color: #f7931a; box-shadow: 0 0 0 4px rgba(247,147,26,.09); }
+.future-money-input b { color: #a95a0a; }
+.future-money-input input { width: 100%; border: 0; outline: 0; color: #332820; background: transparent; font-size: 18px; font-weight: 700; }
+.future-option-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 7px; }
+.future-option-row button { min-height: 37px; border: 1px solid #dfd0bd; border-radius: 9px; color: #716052; background: #fffaf2; font-size: 10px; font-weight: 700; transition: .16s var(--ease-out); }
+.future-option-row button:hover { border-color: #e5a14e; color: #9d5207; }
+.future-option-row button:active { transform: scale(.97); }
+.future-option-row button.active { border-color: #ed8c1c; color: #6a3706; background: #ffe8c9; box-shadow: 0 0 0 3px rgba(247,147,26,.08); }
+.future-option-row.compact { width: min(250px,100%); grid-template-columns: repeat(3,1fr); }
+.future-slider-label { display: flex; align-items: center; justify-content: space-between; }
+.future-slider-label b { color: #bd6409; font: 700 17px "Space Grotesk", sans-serif; }
+.future-slider { width: 100%; accent-color: #f7931a; }
+.future-slider-axis { display: flex; justify-content: space-between; color: #9b897a; font: 8px "IBM Plex Mono", monospace; }
+.future-reference { display: flex; align-items: center; gap: 11px; padding: 12px; border-radius: 12px; color: #6d5d50; background: #f7ecde; }
+.future-reference > svg { color: #d3730b; }
+.future-reference div { display: grid; gap: 2px; }
+.future-reference span, .future-reference small { font-size: 9px; }
+.future-reference b { color: #3d3027; font-size: 11px; }
+.future-result-card { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; min-height: 100%; padding: 30px; border-radius: 20px; color: #fff6e8; background: radial-gradient(circle at 92% 12%,rgba(247,147,26,.34),transparent 35%),linear-gradient(140deg,#3b2b20,#211915); box-shadow: 0 20px 48px rgba(58,40,25,.19); }
+.future-result-card::after { content: "₿"; position: absolute; right: 22px; top: 10px; color: rgba(247,147,26,.08); font: 700 160px "Space Grotesk", sans-serif; }
+.future-result-kicker { position: relative; z-index: 1; display: flex; align-items: center; gap: 7px; color: #ffbe68; font: 600 9px "IBM Plex Mono", monospace; letter-spacing: .12em; }
+.future-result-card > strong { position: relative; z-index: 1; margin-top: 17px; font: 600 clamp(42px,5vw,70px)/.95 "Space Grotesk", sans-serif; letter-spacing: -.06em; }
+.future-result-card > p { position: relative; z-index: 1; margin-top: 10px; color: #c8b6a5; font-size: 12px; }
+.future-result-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; margin-top: 25px; overflow: hidden; border: 1px solid rgba(255,255,255,.09); border-radius: 13px; background: rgba(255,255,255,.09); }
+.future-result-grid div { display: grid; gap: 5px; padding: 13px; background: rgba(24,18,15,.76); }
+.future-result-grid span { color: #a99787; font-size: 9px; }
+.future-result-grid b { font-size: 13px; }
+.future-result-grid .positive { color: #8ee1bc; }
+.future-result-grid .negative { color: #ff9d91; }
+.future-result-note { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; margin-top: 15px; color: #b9a897; font-size: 9px; }
+.future-result-note svg { width: 15px; color: #f9a23d; }
+.future-chart-card, .future-scenarios-card { padding: 24px; }
+.future-legend { display: flex; flex-wrap: wrap; gap: 12px; color: #78675b; font-size: 9px; }
+.future-legend span { display: flex; align-items: center; gap: 6px; }
+.future-legend i { width: 17px; height: 2px; background: #aa9b8b; }
+.future-legend i.orange { height: 3px; background: #e47f0b; }
+.future-line-chart { margin-top: 18px; }
+.future-line-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.future-chart-axis { display: flex; justify-content: space-between; color: #998777; font: 8px "IBM Plex Mono", monospace; }
+.future-scenarios-card > .br-section-head > svg { color: #d5760d; }
+.future-scenario-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 11px; margin-top: 18px; }
+.future-scenario-grid article { padding: 17px; border: 1px solid #e2d5c3; border-radius: 14px; background: #fffaf3; }
+.future-scenario-head { display: flex; justify-content: space-between; gap: 8px; color: #7d6d60; font-size: 9px; }
+.future-scenario-head b { color: #a95a0a; }
+.future-scenario-grid article > strong { display: block; margin: 15px 0 11px; color: #2f251e; font: 600 25px "Space Grotesk",sans-serif; letter-spacing: -.04em; }
+.future-scenario-track { height: 6px; margin-bottom: 13px; overflow: hidden; border-radius: 99px; background: #eee3d5; }
+.future-scenario-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#f5aa4f,#e47f0b); }
+.future-scenario-grid p { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; color: #8c7a6b; font-size: 9px; }
+.future-scenario-grid p b { color: #4d3d31; }
+.future-scenario-grid .positive, .future-breakdown .positive { color: var(--future-positive); }
+.future-scenario-grid .negative, .future-breakdown .negative { color: var(--future-negative); }
+.future-breakdown { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 12px; }
+.future-breakdown > svg { color: #cbbba7; }
+.future-breakdown article { min-height: 150px; padding: 18px; }
+.future-breakdown article > svg { color: #d6760d; }
+.future-breakdown span { display: block; margin-top: 12px; color: #806f61; font-size: 9px; }
+.future-breakdown strong { display: block; margin-top: 4px; color: #332820; font: 600 22px "Space Grotesk",sans-serif; }
+.future-breakdown p { margin-top: 10px; color: #8c7a6b; font-size: 9px; line-height: 1.5; }
+.future-assumptions { padding: 0; overflow: hidden; }
+.future-assumptions summary { padding: 16px 18px; color: #69594d; font-size: 10px; font-weight: 800; cursor: pointer; }
+.future-assumptions[open] summary { border-bottom: 1px solid #e5d9c9; }
+.future-assumptions > div { display: grid; gap: 9px; padding: 16px 18px; color: #7e6d60; font-size: 10px; line-height: 1.55; background: #f8f0e5; }
+@media (max-width: 980px) {
+  .future-layout { grid-template-columns: 1fr; }
+  .future-result-card { min-height: 460px; }
+  .future-breakdown { grid-template-columns: 1fr; }
+  .future-breakdown > svg { transform: rotate(90deg); justify-self: center; }
+}
+@media (max-width: 700px) {
+  .future-scenario-grid { grid-template-columns: 1fr; }
+  .future-chart-card, .future-scenarios-card, .future-controls { padding: 17px; }
+  .future-result-card { min-height: 420px; padding: 22px 18px; }
+  .future-result-grid { grid-template-columns: 1fr; }
+  .future-result-card > strong { font-size: 44px; }
+  .future-legend { margin-top: 12px; }
+}
+@media (max-width: 430px) {
+  .future-option-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .future-option-row.compact { grid-template-columns: repeat(3,1fr); }
+  .future-scenario-grid article > strong { font-size: 23px; }
+}

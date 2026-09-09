@@ -1,4 +1,4 @@
-import type { CustodyProvider, KycProvider, PixProvider, PurchasePaymentProvider, YieldProvider } from "./types";
+import type { CustodyProvider, KycProvider, PixProvider, PurchasePaymentProvider, SbtcConversionProvider, YieldProvider } from "./types";
 
 const sandboxId = (prefix: string, stableId: number) => `${prefix}-sandbox-${stableId}`;
 
@@ -75,14 +75,26 @@ export const sandboxCustodyProvider: CustodyProvider = {
   },
 };
 
+export const sandboxSbtcConversionProvider: SbtcConversionProvider = {
+  provider: "sandbox_custody",
+  network: "sandbox",
+  async convertBtcToSbtc({ purchaseId, btcAmount }) {
+    return {
+      externalId: sandboxId("sbtc-conversion", purchaseId),
+      status: "settled",
+      payload: { btcAmount, sbtcAmount: btcAmount, route: "BTC>sBTC", network: "sandbox" },
+    };
+  },
+};
+
 export const sandboxYieldProvider: YieldProvider = {
   provider: "sandbox_stacks",
   network: "sandbox",
-  async activatePosition({ purchaseId, btcAmount }) {
+  async activatePosition({ purchaseId, sbtcAmount }) {
     return {
       externalId: sandboxId("stacks", purchaseId),
       status: "active",
-      payload: { btcAmount, route: "BTC>sBTC>stBTC" },
+      payload: { btcAmount: sbtcAmount, sbtcAmount, route: "BTC>sBTC>stBTC", network: "sandbox" },
     };
   },
   async exitPosition({ redemptionId, btcAmount }) {

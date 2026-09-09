@@ -13,7 +13,7 @@ import {
 } from "@stacks/transactions";
 import { c32addressDecode, versions } from "c32check";
 import { getProviderEventByIdempotencyKey, recordProviderEvent } from "../db";
-import type { YieldProvider } from "./types";
+import type { SbtcConversionProvider, YieldProvider } from "./types";
 
 export const OFFICIAL_SBTC_TESTNET_CONTRACT = "SN3VMHXEN64ZZF71JQ5VESXDWTR301XTTXGF4J8F1.sbtc-token";
 const DEFAULT_TESTNET_API = "https://api.testnet.hiro.so";
@@ -222,6 +222,22 @@ export async function buildStbtcDepositTransaction(input: {
   });
 }
 
+export function createStacksTestnetSbtcConversionProvider(env: NodeJS.ProcessEnv = process.env): SbtcConversionProvider {
+  const blocker = "Conversão BTC → sBTC testnet ainda não está configurada; o backend requer um bridge/issuer verificável antes de movimentar valores.";
+  return {
+    provider: "stacks_testnet",
+    network: "testnet",
+    async preflight() {
+      const config = loadStacksTestnetConfig(env);
+      if (config.mode !== "testnet") throw new Error("O modo testnet precisa ser ativado para usar a conversão BTC → sBTC.");
+      throw new Error(blocker);
+    },
+    async convertBtcToSbtc() {
+      throw new Error(blocker);
+    },
+  };
+}
+
 export function createStacksTestnetYieldProvider(env: NodeJS.ProcessEnv = process.env): YieldProvider {
   return {
     provider: "stacks_testnet",
@@ -231,7 +247,7 @@ export function createStacksTestnetYieldProvider(env: NodeJS.ProcessEnv = proces
       if (!status.ready) throw new Error(status.blocker || status.error || "Integração Stacks testnet indisponível.");
     },
 
-    async activatePosition({ btcAmount, idempotencyKey }) {
+    async activatePosition({ sbtcAmount, idempotencyKey }) {
       const config = loadStacksTestnetConfig(env);
       if (config.mode !== "testnet" || !config.signerPrivateKey || !config.stbtcCoreContract || !config.stbtcDataContract) {
         throw new Error("Integração stBTC testnet não está totalmente configurada.");
@@ -254,7 +270,7 @@ export function createStacksTestnetYieldProvider(env: NodeJS.ProcessEnv = proces
         ratio = BigInt(payload.ratio);
       } else {
         const senderAddress = getAddressFromPrivateKey(config.signerPrivateKey, "testnet");
-        amountSats = btcStringToSats(btcAmount);
+        amountSats = btcStringToSats(sbtcAmount);
         if (amountSats <= BigInt(0)) throw new Error("A posição precisa ser maior que zero.");
 
         const sbtcBalance = await readContractUint(config.sbtcContract, "get-balance-available", senderAddress, [principalCV(senderAddress)]);
@@ -295,7 +311,8 @@ export function createStacksTestnetYieldProvider(env: NodeJS.ProcessEnv = proces
         externalId: txid,
         status: "active",
         payload: {
-          btcAmount,
+          btcAmount: sbtcAmount,
+          sbtcAmount,
           route: "BTC>sBTC>stBTC",
           network: "testnet",
           txid,

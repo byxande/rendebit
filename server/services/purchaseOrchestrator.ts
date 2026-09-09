@@ -9,9 +9,9 @@ import {
 } from "../db";
 import { ENV } from "../_core/env";
 import { createMercadoPagoPaymentProvider } from "../providers/mercadoPago";
-import { sandboxCustodyProvider, sandboxPurchasePaymentProvider, sandboxYieldProvider } from "../providers/sandbox";
-import { createStacksTestnetYieldProvider } from "../providers/stacksTestnet";
-import type { CustodyProvider, PurchasePaymentMethod, PurchasePaymentProvider, YieldProvider } from "../providers/types";
+import { sandboxCustodyProvider, sandboxPurchasePaymentProvider, sandboxSbtcConversionProvider, sandboxYieldProvider } from "../providers/sandbox";
+import { createStacksTestnetSbtcConversionProvider, createStacksTestnetYieldProvider } from "../providers/stacksTestnet";
+import type { CustodyProvider, PurchasePaymentMethod, PurchasePaymentProvider, SbtcConversionProvider, YieldProvider } from "../providers/types";
 
 type WorkflowInput = {
   userId: number;
@@ -25,6 +25,7 @@ type WorkflowInput = {
 type WorkflowDependencies = {
   payment: PurchasePaymentProvider;
   custody: CustodyProvider;
+  sbtcConversion: SbtcConversionProvider;
   yieldProvider: YieldProvider;
   startPurchase: typeof startSandboxPurchase;
   attachPayment: typeof attachPurchasePayment;
@@ -38,6 +39,9 @@ type WorkflowDependencies = {
 const defaultYieldProvider = process.env.STACKS_YIELD_MODE === "testnet"
   ? createStacksTestnetYieldProvider()
   : sandboxYieldProvider;
+const defaultSbtcConversionProvider = process.env.STACKS_YIELD_MODE === "testnet"
+  ? createStacksTestnetSbtcConversionProvider()
+  : sandboxSbtcConversionProvider;
 
 const defaultPaymentProvider = ENV.paymentsProvider === "mercado_pago"
   ? createMercadoPagoPaymentProvider()
@@ -46,6 +50,7 @@ const defaultPaymentProvider = ENV.paymentsProvider === "mercado_pago"
 const defaultDependencies: WorkflowDependencies = {
   payment: defaultPaymentProvider,
   custody: sandboxCustodyProvider,
+  sbtcConversion: defaultSbtcConversionProvider,
   yieldProvider: defaultYieldProvider,
   startPurchase: startSandboxPurchase,
   attachPayment: attachPurchasePayment,
@@ -66,6 +71,11 @@ async function activateApprovedPurchase(
     throw new Error("O pagamento ainda não foi aprovado e conciliado.");
   }
   try {
+    await dependencies.sbtcConversion.preflight?.({
+      purchaseId: purchase.id,
+      btcAmount: purchase.btcAmount,
+      idempotencyKey: `${idempotencyKey}:sbtc-preflight`,
+    });
     await dependencies.yieldProvider.preflight?.({
       purchaseId: purchase.id,
       btcAmount: purchase.btcAmount,
@@ -85,9 +95,22 @@ async function activateApprovedPurchase(
       payload: { purchaseId: purchase.id, ...custody.payload, result: custody.status, paymentProvider: purchase.paymentProvider },
     });
 
+    const conversion = await dependencies.sbtcConversion.convertBtcToSbtc({
+      purchaseId: purchase.id,
+      btcAmount: custody.payload.btcAmount,
+      idempotencyKey: `${idempotencyKey}:sbtc-conversion`,
+    });
+    await dependencies.recordEvent({
+      provider: dependencies.sbtcConversion.provider,
+      eventType: "sbtc.conversion.completed",
+      externalId: conversion.externalId,
+      idempotencyKey: `${idempotencyKey}:sbtc-event`,
+      payload: { purchaseId: purchase.id, ...conversion.payload, result: conversion.status, mode: dependencies.sbtcConversion.network },
+    });
+
     const yieldPosition = await dependencies.yieldProvider.activatePosition({
       purchaseId: purchase.id,
-      btcAmount: purchase.btcAmount,
+      sbtcAmount: conversion.payload.sbtcAmount,
       idempotencyKey: `${idempotencyKey}:yield`,
     });
     await dependencies.recordEvent({
@@ -119,6 +142,11 @@ export async function confirmPurchaseWorkflow(input: WorkflowInput, dependencies
   }
   if (purchase.status !== "awaiting_payment") throw new Error("A compra já foi encerrada e precisa de reconciliação manual.");
 
+  await dependencies.sbtcConversion.preflight?.({
+    purchaseId: purchase.id,
+    btcAmount: purchase.btcAmount,
+    idempotencyKey: `${input.idempotencyKey}:sbtc-preflight`,
+  });
   await dependencies.yieldProvider.preflight?.({
     purchaseId: purchase.id,
     btcAmount: purchase.btcAmount,

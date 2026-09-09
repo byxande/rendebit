@@ -50,11 +50,17 @@ function dependencies(paymentStatus: "approved" | "pending" = "approved") {
         }),
       },
       custody: { buyBitcoin: vi.fn(async () => { calls.push("custody"); return { externalId: "custody-42", status: "settled", payload: { btcAmount: "0.00247144" } } as const; }) },
+      sbtcConversion: {
+        provider: "sandbox_custody" as const,
+        network: "sandbox" as const,
+        preflight: vi.fn(async () => { calls.push("sbtc-preflight"); }),
+        convertBtcToSbtc: vi.fn(async () => { calls.push("sbtc-conversion"); return { externalId: "sbtc-42", status: "settled", payload: { btcAmount: "0.00247144", sbtcAmount: "0.00247144", route: "BTC>sBTC" as const, network: "sandbox" as const } }; }),
+      },
       yieldProvider: {
         provider: "sandbox_stacks" as const,
         network: "sandbox" as const,
         preflight: vi.fn(async () => { calls.push("preflight"); }),
-        activatePosition: vi.fn(async () => { calls.push("yield"); return { externalId: "stacks-42", status: "active", payload: { btcAmount: "0.00247144", route: "BTC>sBTC>stBTC" } } as const; }),
+        activatePosition: vi.fn(async () => { calls.push("yield"); return { externalId: "stacks-42", status: "active", payload: { btcAmount: "0.00247144", sbtcAmount: "0.00247144", route: "BTC>sBTC>stBTC" } } as const; }),
       },
     },
   };
@@ -65,7 +71,9 @@ describe("confirmPurchaseWorkflow", () => {
     const { deps, calls } = dependencies("approved");
     const result = await confirmPurchaseWorkflow(workflowInput, deps as never);
     expect(result.status).toBe("settled");
-    expect(calls).toEqual(["preflight", "payment", "event:sandbox_payments", "preflight", "custody", "event:sandbox_custody", "yield", "event:sandbox_stacks"]);
+    expect(calls).toEqual(["sbtc-preflight", "preflight", "payment", "event:sandbox_payments", "sbtc-preflight", "preflight", "custody", "event:sandbox_custody", "sbtc-conversion", "event:sandbox_custody", "yield", "event:sandbox_stacks"]);
+    expect(deps.sbtcConversion.convertBtcToSbtc).toHaveBeenCalledWith(expect.objectContaining({ btcAmount: "0.00247144" }));
+    expect(deps.yieldProvider.activatePosition).toHaveBeenCalledWith(expect.objectContaining({ sbtcAmount: "0.00247144" }));
     expect(deps.settlePurchase).toHaveBeenCalledOnce();
   });
 
@@ -76,6 +84,15 @@ describe("confirmPurchaseWorkflow", () => {
     expect(result.checkoutUrl).toBe("https://checkout.example");
     expect(deps.custody.buyBitcoin).not.toHaveBeenCalled();
     expect(deps.yieldProvider.activatePosition).not.toHaveBeenCalled();
+  });
+
+  it("não ativa rendimento quando a conversão BTC para sBTC falha", async () => {
+    const { deps } = dependencies("approved");
+    deps.sbtcConversion.convertBtcToSbtc.mockRejectedValueOnce(new Error("Conversão BTC para sBTC indisponível") as never);
+    await expect(confirmPurchaseWorkflow(workflowInput, deps as never)).rejects.toThrow("Conversão BTC para sBTC indisponível");
+    expect(deps.custody.buyBitcoin).toHaveBeenCalledOnce();
+    expect(deps.yieldProvider.activatePosition).not.toHaveBeenCalled();
+    expect(deps.failPurchase).toHaveBeenCalledOnce();
   });
 
   it("não cria checkout quando o preflight dos contratos falha", async () => {

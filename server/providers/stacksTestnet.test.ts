@@ -5,6 +5,7 @@ import {
   btcStringToSats,
   buildStbtcDepositTransaction,
   calculateMinSharesOut,
+  createStacksTestnetSbtcConversionProvider,
   getStacksTestnetStatus,
   loadStacksTestnetConfig,
 } from "./stacksTestnet";
@@ -57,4 +58,9 @@ describe("Stacks testnet yield provider", () => {
     expect(status.contracts?.stbtcCore.configured).toBe(false);
     expect(status.blocker).toContain("deployment stBTC testnet");
   }, 30_000);
+
+  it("bloqueia BTC → sBTC quando o bridge testnet ainda não foi configurado", async () => {
+    const provider = createStacksTestnetSbtcConversionProvider({ STACKS_YIELD_MODE: "testnet" });
+    await expect(provider.preflight?.({ purchaseId: 42, btcAmount: "0.00100000", idempotencyKey: "sbtc-preflight-42" })).rejects.toThrow("bridge/issuer verificável");
+  });
 });

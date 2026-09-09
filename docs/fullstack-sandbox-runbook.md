@@ -6,7 +6,7 @@ O projeto foi migrado de uma demonstração puramente frontend para uma aplicaç
 
 A jornada persiste o perfil com dados mascarados, simula a aprovação de KYC, cria uma cotação com validade e chave idempotente, registra a compra, produz lançamentos de ledger e salva eventos separados para Pix, custódia e ativação da estratégia. Os adaptadores de sandbox implementam contratos substituíveis por provedores reais.
 
-A confirmação agora é orquestrada em sequência: **Pix liquidado → BTC adquirido pelo custodiante → estratégia Stacks ativada → ledger e compra liquidados**. Se qualquer provedor falhar, a compra é marcada como falha e não aparece como posição ativa. Cada chamada de provedor recebe uma chave idempotente própria.
+A confirmação agora é orquestrada em sequência: **Pix/checkout aprovado → BTC adquirido pelo custodiante → BTC convertido em sBTC → estratégia Stacks ativada → ledger e compra liquidados**. A conversão é um estágio próprio, com preflight, evento e chave idempotente; no sandbox ela é simulada 1:1, enquanto no testnet permanece bloqueada até existir um bridge/issuer verificável. Se qualquer provedor falhar, a compra é marcada como falha e não aparece como posição ativa.
 
 A Xverse foi classificada como integração opcional de autocustódia. Sua API pode apoiar dados, RPC, portfólio, swaps e transmissão de transações Bitcoin já assinadas; o Sats Connect pode solicitar assinatura Stacks, mas exige aprovação visível do usuário. Ela não é tratada como custodiante nem como assinador server-side para o fluxo automático da RendeBit.
 

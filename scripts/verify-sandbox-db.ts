@@ -125,6 +125,7 @@ try {
     pixProviderEvents: (await db.select().from(providerEvents).where(like(providerEvents.idempotencyKey, `pix-deposit-${firstDeposit.id}:%`))).length,
     quotes: (await db.select().from(purchaseQuotes).where(eq(purchaseQuotes.userId, userId))).length,
     purchases: (await db.select().from(purchases).where(eq(purchases.userId, userId))).length,
+    sbtcConversionEvents: (await db.select().from(providerEvents).where(like(providerEvents.eventType, "sbtc.conversion.completed"))).filter(item => item.idempotencyKey.includes(suffix)).length,
     redemptionQuotes: (await db.select().from(redemptionQuotes).where(eq(redemptionQuotes.userId, userId))).length,
     redemptions: (await db.select().from(redemptions).where(eq(redemptions.userId, userId))).length,
     ledgerEntries: (await db.select().from(ledgerEntries).where(eq(ledgerEntries.userId, userId))).length,
@@ -132,6 +133,7 @@ try {
     closings: (await db.select().from(profitDistributions).where(eq(profitDistributions.ownerUserId, userId))).length,
   };
   if (counts.pixProviderEvents !== 2) throw new Error("Trilha de eventos Pix incompleta.");
+  if (counts.sbtcConversionEvents !== 1) throw new Error("Evento de conversão BTC → sBTC ausente.");
   console.log(JSON.stringify({ ok: true, counts, status: firstClosing?.status }, null, 2));
 } finally {
   if (userId !== null) {

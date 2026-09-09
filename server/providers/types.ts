@@ -39,12 +39,26 @@ export interface CustodyProvider {
   sellBitcoin(input: { redemptionId: number; btcAmount: string; grossBrl: string; idempotencyKey: string }): Promise<ProviderResult<{ btcAmount: string; grossBrl: string }>>;
 }
 
+export interface SbtcConversionProvider {
+  provider: "sandbox_custody" | "stacks_testnet";
+  network: "sandbox" | "testnet";
+  preflight?(input: { purchaseId: number; btcAmount: string; idempotencyKey: string }): Promise<void>;
+  convertBtcToSbtc(input: { purchaseId: number; btcAmount: string; idempotencyKey: string }): Promise<ProviderResult<{
+    btcAmount: string;
+    sbtcAmount: string;
+    route: "BTC>sBTC";
+    network?: "sandbox" | "testnet";
+    txid?: string;
+  }>>;
+}
+
 export interface YieldProvider {
   provider: "sandbox_stacks" | "stacks_testnet";
   network: "sandbox" | "testnet";
   preflight?(input: { purchaseId: number; btcAmount: string; idempotencyKey: string }): Promise<void>;
-  activatePosition(input: { purchaseId: number; btcAmount: string; idempotencyKey: string }): Promise<ProviderResult<{
+  activatePosition(input: { purchaseId: number; sbtcAmount: string; idempotencyKey: string }): Promise<ProviderResult<{
     btcAmount: string;
+    sbtcAmount: string;
     route: "BTC>sBTC>stBTC";
     network?: "sandbox" | "testnet";
     txid?: string;

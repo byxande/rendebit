@@ -6,6 +6,7 @@ import {
   InsertUser,
   ledgerEntries,
   pixDeposits,
+  profitCapitalSweeps,
   profitDistributions,
   providerEvents,
   purchaseQuotes,
@@ -18,6 +19,7 @@ import {
 import { ENV } from "./_core/env";
 import {
   calculateDistributableProfit,
+  calculateProfitStbtcSweep,
   estimateDistributionAsset,
   isValidStacksAddress,
 } from "./finance";
@@ -69,13 +71,18 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
 
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db
+    .insert(users)
+    .values(values)
+    .onDuplicateKeyUpdate({ set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  return (await db.select().from(users).where(eq(users.openId, openId)).limit(1))[0];
+  return (
+    await db.select().from(users).where(eq(users.openId, openId)).limit(1)
+  )[0];
 }
 
 export async function recordAuthEvent(input: {
@@ -90,7 +97,15 @@ export async function recordAuthEvent(input: {
 
 export async function getCustomerProfile(userId: number) {
   const db = await requireDb();
-  return (await db.select().from(customerProfiles).where(eq(customerProfiles.userId, userId)).limit(1))[0] ?? null;
+  return (
+    (
+      await db
+        .select()
+        .from(customerProfiles)
+        .where(eq(customerProfiles.userId, userId))
+        .limit(1)
+    )[0] ?? null
+  );
 }
 
 export async function upsertSandboxProfile(input: {
@@ -102,99 +117,209 @@ export async function upsertSandboxProfile(input: {
   pixOwnershipConfirmed: boolean;
 }) {
   const db = await requireDb();
-  await db.insert(customerProfiles).values({
+  await db
+    .insert(customerProfiles)
+    .values({
     ...input,
     country: "BR",
     verificationStatus: "pending",
-  }).onDuplicateKeyUpdate({ set: {
+    })
+    .onDuplicateKeyUpdate({
+      set: {
     legalName: input.legalName,
     cpfMasked: input.cpfMasked,
     pixBank: input.pixBank,
     pixAccountMasked: input.pixAccountMasked,
     pixOwnershipConfirmed: input.pixOwnershipConfirmed,
-  } });
+      },
+    });
   return getCustomerProfile(input.userId);
 }
 
-export async function verifySandboxProfile(userId: number, providerReference: string) {
+export async function verifySandboxProfile(
+  userId: number,
+  providerReference: string
+) {
   const db = await requireDb();
-  await db.update(customerProfiles).set({
+  await db
+    .update(customerProfiles)
+    .set({
     verificationStatus: "verified",
     providerReference,
     verifiedAt: new Date(),
-  }).where(eq(customerProfiles.userId, userId));
+    })
+    .where(eq(customerProfiles.userId, userId));
   return getCustomerProfile(userId);
 }
 
 export async function recordProviderEvent(input: {
-  provider: "sandbox_kyc" | "sandbox_pix" | "sandbox_payments" | "mercado_pago" | "sandbox_custody" | "sandbox_stacks" | "stacks_testnet";
+  provider:
+    | "sandbox_kyc"
+    | "sandbox_pix"
+    | "sandbox_payments"
+    | "mercado_pago"
+    | "sandbox_custody"
+    | "sandbox_stacks"
+    | "stacks_testnet";
   eventType: string;
   externalId: string;
   payload: unknown;
   idempotencyKey: string;
 }) {
   const db = await requireDb();
-  const existing = (await db.select().from(providerEvents).where(eq(providerEvents.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+  const existing = (
+    await db
+      .select()
+      .from(providerEvents)
+      .where(eq(providerEvents.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
   if (existing) return existing;
-  await db.insert(providerEvents).values({
+  await db
+    .insert(providerEvents)
+    .values({
     ...input,
     signatureVerified: true,
     status: "processed",
     payload: JSON.stringify(input.payload),
     processedAt: new Date(),
-  }).onDuplicateKeyUpdate({
+    })
+    .onDuplicateKeyUpdate({
     set: { idempotencyKey: input.idempotencyKey },
   });
-  return (await db.select().from(providerEvents).where(eq(providerEvents.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(providerEvents)
+      .where(eq(providerEvents.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
 }
 
 export async function getProviderEventByIdempotencyKey(idempotencyKey: string) {
   const db = await requireDb();
-  return (await db.select().from(providerEvents).where(eq(providerEvents.idempotencyKey, idempotencyKey)).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(providerEvents)
+      .where(eq(providerEvents.idempotencyKey, idempotencyKey))
+      .limit(1)
+  )[0];
 }
 
-export async function startPixDeposit(input: { userId: number; amountBrl: number; idempotencyKey: string; expiresAt: Date }) {
+export async function startPixDeposit(input: {
+  userId: number;
+  amountBrl: number;
+  idempotencyKey: string;
+  expiresAt: Date;
+}) {
   const db = await requireDb();
-  const existing = (await db.select().from(pixDeposits).where(eq(pixDeposits.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+  const existing = (
+    await db
+      .select()
+      .from(pixDeposits)
+      .where(eq(pixDeposits.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
   if (existing) {
-    if (existing.userId !== input.userId) throw new Error("Chave idempotente já pertence a outro usuário.");
+    if (existing.userId !== input.userId)
+      throw new Error("Chave idempotente já pertence a outro usuário.");
     return existing;
   }
   const profile = await getCustomerProfile(input.userId);
-  if (!profile || profile.verificationStatus !== "verified") throw new Error("Conclua a verificação sandbox antes de depositar via Pix.");
+  if (!profile || profile.verificationStatus !== "verified")
+    throw new Error(
+      "Conclua a verificação sandbox antes de depositar via Pix."
+    );
   await db.insert(pixDeposits).values({
     userId: input.userId,
     amountBrl: input.amountBrl.toFixed(2),
     idempotencyKey: input.idempotencyKey,
     expiresAt: input.expiresAt,
   });
-  return (await db.select().from(pixDeposits).where(eq(pixDeposits.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(pixDeposits)
+      .where(eq(pixDeposits.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
 }
 
-export async function attachPixDepositCharge(input: { userId: number; depositId: number; providerReference: string; pixCopyPaste: string; qrCodeText: string }) {
+export async function attachPixDepositCharge(input: {
+  userId: number;
+  depositId: number;
+  providerReference: string;
+  pixCopyPaste: string;
+  qrCodeText: string;
+}) {
   const db = await requireDb();
-  await db.update(pixDeposits).set({
+  await db
+    .update(pixDeposits)
+    .set({
     providerReference: input.providerReference,
     pixCopyPaste: input.pixCopyPaste,
     qrCodeText: input.qrCodeText,
     status: "awaiting_payment",
-  }).where(and(eq(pixDeposits.id, input.depositId), eq(pixDeposits.userId, input.userId), eq(pixDeposits.status, "created")));
-  return (await db.select().from(pixDeposits).where(and(eq(pixDeposits.id, input.depositId), eq(pixDeposits.userId, input.userId))).limit(1))[0];
+    })
+    .where(
+      and(
+        eq(pixDeposits.id, input.depositId),
+        eq(pixDeposits.userId, input.userId),
+        eq(pixDeposits.status, "created")
+      )
+    );
+  return (
+    await db
+      .select()
+      .from(pixDeposits)
+      .where(
+        and(
+          eq(pixDeposits.id, input.depositId),
+          eq(pixDeposits.userId, input.userId)
+        )
+      )
+      .limit(1)
+  )[0];
 }
 
-export async function settlePixDeposit(input: { userId: number; depositId: number; endToEndId: string; idempotencyKey: string }) {
+export async function settlePixDeposit(input: {
+  userId: number;
+  depositId: number;
+  endToEndId: string;
+  idempotencyKey: string;
+}) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    await tx.execute(sql`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`);
-    const deposit = (await tx.select().from(pixDeposits).where(and(eq(pixDeposits.id, input.depositId), eq(pixDeposits.userId, input.userId))).limit(1))[0];
+    await tx.execute(
+      sql`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`
+    );
+    const deposit = (
+      await tx
+        .select()
+        .from(pixDeposits)
+        .where(
+          and(
+            eq(pixDeposits.id, input.depositId),
+            eq(pixDeposits.userId, input.userId)
+          )
+        )
+        .limit(1)
+    )[0];
     if (!deposit) throw new Error("Depósito Pix não encontrado.");
     if (deposit.status === "paid") return deposit;
-    if (deposit.status !== "awaiting_payment") throw new Error("Depósito Pix não pode ser liquidado no estado atual.");
+    if (deposit.status !== "awaiting_payment")
+      throw new Error("Depósito Pix não pode ser liquidado no estado atual.");
     if (deposit.expiresAt.getTime() <= Date.now()) {
-      await tx.update(pixDeposits).set({ status: "expired" }).where(eq(pixDeposits.id, deposit.id));
+      await tx
+        .update(pixDeposits)
+        .set({ status: "expired" })
+        .where(eq(pixDeposits.id, deposit.id));
       throw new Error("A cobrança Pix expirou. Gere um novo QR Code.");
     }
-    await tx.insert(ledgerEntries).values({
+    await tx
+      .insert(ledgerEntries)
+      .values({
       userId: input.userId,
       pixDepositId: deposit.id,
       entryType: "pix_deposit",
@@ -203,21 +328,50 @@ export async function settlePixDeposit(input: { userId: number; depositId: numbe
       currency: "BRL",
       amount: deposit.amountBrl,
       idempotencyKey: `${input.idempotencyKey}:brl-credit`,
-      metadata: JSON.stringify({ endToEndId: input.endToEndId, mode: "sandbox" }),
-    }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.idempotencyKey}:brl-credit` } });
-    await tx.update(pixDeposits).set({ status: "paid", endToEndId: input.endToEndId, paidAt: new Date() }).where(eq(pixDeposits.id, deposit.id));
-    return (await tx.select().from(pixDeposits).where(eq(pixDeposits.id, deposit.id)).limit(1))[0];
+        metadata: JSON.stringify({
+          endToEndId: input.endToEndId,
+          mode: "sandbox",
+        }),
+      })
+      .onDuplicateKeyUpdate({
+        set: { idempotencyKey: `${input.idempotencyKey}:brl-credit` },
+      });
+    await tx
+      .update(pixDeposits)
+      .set({ status: "paid", endToEndId: input.endToEndId, paidAt: new Date() })
+      .where(eq(pixDeposits.id, deposit.id));
+    return (
+      await tx
+        .select()
+        .from(pixDeposits)
+        .where(eq(pixDeposits.id, deposit.id))
+        .limit(1)
+    )[0];
   });
 }
 
 export async function listPixDeposits(userId: number) {
   const db = await requireDb();
-  return db.select().from(pixDeposits).where(eq(pixDeposits.userId, userId)).orderBy(desc(pixDeposits.createdAt));
+  return db
+    .select()
+    .from(pixDeposits)
+    .where(eq(pixDeposits.userId, userId))
+    .orderBy(desc(pixDeposits.createdAt));
 }
 
 export async function getPixDeposit(userId: number, depositId: number) {
   const db = await requireDb();
-  return (await db.select().from(pixDeposits).where(and(eq(pixDeposits.id, depositId), eq(pixDeposits.userId, userId))).limit(1))[0] ?? null;
+  return (
+    (
+      await db
+        .select()
+        .from(pixDeposits)
+        .where(
+          and(eq(pixDeposits.id, depositId), eq(pixDeposits.userId, userId))
+        )
+        .limit(1)
+    )[0] ?? null
+  );
 }
 
 export async function listOperationalPixDeposits() {
@@ -227,7 +381,9 @@ export async function listOperationalPixDeposits() {
 
 export async function getAvailableBrlBalance(userId: number) {
   const deposits = await listPixDeposits(userId);
-  return deposits.filter(item => item.status === "paid").reduce((sum, item) => sum + Number(item.amountBrl), 0);
+  return deposits
+    .filter(item => item.status === "paid")
+    .reduce((sum, item) => sum + Number(item.amountBrl), 0);
 }
 
 export async function createPurchaseQuote(input: {
@@ -244,7 +400,13 @@ export async function createPurchaseQuote(input: {
   expiresAt: Date;
 }) {
   const db = await requireDb();
-  const existing = (await db.select().from(purchaseQuotes).where(eq(purchaseQuotes.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+  const existing = (
+    await db
+      .select()
+      .from(purchaseQuotes)
+      .where(eq(purchaseQuotes.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
   if (existing) return existing;
 
   await db.insert(purchaseQuotes).values({
@@ -258,7 +420,13 @@ export async function createPurchaseQuote(input: {
     idempotencyKey: input.idempotencyKey,
     expiresAt: input.expiresAt,
   });
-  return (await db.select().from(purchaseQuotes).where(eq(purchaseQuotes.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(purchaseQuotes)
+      .where(eq(purchaseQuotes.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
 }
 
 export async function startSandboxPurchase(input: {
@@ -269,12 +437,30 @@ export async function startSandboxPurchase(input: {
   paymentProvider: "sandbox" | "mercado_pago";
 }) {
   const db = await requireDb();
-  const existing = (await db.select().from(purchases).where(eq(purchases.externalReference, input.idempotencyKey)).limit(1))[0];
+  const existing = (
+    await db
+      .select()
+      .from(purchases)
+      .where(eq(purchases.externalReference, input.idempotencyKey))
+      .limit(1)
+  )[0];
   if (existing) return existing;
 
-  const quote = (await db.select().from(purchaseQuotes).where(and(eq(purchaseQuotes.id, input.quoteId), eq(purchaseQuotes.userId, input.userId))).limit(1))[0];
+  const quote = (
+    await db
+      .select()
+      .from(purchaseQuotes)
+      .where(
+        and(
+          eq(purchaseQuotes.id, input.quoteId),
+          eq(purchaseQuotes.userId, input.userId)
+        )
+      )
+      .limit(1)
+  )[0];
   if (!quote) throw new Error("Cotação não encontrada.");
-  if (quote.status !== "active" || quote.expiresAt.getTime() <= Date.now()) throw new Error("Cotação expirada. Gere uma nova cotação.");
+  if (quote.status !== "active" || quote.expiresAt.getTime() <= Date.now())
+    throw new Error("Cotação expirada. Gere uma nova cotação.");
 
   return db.transaction(async tx => {
     await tx.insert(purchases).values({
@@ -291,10 +477,19 @@ export async function startSandboxPurchase(input: {
       status: "awaiting_payment",
       yieldStatus: "pending",
     });
-    const purchase = (await tx.select().from(purchases).where(eq(purchases.externalReference, input.idempotencyKey)).limit(1))[0];
+    const purchase = (
+      await tx
+        .select()
+        .from(purchases)
+        .where(eq(purchases.externalReference, input.idempotencyKey))
+        .limit(1)
+    )[0];
     if (!purchase) throw new Error("Falha ao registrar a compra.");
 
-    await tx.update(purchaseQuotes).set({ status: "confirmed" }).where(eq(purchaseQuotes.id, quote.id));
+    await tx
+      .update(purchaseQuotes)
+      .set({ status: "confirmed" })
+      .where(eq(purchaseQuotes.id, quote.id));
     return purchase;
   });
 }
@@ -307,46 +502,112 @@ export async function attachPurchasePayment(input: {
   checkoutUrl: string | null;
 }) {
   const db = await requireDb();
-  await db.update(purchases).set({
+  await db
+    .update(purchases)
+    .set({
     paymentReference: input.paymentReference,
     paymentStatus: input.paymentStatus,
     checkoutUrl: input.checkoutUrl,
-    status: input.paymentStatus === "approved" ? "processing" : "awaiting_payment",
-  }).where(and(eq(purchases.id, input.purchaseId), eq(purchases.userId, input.userId), eq(purchases.status, "awaiting_payment")));
-  return (await db.select().from(purchases).where(and(eq(purchases.id, input.purchaseId), eq(purchases.userId, input.userId))).limit(1))[0];
+      status:
+        input.paymentStatus === "approved" ? "processing" : "awaiting_payment",
+    })
+    .where(
+      and(
+        eq(purchases.id, input.purchaseId),
+        eq(purchases.userId, input.userId),
+        eq(purchases.status, "awaiting_payment")
+      )
+    );
+  return (
+    await db
+      .select()
+      .from(purchases)
+      .where(
+        and(
+          eq(purchases.id, input.purchaseId),
+          eq(purchases.userId, input.userId)
+        )
+      )
+      .limit(1)
+  )[0];
 }
 
 export async function getPurchaseById(purchaseId: number) {
   const db = await requireDb();
-  return (await db.select().from(purchases).where(eq(purchases.id, purchaseId)).limit(1))[0] ?? null;
+  return (
+    (
+      await db
+        .select()
+        .from(purchases)
+        .where(eq(purchases.id, purchaseId))
+        .limit(1)
+    )[0] ?? null
+  );
 }
 
-export async function approvePurchasePayment(input: { purchaseId: number; paymentReference: string }) {
+export async function approvePurchasePayment(input: {
+  purchaseId: number;
+  paymentReference: string;
+}) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    const purchase = (await tx.select().from(purchases).where(eq(purchases.id, input.purchaseId)).limit(1))[0];
+    const purchase = (
+      await tx
+        .select()
+        .from(purchases)
+        .where(eq(purchases.id, input.purchaseId))
+        .limit(1)
+    )[0];
     if (!purchase) throw new Error("Compra não encontrada para conciliação.");
-    if (purchase.paymentReference && purchase.paymentReference !== input.paymentReference && purchase.paymentProvider !== "mercado_pago") {
+    if (
+      purchase.paymentReference &&
+      purchase.paymentReference !== input.paymentReference &&
+      purchase.paymentProvider !== "mercado_pago"
+    ) {
       throw new Error("Referência de pagamento não corresponde à compra.");
     }
     if (purchase.status === "settled") return purchase;
-    if (purchase.status !== "awaiting_payment" && purchase.status !== "processing") throw new Error("Compra não pode receber aprovação no estado atual.");
-    await tx.update(purchases).set({
+    if (
+      purchase.status !== "awaiting_payment" &&
+      purchase.status !== "processing"
+    )
+      throw new Error("Compra não pode receber aprovação no estado atual.");
+    await tx
+      .update(purchases)
+      .set({
       paymentReference: input.paymentReference,
       paymentStatus: "approved",
       status: "processing",
-    }).where(eq(purchases.id, input.purchaseId));
-    return (await tx.select().from(purchases).where(eq(purchases.id, input.purchaseId)).limit(1))[0];
+      })
+      .where(eq(purchases.id, input.purchaseId));
+    return (
+      await tx
+        .select()
+        .from(purchases)
+        .where(eq(purchases.id, input.purchaseId))
+        .limit(1)
+    )[0];
   });
 }
 
-export async function rejectPurchasePayment(input: { purchaseId: number; paymentReference: string }) {
+export async function rejectPurchasePayment(input: {
+  purchaseId: number;
+  paymentReference: string;
+}) {
   const db = await requireDb();
-  await db.update(purchases).set({
+  await db
+    .update(purchases)
+    .set({
     paymentReference: input.paymentReference,
     paymentStatus: "rejected",
     status: "failed",
-  }).where(and(eq(purchases.id, input.purchaseId), eq(purchases.status, "awaiting_payment")));
+    })
+    .where(
+      and(
+        eq(purchases.id, input.purchaseId),
+        eq(purchases.status, "awaiting_payment")
+      )
+    );
 }
 
 export async function settleSandboxPurchase(input: {
@@ -355,10 +616,23 @@ export async function settleSandboxPurchase(input: {
   idempotencyKey: string;
 }) {
   const db = await requireDb();
-  const purchase = (await db.select().from(purchases).where(and(eq(purchases.id, input.purchaseId), eq(purchases.userId, input.userId))).limit(1))[0];
+  const purchase = (
+    await db
+      .select()
+      .from(purchases)
+      .where(
+        and(
+          eq(purchases.id, input.purchaseId),
+          eq(purchases.userId, input.userId)
+        )
+      )
+      .limit(1)
+  )[0];
   if (!purchase) throw new Error("Compra não encontrada.");
-  if (purchase.status === "settled" && purchase.yieldStatus === "active") return purchase;
-  if (purchase.status !== "processing") throw new Error("Compra não pode ser liquidada no estado atual.");
+  if (purchase.status === "settled" && purchase.yieldStatus === "active")
+    return purchase;
+  if (purchase.status !== "processing")
+    throw new Error("Compra não pode ser liquidada no estado atual.");
 
   return db.transaction(async tx => {
     await tx.insert(ledgerEntries).values([
@@ -396,24 +670,50 @@ export async function settleSandboxPurchase(input: {
         metadata: JSON.stringify({ yieldStatus: "active", mode: "sandbox" }),
       },
     ]);
-    await tx.update(purchases).set({ status: "settled", yieldStatus: "active", settledAt: new Date() }).where(eq(purchases.id, input.purchaseId));
-    return (await tx.select().from(purchases).where(eq(purchases.id, input.purchaseId)).limit(1))[0];
+    await tx
+      .update(purchases)
+      .set({ status: "settled", yieldStatus: "active", settledAt: new Date() })
+      .where(eq(purchases.id, input.purchaseId));
+    return (
+      await tx
+        .select()
+        .from(purchases)
+        .where(eq(purchases.id, input.purchaseId))
+        .limit(1)
+    )[0];
   });
 }
 
 export async function failSandboxPurchase(userId: number, purchaseId: number) {
   const db = await requireDb();
-  await db.update(purchases).set({ status: "failed", yieldStatus: "pending" }).where(and(eq(purchases.id, purchaseId), eq(purchases.userId, userId), eq(purchases.status, "processing")));
+  await db
+    .update(purchases)
+    .set({ status: "failed", yieldStatus: "pending" })
+    .where(
+      and(
+        eq(purchases.id, purchaseId),
+        eq(purchases.userId, userId),
+        eq(purchases.status, "processing")
+      )
+    );
 }
 
 export async function listPurchases(userId: number) {
   const db = await requireDb();
-  return db.select().from(purchases).where(eq(purchases.userId, userId)).orderBy(desc(purchases.createdAt));
+  return db
+    .select()
+    .from(purchases)
+    .where(eq(purchases.userId, userId))
+    .orderBy(desc(purchases.createdAt));
 }
 
 export async function listLedger(userId: number) {
   const db = await requireDb();
-  return db.select().from(ledgerEntries).where(eq(ledgerEntries.userId, userId)).orderBy(desc(ledgerEntries.createdAt));
+  return db
+    .select()
+    .from(ledgerEntries)
+    .where(eq(ledgerEntries.userId, userId))
+    .orderBy(desc(ledgerEntries.createdAt));
 }
 
 export async function listOperationalLedger() {
@@ -424,12 +724,25 @@ export async function listOperationalLedger() {
 export async function getAvailableBtcBalance(userId: number) {
   const db = await requireDb();
   const [purchaseRows, redemptionRows] = await Promise.all([
-    db.select({ btcAmount: purchases.btcAmount, status: purchases.status }).from(purchases).where(eq(purchases.userId, userId)),
-    db.select({ btcAmount: redemptions.btcAmount, status: redemptions.status }).from(redemptions).where(eq(redemptions.userId, userId)),
+    db
+      .select({ btcAmount: purchases.btcAmount, status: purchases.status })
+      .from(purchases)
+      .where(eq(purchases.userId, userId)),
+    db
+      .select({ btcAmount: redemptions.btcAmount, status: redemptions.status })
+      .from(redemptions)
+      .where(eq(redemptions.userId, userId)),
   ]);
-  const acquiredBtc = purchaseRows.filter(item => item.status === "settled").reduce((sum, item) => sum + Number(item.btcAmount), 0);
-  const unavailableBtc = redemptionRows.filter(item => !["failed", "cancelled"].includes(item.status)).reduce((sum, item) => sum + Number(item.btcAmount), 0);
-  return Math.max(0, Math.round((acquiredBtc - unavailableBtc) * 100_000_000) / 100_000_000);
+  const acquiredBtc = purchaseRows
+    .filter(item => item.status === "settled")
+    .reduce((sum, item) => sum + Number(item.btcAmount), 0);
+  const unavailableBtc = redemptionRows
+    .filter(item => !["failed", "cancelled"].includes(item.status))
+    .reduce((sum, item) => sum + Number(item.btcAmount), 0);
+  return Math.max(
+    0,
+    Math.round((acquiredBtc - unavailableBtc) * 100_000_000) / 100_000_000
+  );
 }
 
 export async function createRedemptionQuote(input: {
@@ -448,13 +761,21 @@ export async function createRedemptionQuote(input: {
   expiresAt: Date;
 }) {
   const db = await requireDb();
-  const existing = (await db.select().from(redemptionQuotes).where(eq(redemptionQuotes.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+  const existing = (
+    await db
+      .select()
+      .from(redemptionQuotes)
+      .where(eq(redemptionQuotes.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
   if (existing) {
-    if (existing.userId !== input.userId) throw new Error("Chave idempotente já pertence a outro usuário.");
+    if (existing.userId !== input.userId)
+      throw new Error("Chave idempotente já pertence a outro usuário.");
     return existing;
   }
   const availableBtc = await getAvailableBtcBalance(input.userId);
-  if (input.quote.btcAmount > availableBtc) throw new Error("Saldo disponível insuficiente para este resgate.");
+  if (input.quote.btcAmount > availableBtc)
+    throw new Error("Saldo disponível insuficiente para este resgate.");
 
   await db.insert(redemptionQuotes).values({
     userId: input.userId,
@@ -469,38 +790,104 @@ export async function createRedemptionQuote(input: {
     idempotencyKey: input.idempotencyKey,
     expiresAt: input.expiresAt,
   });
-  return (await db.select().from(redemptionQuotes).where(eq(redemptionQuotes.idempotencyKey, input.idempotencyKey)).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(redemptionQuotes)
+      .where(eq(redemptionQuotes.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
 }
 
-export async function startSandboxRedemption(input: { userId: number; quoteId: number; idempotencyKey: string }) {
+export async function startSandboxRedemption(input: {
+  userId: number;
+  quoteId: number;
+  idempotencyKey: string;
+}) {
   const db = await requireDb();
-  const existing = (await db.select().from(redemptions).where(eq(redemptions.externalReference, input.idempotencyKey)).limit(1))[0];
+  const existing = (
+    await db
+      .select()
+      .from(redemptions)
+      .where(eq(redemptions.externalReference, input.idempotencyKey))
+      .limit(1)
+  )[0];
   if (existing) {
-    if (existing.userId !== input.userId || existing.quoteId !== input.quoteId) throw new Error("Chave idempotente não corresponde a este resgate.");
+    if (existing.userId !== input.userId || existing.quoteId !== input.quoteId)
+      throw new Error("Chave idempotente não corresponde a este resgate.");
     return existing;
   }
 
   return db.transaction(async tx => {
-    await tx.execute(sql`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`);
-    const concurrentExisting = (await tx.select().from(redemptions).where(eq(redemptions.externalReference, input.idempotencyKey)).limit(1))[0];
+    await tx.execute(
+      sql`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`
+    );
+    const concurrentExisting = (
+      await tx
+        .select()
+        .from(redemptions)
+        .where(eq(redemptions.externalReference, input.idempotencyKey))
+        .limit(1)
+    )[0];
     if (concurrentExisting) {
-      if (concurrentExisting.userId !== input.userId || concurrentExisting.quoteId !== input.quoteId) throw new Error("Chave idempotente não corresponde a este resgate.");
+      if (
+        concurrentExisting.userId !== input.userId ||
+        concurrentExisting.quoteId !== input.quoteId
+      )
+        throw new Error("Chave idempotente não corresponde a este resgate.");
       return concurrentExisting;
     }
-    const quote = (await tx.select().from(redemptionQuotes).where(and(eq(redemptionQuotes.id, input.quoteId), eq(redemptionQuotes.userId, input.userId))).limit(1))[0];
+    const quote = (
+      await tx
+        .select()
+        .from(redemptionQuotes)
+        .where(
+          and(
+            eq(redemptionQuotes.id, input.quoteId),
+            eq(redemptionQuotes.userId, input.userId)
+          )
+        )
+        .limit(1)
+    )[0];
     if (!quote) throw new Error("Cotação de resgate não encontrada.");
-    if (quote.status !== "active" || quote.expiresAt.getTime() <= Date.now()) throw new Error("Cotação expirada. Gere uma nova cotação.");
-    const profile = (await tx.select().from(customerProfiles).where(eq(customerProfiles.userId, input.userId)).limit(1))[0];
-    if (!profile || profile.verificationStatus !== "verified" || !profile.pixOwnershipConfirmed || !profile.pixAccountMasked) {
+    if (quote.status !== "active" || quote.expiresAt.getTime() <= Date.now())
+      throw new Error("Cotação expirada. Gere uma nova cotação.");
+    const profile = (
+      await tx
+        .select()
+        .from(customerProfiles)
+        .where(eq(customerProfiles.userId, input.userId))
+        .limit(1)
+    )[0];
+    if (
+      !profile ||
+      profile.verificationStatus !== "verified" ||
+      !profile.pixOwnershipConfirmed ||
+      !profile.pixAccountMasked
+    ) {
       throw new Error("Conta Pix de mesma titularidade não verificada.");
     }
 
-    const purchaseRows = await tx.select({ btcAmount: purchases.btcAmount, status: purchases.status }).from(purchases).where(eq(purchases.userId, input.userId));
-    const redemptionRows = await tx.select({ btcAmount: redemptions.btcAmount, status: redemptions.status }).from(redemptions).where(eq(redemptions.userId, input.userId));
-    const acquiredBtc = purchaseRows.filter(item => item.status === "settled").reduce((sum, item) => sum + Number(item.btcAmount), 0);
-    const unavailableBtc = redemptionRows.filter(item => !["failed", "cancelled"].includes(item.status)).reduce((sum, item) => sum + Number(item.btcAmount), 0);
-    const availableBtc = Math.max(0, Math.round((acquiredBtc - unavailableBtc) * 100_000_000) / 100_000_000);
-    if (Number(quote.btcAmount) > availableBtc) throw new Error("Saldo disponível mudou. Gere uma nova cotação.");
+    const purchaseRows = await tx
+      .select({ btcAmount: purchases.btcAmount, status: purchases.status })
+      .from(purchases)
+      .where(eq(purchases.userId, input.userId));
+    const redemptionRows = await tx
+      .select({ btcAmount: redemptions.btcAmount, status: redemptions.status })
+      .from(redemptions)
+      .where(eq(redemptions.userId, input.userId));
+    const acquiredBtc = purchaseRows
+      .filter(item => item.status === "settled")
+      .reduce((sum, item) => sum + Number(item.btcAmount), 0);
+    const unavailableBtc = redemptionRows
+      .filter(item => !["failed", "cancelled"].includes(item.status))
+      .reduce((sum, item) => sum + Number(item.btcAmount), 0);
+    const availableBtc = Math.max(
+      0,
+      Math.round((acquiredBtc - unavailableBtc) * 100_000_000) / 100_000_000
+    );
+    if (Number(quote.btcAmount) > availableBtc)
+      throw new Error("Saldo disponível mudou. Gere uma nova cotação.");
 
     await tx.insert(redemptions).values({
       userId: input.userId,
@@ -515,8 +902,17 @@ export async function startSandboxRedemption(input: { userId: number; quoteId: n
       status: "processing",
       stage: "reserved",
     });
-    await tx.update(redemptionQuotes).set({ status: "confirmed" }).where(eq(redemptionQuotes.id, quote.id));
-    return (await tx.select().from(redemptions).where(eq(redemptions.externalReference, input.idempotencyKey)).limit(1))[0];
+    await tx
+      .update(redemptionQuotes)
+      .set({ status: "confirmed" })
+      .where(eq(redemptionQuotes.id, quote.id));
+    return (
+      await tx
+        .select()
+        .from(redemptions)
+        .where(eq(redemptions.externalReference, input.idempotencyKey))
+        .limit(1)
+    )[0];
   });
 }
 
@@ -527,49 +923,178 @@ export async function advanceSandboxRedemption(input: {
   externalReference: string;
 }) {
   const db = await requireDb();
-  const condition = and(eq(redemptions.id, input.redemptionId), eq(redemptions.userId, input.userId), eq(redemptions.status, "processing"));
+  const condition = and(
+    eq(redemptions.id, input.redemptionId),
+    eq(redemptions.userId, input.userId),
+    eq(redemptions.status, "processing")
+  );
   if (input.stage === "protocol_exit") {
-    await db.update(redemptions).set({ stage: "protocol_exit", protocolExitReference: input.externalReference }).where(condition);
+    await db
+      .update(redemptions)
+      .set({
+        stage: "protocol_exit",
+        protocolExitReference: input.externalReference,
+      })
+      .where(condition);
   } else if (input.stage === "conversion") {
-    await db.update(redemptions).set({ stage: "conversion", conversionReference: input.externalReference }).where(condition);
+    await db
+      .update(redemptions)
+      .set({
+        stage: "conversion",
+        conversionReference: input.externalReference,
+      })
+      .where(condition);
   } else {
-    await db.update(redemptions).set({ stage: "pix", pixEndToEndId: input.externalReference }).where(condition);
+    await db
+      .update(redemptions)
+      .set({ stage: "pix", pixEndToEndId: input.externalReference })
+      .where(condition);
   }
-  return (await db.select().from(redemptions).where(and(eq(redemptions.id, input.redemptionId), eq(redemptions.userId, input.userId))).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(redemptions)
+      .where(
+        and(
+          eq(redemptions.id, input.redemptionId),
+          eq(redemptions.userId, input.userId)
+        )
+      )
+      .limit(1)
+  )[0];
 }
 
-export async function settleSandboxRedemption(input: { userId: number; redemptionId: number; idempotencyKey: string }) {
+export async function settleSandboxRedemption(input: {
+  userId: number;
+  redemptionId: number;
+  idempotencyKey: string;
+}) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    await tx.execute(sql`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`);
-    const redemption = (await tx.select().from(redemptions).where(and(eq(redemptions.id, input.redemptionId), eq(redemptions.userId, input.userId))).limit(1))[0];
+    await tx.execute(
+      sql`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`
+    );
+    const redemption = (
+      await tx
+        .select()
+        .from(redemptions)
+        .where(
+          and(
+            eq(redemptions.id, input.redemptionId),
+            eq(redemptions.userId, input.userId)
+          )
+        )
+        .limit(1)
+    )[0];
     if (!redemption) throw new Error("Resgate não encontrado.");
     if (redemption.status === "settled") return redemption;
-    if (redemption.status !== "processing" || redemption.stage !== "pix") throw new Error("Resgate não pode ser liquidado no estado atual.");
+    if (redemption.status !== "processing" || redemption.stage !== "pix")
+      throw new Error("Resgate não pode ser liquidado no estado atual.");
 
     await tx.insert(ledgerEntries).values([
-      { userId: input.userId, redemptionId: redemption.id, entryType: "yield_exit", direction: "debit", account: "customer_btc_position", currency: "BTC", amount: redemption.btcAmount, idempotencyKey: `${input.idempotencyKey}:position-exit`, metadata: JSON.stringify({ mode: "sandbox" }) },
-      { userId: input.userId, redemptionId: redemption.id, entryType: "sell_btc", direction: "credit", account: "customer_brl_redemption", currency: "BRL", amount: redemption.grossBrl, idempotencyKey: `${input.idempotencyKey}:conversion`, metadata: JSON.stringify({ mode: "sandbox" }) },
-      { userId: input.userId, redemptionId: redemption.id, entryType: "provider_cost", direction: "debit", account: "protocol_redemption_cost", currency: "BRL", amount: redemption.protocolFeeBrl, idempotencyKey: `${input.idempotencyKey}:protocol-fee`, metadata: JSON.stringify({ mode: "sandbox" }) },
-      { userId: input.userId, redemptionId: redemption.id, entryType: "fee_revenue", direction: "credit", account: "organization_redemption_fee", currency: "BRL", amount: redemption.conversionPixFeeBrl, idempotencyKey: `${input.idempotencyKey}:service-fee`, metadata: JSON.stringify({ mode: "sandbox" }) },
-      { userId: input.userId, redemptionId: redemption.id, entryType: "pix_out", direction: "debit", account: "customer_brl_redemption", currency: "BRL", amount: redemption.netBrl, idempotencyKey: `${input.idempotencyKey}:pix-out`, metadata: JSON.stringify({ destination: redemption.pixDestinationMasked, endToEndId: redemption.pixEndToEndId, mode: "sandbox" }) },
+      {
+        userId: input.userId,
+        redemptionId: redemption.id,
+        entryType: "yield_exit",
+        direction: "debit",
+        account: "customer_btc_position",
+        currency: "BTC",
+        amount: redemption.btcAmount,
+        idempotencyKey: `${input.idempotencyKey}:position-exit`,
+        metadata: JSON.stringify({ mode: "sandbox" }),
+      },
+      {
+        userId: input.userId,
+        redemptionId: redemption.id,
+        entryType: "sell_btc",
+        direction: "credit",
+        account: "customer_brl_redemption",
+        currency: "BRL",
+        amount: redemption.grossBrl,
+        idempotencyKey: `${input.idempotencyKey}:conversion`,
+        metadata: JSON.stringify({ mode: "sandbox" }),
+      },
+      {
+        userId: input.userId,
+        redemptionId: redemption.id,
+        entryType: "provider_cost",
+        direction: "debit",
+        account: "protocol_redemption_cost",
+        currency: "BRL",
+        amount: redemption.protocolFeeBrl,
+        idempotencyKey: `${input.idempotencyKey}:protocol-fee`,
+        metadata: JSON.stringify({ mode: "sandbox" }),
+      },
+      {
+        userId: input.userId,
+        redemptionId: redemption.id,
+        entryType: "fee_revenue",
+        direction: "credit",
+        account: "organization_redemption_fee",
+        currency: "BRL",
+        amount: redemption.conversionPixFeeBrl,
+        idempotencyKey: `${input.idempotencyKey}:service-fee`,
+        metadata: JSON.stringify({ mode: "sandbox" }),
+      },
+      {
+        userId: input.userId,
+        redemptionId: redemption.id,
+        entryType: "pix_out",
+        direction: "debit",
+        account: "customer_brl_redemption",
+        currency: "BRL",
+        amount: redemption.netBrl,
+        idempotencyKey: `${input.idempotencyKey}:pix-out`,
+        metadata: JSON.stringify({
+          destination: redemption.pixDestinationMasked,
+          endToEndId: redemption.pixEndToEndId,
+          mode: "sandbox",
+        }),
+      },
     ]);
-    await tx.update(redemptions).set({ status: "settled", stage: "completed", settledAt: new Date() }).where(eq(redemptions.id, redemption.id));
-    return (await tx.select().from(redemptions).where(eq(redemptions.id, redemption.id)).limit(1))[0];
+    await tx
+      .update(redemptions)
+      .set({ status: "settled", stage: "completed", settledAt: new Date() })
+      .where(eq(redemptions.id, redemption.id));
+    return (
+      await tx
+        .select()
+        .from(redemptions)
+        .where(eq(redemptions.id, redemption.id))
+        .limit(1)
+    )[0];
   });
 }
 
-export async function failSandboxRedemption(userId: number, redemptionId: number, reason: string, manualReview: boolean) {
+export async function failSandboxRedemption(
+  userId: number,
+  redemptionId: number,
+  reason: string,
+  manualReview: boolean
+) {
   const db = await requireDb();
-  await db.update(redemptions).set({
+  await db
+    .update(redemptions)
+    .set({
     status: manualReview ? "manual_review" : "failed",
     failureReason: reason.slice(0, 2_000),
-  }).where(and(eq(redemptions.id, redemptionId), eq(redemptions.userId, userId), eq(redemptions.status, "processing")));
+    })
+    .where(
+      and(
+        eq(redemptions.id, redemptionId),
+        eq(redemptions.userId, userId),
+        eq(redemptions.status, "processing")
+      )
+    );
 }
 
 export async function listRedemptions(userId: number) {
   const db = await requireDb();
-  return db.select().from(redemptions).where(eq(redemptions.userId, userId)).orderBy(desc(redemptions.createdAt));
+  return db
+    .select()
+    .from(redemptions)
+    .where(eq(redemptions.userId, userId))
+    .orderBy(desc(redemptions.createdAt));
 }
 
 export async function listOperationalRedemptions() {
@@ -579,16 +1104,29 @@ export async function listOperationalRedemptions() {
 
 export async function getTreasurySettings(ownerUserId: number) {
   const db = await requireDb();
-  const existing = (await db.select().from(treasurySettings).where(eq(treasurySettings.ownerUserId, ownerUserId)).limit(1))[0];
+  const existing = (
+    await db
+      .select()
+      .from(treasurySettings)
+      .where(eq(treasurySettings.ownerUserId, ownerUserId))
+      .limit(1)
+  )[0];
   if (existing) return existing;
   await db.insert(treasurySettings).values({ ownerUserId });
-  return (await db.select().from(treasurySettings).where(eq(treasurySettings.ownerUserId, ownerUserId)).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(treasurySettings)
+      .where(eq(treasurySettings.ownerUserId, ownerUserId))
+      .limit(1)
+  )[0];
 }
 
 export async function updateTreasurySettings(input: {
   ownerUserId: number;
   organizationName: string;
   stacksWalletAddress: string | null;
+  personalProfitWalletAddress: string | null;
   distributionAsset: "STX" | "sBTC" | "stBTC";
   cadence: "daily" | "weekly" | "monthly";
   approvalMode: "manual" | "multisig" | "automatic";
@@ -598,10 +1136,34 @@ export async function updateTreasurySettings(input: {
 }) {
   const db = await requireDb();
   await getTreasurySettings(input.ownerUserId);
-  const walletIsValid = input.stacksWalletAddress ? isValidStacksAddress(input.stacksWalletAddress, input.network) : false;
-  await db.update(treasurySettings).set({
+  const stacksWalletAddress =
+    input.stacksWalletAddress?.trim().toUpperCase() || null;
+  const personalProfitWalletAddress =
+    input.personalProfitWalletAddress?.trim().toUpperCase() || null;
+  const walletIsValid = stacksWalletAddress
+    ? isValidStacksAddress(stacksWalletAddress, input.network)
+    : false;
+  const profitWalletIsValid =
+    !personalProfitWalletAddress ||
+    isValidStacksAddress(personalProfitWalletAddress, input.network);
+  if (!profitWalletIsValid)
+    throw new Error(
+      "Carteira dedicada de lucros inválida para a rede escolhida."
+    );
+  if (
+    personalProfitWalletAddress &&
+    personalProfitWalletAddress === stacksWalletAddress
+  ) {
+    throw new Error(
+      "A conta de lucros stBTC precisa usar uma carteira diferente da carteira operacional."
+    );
+  }
+  await db
+    .update(treasurySettings)
+    .set({
     organizationName: input.organizationName,
-    stacksWalletAddress: input.stacksWalletAddress,
+      stacksWalletAddress,
+      personalProfitWalletAddress,
     distributionAsset: input.distributionAsset,
     cadence: input.cadence,
     approvalMode: input.approvalMode,
@@ -610,22 +1172,54 @@ export async function updateTreasurySettings(input: {
     operationalReserveBps: input.operationalReserveBps,
     distributionShareBps: 10000,
     status: walletIsValid ? "ready" : "draft",
-  }).where(eq(treasurySettings.ownerUserId, input.ownerUserId));
+    })
+    .where(eq(treasurySettings.ownerUserId, input.ownerUserId));
   return getTreasurySettings(input.ownerUserId);
 }
 
-export async function createProfitDistribution(ownerUserId: number, periodKey: string, idempotencyKey: string) {
+export async function createProfitDistribution(
+  ownerUserId: number,
+  periodKey: string,
+  idempotencyKey: string
+) {
   const db = await requireDb();
-  const existingPeriod = (await db.select().from(profitDistributions).where(and(eq(profitDistributions.ownerUserId, ownerUserId), eq(profitDistributions.periodKey, periodKey))).limit(1))[0];
+  const existingPeriod = (
+    await db
+      .select()
+      .from(profitDistributions)
+      .where(
+        and(
+          eq(profitDistributions.ownerUserId, ownerUserId),
+          eq(profitDistributions.periodKey, periodKey)
+        )
+      )
+      .limit(1)
+  )[0];
   if (existingPeriod) return existingPeriod;
-  const existing = (await db.select().from(profitDistributions).where(eq(profitDistributions.idempotencyKey, idempotencyKey)).limit(1))[0];
+  const existing = (
+    await db
+      .select()
+      .from(profitDistributions)
+      .where(eq(profitDistributions.idempotencyKey, idempotencyKey))
+      .limit(1)
+  )[0];
   if (existing) return existing;
 
   const settings = await getTreasurySettings(ownerUserId);
   if (!settings) throw new Error("Configuração de tesouraria indisponível.");
-  const ledger = (await db.select().from(ledgerEntries)).filter(entry => entry.createdAt.toISOString().slice(0, 7) === periodKey);
-  const grossRevenueBrl = ledger.filter(entry => entry.entryType === "fee_revenue" && entry.currency === "BRL").reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const providerCostsBrl = ledger.filter(entry => entry.entryType === "provider_cost" && entry.currency === "BRL").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const ledger = (await db.select().from(ledgerEntries)).filter(
+    entry => entry.createdAt.toISOString().slice(0, 7) === periodKey
+  );
+  const grossRevenueBrl = ledger
+    .filter(
+      entry => entry.entryType === "fee_revenue" && entry.currency === "BRL"
+    )
+    .reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const providerCostsBrl = ledger
+    .filter(
+      entry => entry.entryType === "provider_cost" && entry.currency === "BRL"
+    )
+    .reduce((sum, entry) => sum + Number(entry.amount), 0);
   const calculation = calculateDistributableProfit({
     grossRevenueBrl,
     providerCostsBrl,
@@ -633,8 +1227,11 @@ export async function createProfitDistribution(ownerUserId: number, periodKey: s
     operationalReserveBps: settings.operationalReserveBps,
     distributionShareBps: settings.distributionShareBps,
   });
-  const walletReady = Boolean(settings.stacksWalletAddress) && isValidStacksAddress(settings.stacksWalletAddress ?? "", settings.network);
-  const status = walletReady && settings.status === "ready" ? "pending_approval" : "blocked";
+  const walletReady =
+    Boolean(settings.stacksWalletAddress) &&
+    isValidStacksAddress(settings.stacksWalletAddress ?? "", settings.network);
+  const status =
+    walletReady && settings.status === "ready" ? "pending_approval" : "blocked";
 
   await db.insert(profitDistributions).values({
     ownerUserId,
@@ -645,38 +1242,304 @@ export async function createProfitDistribution(ownerUserId: number, periodKey: s
     operationalReserveBrl: calculation.operationalReserveBrl.toFixed(2),
     distributableProfitBrl: calculation.distributableProfitBrl.toFixed(2),
     distributionAsset: settings.distributionAsset,
-    estimatedAssetAmount: estimateDistributionAsset(calculation.distributableProfitBrl, settings.distributionAsset).toFixed(8),
+    estimatedAssetAmount: estimateDistributionAsset(
+      calculation.distributableProfitBrl,
+      settings.distributionAsset
+    ).toFixed(8),
     stacksWalletAddress: settings.stacksWalletAddress,
     status,
     idempotencyKey,
   });
-  return (await db.select().from(profitDistributions).where(eq(profitDistributions.idempotencyKey, idempotencyKey)).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(profitDistributions)
+      .where(eq(profitDistributions.idempotencyKey, idempotencyKey))
+      .limit(1)
+  )[0];
 }
 
-export async function approveSandboxDistribution(ownerUserId: number, distributionId: number) {
+export async function approveSandboxDistribution(
+  ownerUserId: number,
+  distributionId: number
+) {
   const db = await requireDb();
-  const distribution = (await db.select().from(profitDistributions).where(and(eq(profitDistributions.id, distributionId), eq(profitDistributions.ownerUserId, ownerUserId))).limit(1))[0];
+  const distribution = (
+    await db
+      .select()
+      .from(profitDistributions)
+      .where(
+        and(
+          eq(profitDistributions.id, distributionId),
+          eq(profitDistributions.ownerUserId, ownerUserId)
+        )
+      )
+      .limit(1)
+  )[0];
   if (!distribution) throw new Error("Distribuição não encontrada.");
-  if (distribution.status === "blocked") throw new Error("Configure uma carteira Stacks válida antes de aprovar.");
+  if (distribution.distributionAsset === "stBTC") {
+    const sweep = await createProfitCapitalSweep(
+      ownerUserId,
+      distributionId,
+      `profit-sweep:${distributionId}`
+    );
+    await approveSandboxProfitCapitalSweep(ownerUserId, sweep.id);
+    return (
+      await db
+        .select()
+        .from(profitDistributions)
+        .where(eq(profitDistributions.id, distributionId))
+        .limit(1)
+    )[0];
+  }
+  if (distribution.status === "blocked")
+    throw new Error("Configure uma carteira Stacks válida antes de aprovar.");
   if (distribution.status === "simulated_sent") return distribution;
-
   const transactionId = `sandbox-${distribution.id}-${distribution.periodKey}`;
   await db.transaction(async tx => {
-    await tx.update(profitDistributions).set({ status: "simulated_sent", transactionId, approvedAt: new Date() }).where(eq(profitDistributions.id, distribution.id));
+    await tx.execute(
+      sql`SELECT id FROM profit_distributions WHERE id = ${distribution.id} FOR UPDATE`
+    );
+    const current = (
+      await tx
+        .select()
+        .from(profitDistributions)
+        .where(eq(profitDistributions.id, distribution.id))
+        .limit(1)
+    )[0];
+    if (!current || current.status === "simulated_sent") return;
+    await tx
+      .update(profitDistributions)
+      .set({ status: "simulated_sent", transactionId, approvedAt: new Date() })
+      .where(eq(profitDistributions.id, distribution.id));
     await tx.insert(ledgerEntries).values({
+      userId: ownerUserId,
       entryType: "profit_distribution",
       direction: "debit",
       account: "organization_distributable_profit",
       currency: distribution.distributionAsset,
       amount: distribution.estimatedAssetAmount,
       idempotencyKey: `profit-distribution:${distribution.id}`,
-      metadata: JSON.stringify({ wallet: distribution.stacksWalletAddress, transactionId, mode: "sandbox" }),
+      metadata: JSON.stringify({
+        wallet: distribution.stacksWalletAddress,
+        transactionId,
+        mode: "sandbox",
+      }),
     });
   });
-  return (await db.select().from(profitDistributions).where(eq(profitDistributions.id, distribution.id)).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(profitDistributions)
+      .where(eq(profitDistributions.id, distributionId))
+      .limit(1)
+  )[0];
+}
+
+export async function createProfitCapitalSweep(
+  ownerUserId: number,
+  distributionId: number,
+  idempotencyKey: string
+) {
+  const db = await requireDb();
+  const settings = await getTreasurySettings(ownerUserId);
+  return db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT id FROM profit_distributions WHERE id = ${distributionId} FOR UPDATE`
+    );
+    const existing =
+      (
+        await tx
+          .select()
+          .from(profitCapitalSweeps)
+          .where(eq(profitCapitalSweeps.profitDistributionId, distributionId))
+          .limit(1)
+      )[0] ??
+      (
+        await tx
+          .select()
+          .from(profitCapitalSweeps)
+          .where(eq(profitCapitalSweeps.idempotencyKey, idempotencyKey))
+          .limit(1)
+      )[0];
+    if (existing) return existing;
+    const distribution = (
+      await tx
+        .select()
+        .from(profitDistributions)
+        .where(
+          and(
+            eq(profitDistributions.id, distributionId),
+            eq(profitDistributions.ownerUserId, ownerUserId)
+          )
+        )
+        .limit(1)
+    )[0];
+    if (!distribution) throw new Error("Fechamento de lucro não encontrado.");
+    if (distribution.distributionAsset !== "stBTC")
+      throw new Error(
+        "A conta pessoal de lucros exige stBTC como ativo de destino."
+      );
+    if (distribution.status === "simulated_sent")
+      throw new Error(
+        "Este fechamento já foi finalizado e não pode gerar um novo sweep."
+      );
+    const destinationWalletAddress = settings?.personalProfitWalletAddress;
+    const walletReady =
+      Boolean(destinationWalletAddress) &&
+      isValidStacksAddress(
+        destinationWalletAddress ?? "",
+        settings?.network ?? "testnet"
+      );
+    const calculation = calculateProfitStbtcSweep({
+      distributableProfitBrl: Number(distribution.distributableProfitBrl),
+    });
+    const blockerReason = !walletReady
+      ? "Carteira dedicada de lucros stBTC ausente ou inválida."
+      : settings?.network !== "testnet"
+        ? "A execução mainnet permanece bloqueada no sandbox."
+        : null;
+    const status =
+      walletReady &&
+      settings?.status === "ready" &&
+      settings.network === "testnet"
+        ? "pending_approval"
+        : "blocked";
+    await tx.insert(profitCapitalSweeps).values({
+      ownerUserId,
+      profitDistributionId: distribution.id,
+      sourceAmountBrl: calculation.sourceAmountBrl.toFixed(2),
+      referenceAssetBrl: calculation.referenceAssetBrl.toFixed(2),
+      slippageBps: calculation.slippageBps,
+      estimatedAssetAmount: calculation.estimatedAssetAmount.toFixed(8),
+      minimumAssetAmount: calculation.minimumAssetAmount.toFixed(8),
+      destinationWalletAddress,
+      network: settings?.network ?? "testnet",
+      status,
+      blockerReason,
+      idempotencyKey,
+    });
+    return (
+      await tx
+        .select()
+        .from(profitCapitalSweeps)
+        .where(eq(profitCapitalSweeps.profitDistributionId, distributionId))
+        .limit(1)
+    )[0];
+  });
+}
+
+export async function approveSandboxProfitCapitalSweep(
+  ownerUserId: number,
+  sweepId: number
+) {
+  const db = await requireDb();
+  const completed = await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT id FROM profit_capital_sweeps WHERE id = ${sweepId} FOR UPDATE`
+    );
+    const sweep = (
+      await tx
+        .select()
+        .from(profitCapitalSweeps)
+        .where(
+          and(
+            eq(profitCapitalSweeps.id, sweepId),
+            eq(profitCapitalSweeps.ownerUserId, ownerUserId)
+          )
+        )
+        .limit(1)
+    )[0];
+    if (!sweep) throw new Error("Sweep de lucro não encontrado.");
+    if (sweep.status === "blocked")
+      throw new Error(sweep.blockerReason || "Sweep bloqueado por segurança.");
+    if (sweep.status === "simulated_sent") return sweep;
+    const transactionId = `sandbox-stbtc-profit-${sweep.id}`;
+    await tx
+      .update(profitCapitalSweeps)
+      .set({ status: "simulated_sent", transactionId, approvedAt: new Date() })
+      .where(eq(profitCapitalSweeps.id, sweep.id));
+    await tx
+      .update(profitDistributions)
+      .set({ status: "simulated_sent", transactionId, approvedAt: new Date() })
+      .where(eq(profitDistributions.id, sweep.profitDistributionId));
+    await tx.insert(ledgerEntries).values([
+      {
+        userId: ownerUserId,
+        entryType: "profit_distribution",
+        direction: "debit",
+        account: sweep.sourceAccount,
+        currency: "BRL",
+        amount: sweep.sourceAmountBrl,
+        idempotencyKey: `profit-sweep:${sweep.id}:brl`,
+        metadata: JSON.stringify({
+          sweepId: sweep.id,
+          route: sweep.route,
+          mode: "sandbox",
+        }),
+      },
+      {
+        userId: ownerUserId,
+        entryType: "profit_distribution",
+        direction: "credit",
+        account: sweep.destinationAccount,
+        currency: "stBTC",
+        amount: sweep.estimatedAssetAmount,
+        idempotencyKey: `profit-sweep:${sweep.id}:stbtc`,
+        metadata: JSON.stringify({
+          sweepId: sweep.id,
+          wallet: sweep.destinationWalletAddress,
+          minimumAssetAmount: sweep.minimumAssetAmount,
+          route: sweep.route,
+          transactionId,
+          mode: "sandbox",
+        }),
+      },
+    ]);
+    return (
+      await tx
+        .select()
+        .from(profitCapitalSweeps)
+        .where(eq(profitCapitalSweeps.id, sweep.id))
+        .limit(1)
+    )[0];
+    });
+  if (completed) {
+    await recordProviderEvent({
+      provider: "sandbox_stacks",
+      eventType: "profit.stbtc_sweep.simulated",
+      externalId:
+        completed.transactionId ?? `sandbox-stbtc-profit-${completed.id}`,
+      idempotencyKey: `${completed.idempotencyKey}:event`,
+      payload: {
+        sweepId: completed.id,
+        sourceAmountBrl: completed.sourceAmountBrl,
+        estimatedAssetAmount: completed.estimatedAssetAmount,
+        minimumAssetAmount: completed.minimumAssetAmount,
+        destinationWalletAddress: completed.destinationWalletAddress,
+        route: completed.route,
+        network: completed.network,
+        mode: "sandbox",
+      },
+  });
+  }
+  return completed;
+}
+
+export async function listProfitCapitalSweeps(ownerUserId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(profitCapitalSweeps)
+    .where(eq(profitCapitalSweeps.ownerUserId, ownerUserId))
+    .orderBy(desc(profitCapitalSweeps.createdAt));
 }
 
 export async function listProfitDistributions(ownerUserId: number) {
   const db = await requireDb();
-  return db.select().from(profitDistributions).where(eq(profitDistributions.ownerUserId, ownerUserId)).orderBy(desc(profitDistributions.createdAt));
+  return db
+    .select()
+    .from(profitDistributions)
+    .where(eq(profitDistributions.ownerUserId, ownerUserId))
+    .orderBy(desc(profitDistributions.createdAt));
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateDistributableProfit,
+  calculateProfitStbtcSweep,
   calculatePurchaseQuote,
   calculateRedemptionQuote,
   estimateDistributionAsset,
@@ -33,7 +34,9 @@ describe("calculateRedemptionQuote", () => {
   it("rejeita quantidade, preço ou taxas inválidas", () => {
     expect(() => calculateRedemptionQuote(0)).toThrow("maior que zero");
     expect(() => calculateRedemptionQuote(0.01, 0)).toThrow("indisponível");
-    expect(() => calculateRedemptionQuote(0.01, 400_000, 1_001)).toThrow("fora do intervalo");
+    expect(() => calculateRedemptionQuote(0.01, 400_000, 1_001)).toThrow(
+      "fora do intervalo"
+    );
   });
 });
 
@@ -66,13 +69,43 @@ describe("calculateDistributableProfit", () => {
 
 describe("Stacks treasury", () => {
   it("diferencia endereços públicos de testnet e mainnet", () => {
-    expect(isValidStacksAddress("ST000000000000000000002AMW42H", "testnet")).toBe(true);
-    expect(isValidStacksAddress("SP000000000000000000002Q6VF78", "mainnet")).toBe(true);
-    expect(isValidStacksAddress("SP000000000000000000002Q6VF78", "testnet")).toBe(false);
+    expect(
+      isValidStacksAddress("ST000000000000000000002AMW42H", "testnet")
+    ).toBe(true);
+    expect(
+      isValidStacksAddress("SP000000000000000000002Q6VF78", "mainnet")
+    ).toBe(true);
+    expect(
+      isValidStacksAddress("SP000000000000000000002Q6VF78", "testnet")
+    ).toBe(false);
   });
 
   it("estima o ativo somente como referência sandbox", () => {
     expect(estimateDistributionAsset(421_930, "sBTC")).toBe(1);
     expect(estimateDistributionAsset(42, "STX")).toBe(10);
+  });
+
+  it("cria um sweep de lucro BRL para stBTC com mínimo protegido por slippage", () => {
+    const sweep = calculateProfitStbtcSweep({
+      distributableProfitBrl: 1_000,
+      referenceStbtcBrl: 400_000,
+      slippageBps: 50,
+    });
+    expect(sweep.sourceAmountBrl).toBe(1_000);
+    expect(sweep.estimatedAssetAmount).toBe(0.0025);
+    expect(sweep.minimumAssetAmount).toBe(0.0024875);
+    expect(sweep.route).toBe("BRL>BTC>sBTC>stBTC");
+  });
+
+  it("bloqueia sweep sem lucro ou com slippage fora da política", () => {
+    expect(() =>
+      calculateProfitStbtcSweep({ distributableProfitBrl: 0 })
+    ).toThrow("maior que zero");
+    expect(() =>
+      calculateProfitStbtcSweep({
+        distributableProfitBrl: 10,
+        slippageBps: 501,
+      })
+    ).toThrow("entre 0 e 500");
   });
 });

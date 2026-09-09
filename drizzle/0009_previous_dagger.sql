@@ -1,0 +1,1 @@
+ALTER TABLE `treasury_settings` ADD `personalProfitWalletAddress` varchar(80);

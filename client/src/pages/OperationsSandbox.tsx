@@ -20,25 +20,54 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const currency = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
 
 export default function OperationsSandbox() {
   const { user, loading, isAuthenticated } = useAuth();
   const isAdmin = user?.role === "admin";
   const utils = trpc.useUtils();
-  const settingsQuery = trpc.treasury.settings.useQuery(undefined, { enabled: isAdmin });
-  const distributionsQuery = trpc.treasury.distributions.useQuery(undefined, { enabled: isAdmin });
-  const ledgerQuery = trpc.treasury.ledger.useQuery(undefined, { enabled: isAdmin });
-  const pixDepositsQuery = trpc.pixDeposits.operationalList.useQuery(undefined, { enabled: isAdmin });
-  const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated });
-  const redemptionsQuery = trpc.redemptions.operationalList.useQuery(undefined, { enabled: isAdmin });
-  const mercadoPagoQuery = trpc.integrations.mercadoPago.useQuery(undefined, { enabled: isAdmin });
-  const [organizationName, setOrganizationName] = useState("Organização RendeBit");
+  const settingsQuery = trpc.treasury.settings.useQuery(undefined, {
+    enabled: isAdmin,
+  });
+  const distributionsQuery = trpc.treasury.distributions.useQuery(undefined, {
+    enabled: isAdmin,
+  });
+  const capitalSweepsQuery = trpc.treasury.capitalSweeps.useQuery(undefined, {
+    enabled: isAdmin,
+  });
+  const ledgerQuery = trpc.treasury.ledger.useQuery(undefined, {
+    enabled: isAdmin,
+  });
+  const pixDepositsQuery = trpc.pixDeposits.operationalList.useQuery(
+    undefined,
+    { enabled: isAdmin }
+  );
+  const purchasesQuery = trpc.purchases.list.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+  const redemptionsQuery = trpc.redemptions.operationalList.useQuery(
+    undefined,
+    { enabled: isAdmin }
+  );
+  const mercadoPagoQuery = trpc.integrations.mercadoPago.useQuery(undefined, {
+    enabled: isAdmin,
+  });
+  const [organizationName, setOrganizationName] = useState(
+    "Organização RendeBit"
+  );
   const [wallet, setWallet] = useState("");
+  const [profitWallet, setProfitWallet] = useState("");
   const [asset, setAsset] = useState<"STX" | "sBTC" | "stBTC">("sBTC");
   const [network, setNetwork] = useState<"testnet" | "mainnet">("testnet");
-  const [cadence, setCadence] = useState<"daily" | "weekly" | "monthly">("monthly");
-  const [approvalMode, setApprovalMode] = useState<"manual" | "multisig" | "automatic">("manual");
+  const [cadence, setCadence] = useState<"daily" | "weekly" | "monthly">(
+    "monthly"
+  );
+  const [approvalMode, setApprovalMode] = useState<
+    "manual" | "multisig" | "automatic"
+  >("manual");
   const [taxReserve, setTaxReserve] = useState(15);
   const [operationalReserve, setOperationalReserve] = useState(10);
 
@@ -47,6 +76,7 @@ export default function OperationsSandbox() {
     if (!settings) return;
     setOrganizationName(settings.organizationName);
     setWallet(settings.stacksWalletAddress ?? "");
+    setProfitWallet(settings.personalProfitWalletAddress ?? "");
     setAsset(settings.distributionAsset);
     setNetwork(settings.network);
     setCadence(settings.cadence);
@@ -58,42 +88,108 @@ export default function OperationsSandbox() {
   const saveSettings = trpc.treasury.updateSettings.useMutation({
     onSuccess: async data => {
       await utils.treasury.settings.invalidate();
-      toast.success(data.status === "ready" ? "Tesouraria pronta no sandbox" : "Configuração salva como rascunho");
+      toast.success(
+        data.status === "ready"
+          ? "Tesouraria pronta no sandbox"
+          : "Configuração salva como rascunho"
+      );
     },
     onError: error => toast.error(error.message),
   });
   const closePeriod = trpc.treasury.closePeriod.useMutation({
     onSuccess: async data => {
       await utils.treasury.distributions.invalidate();
-      toast.success(data.status === "blocked" ? "Fechamento criado e bloqueado" : "Fechamento aguardando aprovação");
+      toast.success(
+        data.status === "blocked"
+          ? "Fechamento criado e bloqueado"
+          : "Fechamento aguardando aprovação"
+      );
     },
     onError: error => toast.error(error.message),
   });
-  const approve = trpc.treasury.approveSandbox.useMutation({
+  const proposeSweep = trpc.treasury.proposeStbtcSweep.useMutation({
+    onSuccess: async data => {
+      await capitalSweepsQuery.refetch();
+      toast.success(
+        data.status === "pending_approval"
+          ? "Sweep stBTC proposto"
+          : "Sweep stBTC bloqueado",
+        { description: data.blockerReason ?? "Aguardando aprovação explícita." }
+      );
+    },
+    onError: error => toast.error(error.message),
+  });
+  const approveSweep = trpc.treasury.approveStbtcSweep.useMutation({
     onSuccess: async () => {
-      await Promise.all([utils.treasury.distributions.invalidate(), utils.treasury.ledger.invalidate()]);
-      toast.success("Repasse simulado registrado", { description: "Nenhuma transação on-chain real foi enviada." });
+      await Promise.all([
+        utils.treasury.distributions.invalidate(),
+        utils.treasury.capitalSweeps.invalidate(),
+        utils.treasury.ledger.invalidate(),
+      ]);
+      toast.success("Sweep stBTC simulado registrado", {
+        description:
+          "A conta de lucros foi atualizada somente no ledger sandbox; nenhuma transação on-chain real foi enviada.",
+      });
     },
     onError: error => toast.error(error.message),
   });
 
-  if (loading) return <div className="br-ops-gate"><Loader2 className="animate-spin" /> Carregando ambiente seguro…</div>;
-  if (!isAuthenticated) return <div className="br-ops-gate"><KeyRound /><h2>Entre para acessar a operação sandbox</h2><p>O painel usa autenticação e separa dados por usuário.</p><button className="br-primary" type="button" onClick={() => startLogin("google")}>Entrar com Google <ArrowRight size={16} /></button></div>;
-  if (!isAdmin) return <div className="br-ops-gate"><ShieldCheck /><h2>Acesso restrito</h2><p>Somente o administrador da organização pode configurar ou aprovar repasses.</p></div>;
+  if (loading)
+    return (
+      <div className="br-ops-gate">
+        <Loader2 className="animate-spin" /> Carregando ambiente seguro…
+      </div>
+    );
+  if (!isAuthenticated)
+    return (
+      <div className="br-ops-gate">
+        <KeyRound />
+        <h2>Entre para acessar a operação sandbox</h2>
+        <p>O painel usa autenticação e separa dados por usuário.</p>
+        <button
+          className="br-primary"
+          type="button"
+          onClick={() => startLogin("google")}
+        >
+          Entrar com Google <ArrowRight size={16} />
+        </button>
+      </div>
+    );
+  if (!isAdmin)
+    return (
+      <div className="br-ops-gate">
+        <ShieldCheck />
+        <h2>Acesso restrito</h2>
+        <p>
+          Somente o administrador da organização pode configurar ou aprovar
+          repasses.
+        </p>
+      </div>
+    );
 
   const settings = settingsQuery.data;
   const entries = ledgerQuery.data ?? [];
   const pixDeposits = pixDepositsQuery.data ?? [];
   const redemptions = redemptionsQuery.data ?? [];
   const distributions = distributionsQuery.data ?? [];
-  const grossRevenue = entries.filter(item => item.entryType === "fee_revenue" && item.currency === "BRL").reduce((sum, item) => sum + Number(item.amount), 0);
-  const providerCosts = entries.filter(item => item.entryType === "provider_cost" && item.currency === "BRL").reduce((sum, item) => sum + Number(item.amount), 0);
-  const estimatedNet = Math.max(0, grossRevenue - providerCosts) * (1 - taxReserve / 100 - operationalReserve / 100);
+  const capitalSweeps = capitalSweepsQuery.data ?? [];
+  const grossRevenue = entries
+    .filter(item => item.entryType === "fee_revenue" && item.currency === "BRL")
+    .reduce((sum, item) => sum + Number(item.amount), 0);
+  const providerCosts = entries
+    .filter(
+      item => item.entryType === "provider_cost" && item.currency === "BRL"
+    )
+    .reduce((sum, item) => sum + Number(item.amount), 0);
+  const estimatedNet =
+    Math.max(0, grossRevenue - providerCosts) *
+    (1 - taxReserve / 100 - operationalReserve / 100);
 
   function submitSettings() {
     saveSettings.mutate({
       organizationName,
       stacksWalletAddress: wallet.trim() || null,
+      personalProfitWalletAddress: profitWallet.trim() || null,
       distributionAsset: asset,
       cadence,
       approvalMode,
@@ -105,71 +201,613 @@ export default function OperationsSandbox() {
 
   function createClosing() {
     const periodKey = new Date().toISOString().slice(0, 7);
-    closePeriod.mutate({ periodKey, idempotencyKey: `close-${periodKey}-${crypto.randomUUID()}` });
+    closePeriod.mutate({
+      periodKey,
+      idempotencyKey: `close-${periodKey}-${crypto.randomUUID()}`,
+    });
   }
 
   return (
     <div className="br-stack br-ops-page">
       <section className="br-page-hero compact br-ops-hero">
-        <div><span className="br-eyebrow light">OPERAÇÃO CONTROLADA</span><h1>Sandbox financeiro com trilha auditável.</h1><p>KYC, Pix, custódia e Stacks são simulados. Banco, idempotência, ledger e aprovações já são persistentes.</p></div>
-        <div className="br-big-icon"><Database /></div>
+        <div>
+          <span className="br-eyebrow light">OPERAÇÃO CONTROLADA</span>
+          <h1>Sandbox financeiro com trilha auditável.</h1>
+          <p>
+            KYC, Pix, custódia e Stacks são simulados. Banco, idempotência,
+            ledger e aprovações já são persistentes.
+          </p>
+        </div>
+        <div className="br-big-icon">
+          <Database />
+        </div>
       </section>
 
-      <div className="br-sandbox-warning"><AlertTriangle size={18} /><div><b>Nenhum dinheiro ou criptoativo é movimentado.</b><span>Chaves privadas nunca são solicitadas. Ativação real exige contratos, credenciais em secrets, revisão jurídica e controles de produção.</span></div></div>
+      <div className="br-sandbox-warning">
+        <AlertTriangle size={18} />
+        <div>
+          <b>Nenhum dinheiro ou criptoativo é movimentado.</b>
+          <span>
+            Chaves privadas nunca são solicitadas. Ativação real exige
+            contratos, credenciais em secrets, revisão jurídica e controles de
+            produção.
+          </span>
+        </div>
+      </div>
 
       <div className="br-ops-status-grid">
-        <article className="br-panel"><Database /><small>Persistência</small><b>Banco ativo</b><span>{purchasesQuery.data?.length ?? 0} compras registradas</span></article>
-        <article className="br-panel"><BadgeCheck /><small>KYC</small><b>Adaptador sandbox</b><span>Webhook idempotente</span></article>
-        <article className="br-panel"><Landmark /><small>Mercado Pago</small><b>{mercadoPagoQuery.data?.configured ? `Conectado · ${mercadoPagoQuery.data.mode}` : "Aguardando credencial"}</b><span>Pix e cartão · compra de BTC separada</span></article>
-        <article className="br-panel"><WalletCards /><small>Tesouraria</small><b>{settings?.status === "ready" ? "Pronta" : "Bloqueada"}</b><span>{settings?.stacksWalletAddress ? `${settings.stacksWalletAddress.slice(0, 8)}…` : "Carteira não informada"}</span></article>
+        <article className="br-panel">
+          <Database />
+          <small>Persistência</small>
+          <b>Banco ativo</b>
+          <span>{purchasesQuery.data?.length ?? 0} compras registradas</span>
+        </article>
+        <article className="br-panel">
+          <BadgeCheck />
+          <small>KYC</small>
+          <b>Adaptador sandbox</b>
+          <span>Webhook idempotente</span>
+        </article>
+        <article className="br-panel">
+          <Landmark />
+          <small>Mercado Pago</small>
+          <b>
+            {mercadoPagoQuery.data?.configured
+              ? `Conectado · ${mercadoPagoQuery.data.mode}`
+              : "Aguardando credencial"}
+          </b>
+          <span>Pix e cartão · compra de BTC separada</span>
+        </article>
+        <article className="br-panel">
+          <WalletCards />
+          <small>Tesouraria</small>
+          <b>
+            {settings?.personalProfitWalletAddress
+              ? "Lucro stBTC separado"
+              : "Conta de lucro pendente"}
+          </b>
+          <span>
+            {settings?.personalProfitWalletAddress
+              ? `${settings.personalProfitWalletAddress.slice(0, 8)}…`
+              : "Carteira dedicada não informada"}
+          </span>
+        </article>
       </div>
 
       <div className="br-ops-layout">
         <section className="br-panel br-ops-form-card">
-          <div className="br-section-head"><div><span className="br-eyebrow">POLÍTICA DE TESOURARIA</span><h2>Destino do lucro distribuível</h2></div><span className={`br-ops-state ${settings?.status === "ready" ? "ready" : ""}`}>{settings?.status === "ready" ? "Configurada" : "Rascunho"}</span></div>
-          <div className="br-ops-form">
-            <label><span>Organização</span><input value={organizationName} onChange={event => setOrganizationName(event.target.value)} /></label>
-            <label className="wide"><span>Carteira Stacks da organização</span><input value={wallet} onChange={event => setWallet(event.target.value.toUpperCase())} placeholder={network === "mainnet" ? "SP… ou SM…" : "ST… ou SN…"} /></label>
-            <label><span>Rede</span><select value={network} onChange={event => setNetwork(event.target.value as "testnet" | "mainnet")}><option value="testnet">Testnet</option><option value="mainnet">Mainnet (somente configuração)</option></select></label>
-            <label><span>Ativo do repasse</span><select value={asset} onChange={event => setAsset(event.target.value as typeof asset)}><option value="sBTC">sBTC</option><option value="stBTC">stBTC</option><option value="STX">STX</option></select></label>
-            <label><span>Periodicidade</span><select value={cadence} onChange={event => setCadence(event.target.value as typeof cadence)}><option value="monthly">Mensal</option><option value="weekly">Semanal</option><option value="daily">Diária</option></select></label>
-            <label><span>Aprovação</span><select value={approvalMode} onChange={event => setApprovalMode(event.target.value as typeof approvalMode)}><option value="manual">Manual</option><option value="multisig">Multisig</option><option value="automatic">Automática (bloqueada em sandbox)</option></select></label>
-            <label><span>Provisão tributária (%)</span><input type="number" min="0" max="50" value={taxReserve} onChange={event => setTaxReserve(Number(event.target.value))} /></label>
-            <label><span>Reserva operacional (%)</span><input type="number" min="0" max="50" value={operationalReserve} onChange={event => setOperationalReserve(Number(event.target.value))} /></label>
+          <div className="br-section-head">
+            <div>
+              <span className="br-eyebrow">POLÍTICA DE TESOURARIA</span>
+              <h2>Destino do lucro distribuível</h2>
+            </div>
+            <span
+              className={`br-ops-state ${settings?.status === "ready" ? "ready" : ""}`}
+            >
+              {settings?.status === "ready" ? "Configurada" : "Rascunho"}
+            </span>
           </div>
-          <button className="br-primary full" type="button" onClick={submitSettings} disabled={saveSettings.isPending}>{saveSettings.isPending ? <Loader2 className="animate-spin" /> : <ShieldCheck size={16} />} Salvar política</button>
-          <p className="br-dialog-footnote"><KeyRound size={13} /> Informe apenas o endereço público. Assinatura real deverá usar cofre de chaves ou multisig no backend.</p>
+          <div className="br-ops-form">
+            <label>
+              <span>Organização</span>
+              <input
+                value={organizationName}
+                onChange={event => setOrganizationName(event.target.value)}
+              />
+            </label>
+            <label className="wide">
+              <span>Carteira Stacks da organização</span>
+              <input
+                value={wallet}
+                onChange={event => setWallet(event.target.value.toUpperCase())}
+                placeholder={
+                  network === "mainnet" ? "SP… ou SM…" : "ST… ou SN…"
+                }
+              />
+            </label>
+            <label className="wide">
+              <span>Carteira dedicada da conta pessoal de lucros stBTC</span>
+              <input
+                value={profitWallet}
+                onChange={event =>
+                  setProfitWallet(event.target.value.toUpperCase())
+                }
+                placeholder={
+                  network === "mainnet" ? "SP… ou SM…" : "ST… ou SN…"
+                }
+              />
+            </label>
+            <label>
+              <span>Rede</span>
+              <select
+                value={network}
+                onChange={event =>
+                  setNetwork(event.target.value as "testnet" | "mainnet")
+                }
+              >
+                <option value="testnet">Testnet</option>
+                <option value="mainnet">Mainnet (somente configuração)</option>
+              </select>
+            </label>
+            <label>
+              <span>Ativo do repasse</span>
+              <select
+                value={asset}
+                onChange={event => setAsset(event.target.value as typeof asset)}
+              >
+                <option value="sBTC">sBTC</option>
+                <option value="stBTC">stBTC</option>
+                <option value="STX">STX</option>
+              </select>
+            </label>
+            <label>
+              <span>Periodicidade</span>
+              <select
+                value={cadence}
+                onChange={event =>
+                  setCadence(event.target.value as typeof cadence)
+                }
+              >
+                <option value="monthly">Mensal</option>
+                <option value="weekly">Semanal</option>
+                <option value="daily">Diária</option>
+              </select>
+            </label>
+            <label>
+              <span>Aprovação</span>
+              <select
+                value={approvalMode}
+                onChange={event =>
+                  setApprovalMode(event.target.value as typeof approvalMode)
+                }
+              >
+                <option value="manual">Manual</option>
+                <option value="multisig">Multisig</option>
+                <option value="automatic">
+                  Automática (bloqueada em sandbox)
+                </option>
+              </select>
+            </label>
+            <label>
+              <span>Provisão tributária (%)</span>
+              <input
+                type="number"
+                min="0"
+                max="50"
+                value={taxReserve}
+                onChange={event => setTaxReserve(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              <span>Reserva operacional (%)</span>
+              <input
+                type="number"
+                min="0"
+                max="50"
+                value={operationalReserve}
+                onChange={event =>
+                  setOperationalReserve(Number(event.target.value))
+                }
+              />
+            </label>
+          </div>
+          <button
+            className="br-primary full"
+            type="button"
+            onClick={submitSettings}
+            disabled={saveSettings.isPending}
+          >
+            {saveSettings.isPending ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <ShieldCheck size={16} />
+            )}{" "}
+            Salvar política
+          </button>
+          <p className="br-dialog-footnote">
+            <KeyRound size={13} /> Use uma carteira pública dedicada, diferente
+            da operacional. Assinatura real deverá usar cofre de chaves ou
+            multisig no backend.
+          </p>
         </section>
 
         <section className="br-panel br-profit-card">
-          <span className="br-eyebrow">LUCRO DISTRIBUÍVEL</span><h2>Somente após conciliação e reservas.</h2>
-          <div className="br-profit-formula"><div><span>Receitas realizadas</span><b>{currency.format(grossRevenue)}</b></div><div><span>Custos de parceiros</span><b>− {currency.format(providerCosts)}</b></div><div><span>Provisão tributária</span><b>− {taxReserve}%</b></div><div><span>Reserva operacional</span><b>− {operationalReserve}%</b></div><div className="total"><span>Estimativa distribuível</span><strong>{currency.format(estimatedNet)}</strong></div></div>
-          <div className="br-safety-note"><ShieldCheck /><p><b>Fundos de clientes nunca entram neste cálculo.</b> A distribuição usa apenas receita realizada, líquida de custos e reservas.</p></div>
-          <button className="br-outline full" type="button" onClick={createClosing} disabled={closePeriod.isPending}><RefreshCw size={15} /> Fechar período atual</button>
+          <span className="br-eyebrow">LUCRO DISTRIBUÍVEL</span>
+          <h2>Somente após conciliação e reservas.</h2>
+          <div className="br-profit-formula">
+            <div>
+              <span>Receitas realizadas</span>
+              <b>{currency.format(grossRevenue)}</b>
+            </div>
+            <div>
+              <span>Custos de parceiros</span>
+              <b>− {currency.format(providerCosts)}</b>
+            </div>
+            <div>
+              <span>Provisão tributária</span>
+              <b>− {taxReserve}%</b>
+            </div>
+            <div>
+              <span>Reserva operacional</span>
+              <b>− {operationalReserve}%</b>
+            </div>
+            <div className="total">
+              <span>Estimativa distribuível</span>
+              <strong>{currency.format(estimatedNet)}</strong>
+            </div>
+          </div>
+          <div className="br-safety-note">
+            <ShieldCheck />
+            <p>
+              <b>Fundos de clientes nunca entram neste cálculo.</b> A
+              distribuição usa apenas receita realizada, líquida de custos e
+              reservas.
+            </p>
+          </div>
+          <button
+            className="br-outline full"
+            type="button"
+            onClick={createClosing}
+            disabled={closePeriod.isPending}
+          >
+            <RefreshCw size={15} /> Fechar período atual
+          </button>
         </section>
       </div>
 
       <section className="br-panel br-table-card">
-        <div className="br-section-head"><div><span className="br-eyebrow">APROVAÇÕES</span><h2>Repasses simulados</h2></div><span className="br-help-honesty"><CheckCircle2 size={15} /> Aprovação explícita</span></div>
-        {distributions.length === 0 ? <div className="br-ops-empty">Nenhum fechamento criado ainda.</div> : <div className="br-table-scroll"><table><thead><tr><th>Período</th><th>Receita</th><th>Reservas</th><th>Distribuível</th><th>Destino</th><th>Status</th><th>Ação</th></tr></thead><tbody>{distributions.map(item => <tr key={item.id}><td><b>{item.periodKey}</b></td><td>{currency.format(Number(item.grossRevenueBrl))}</td><td>{currency.format(Number(item.taxReserveBrl) + Number(item.operationalReserveBrl))}</td><td><b>{currency.format(Number(item.distributableProfitBrl))}</b><small className="br-asset-estimate">≈ {item.estimatedAssetAmount} {item.distributionAsset}</small></td><td className="mono">{item.stacksWalletAddress ? `${item.stacksWalletAddress.slice(0, 9)}…${item.stacksWalletAddress.slice(-5)}` : "Não configurado"}</td><td><span className={`br-ops-state ${item.status === "simulated_sent" ? "ready" : ""}`}>{item.status === "blocked" ? "Bloqueado" : item.status === "pending_approval" ? "Aguardando" : "Simulado"}</span></td><td>{item.status === "pending_approval" ? <button className="br-small-action" type="button" onClick={() => approve.mutate({ distributionId: item.id })}>Aprovar simulação</button> : item.transactionId ?? "—"}</td></tr>)}</tbody></table></div>}
+        <div className="br-section-head">
+          <div>
+            <span className="br-eyebrow">APROVAÇÕES</span>
+            <h2>Repasses simulados</h2>
+          </div>
+          <span className="br-help-honesty">
+            <CheckCircle2 size={15} /> Aprovação explícita
+          </span>
+        </div>
+        {distributions.length === 0 ? (
+          <div className="br-ops-empty">Nenhum fechamento criado ainda.</div>
+        ) : (
+          <div className="br-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Período</th>
+                  <th>Receita</th>
+                  <th>Reservas</th>
+                  <th>Distribuível</th>
+                  <th>Destino</th>
+                  <th>Status</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {distributions.map(item => {
+                  const sweep = capitalSweeps.find(
+                    entry => entry.profitDistributionId === item.id
+                  );
+                  return (
+                    <tr key={item.id}>
+                      <td>
+                        <b>{item.periodKey}</b>
+                      </td>
+                      <td>{currency.format(Number(item.grossRevenueBrl))}</td>
+                      <td>
+                        {currency.format(
+                          Number(item.taxReserveBrl) +
+                            Number(item.operationalReserveBrl)
+                        )}
+                      </td>
+                      <td>
+                        <b>
+                          {currency.format(Number(item.distributableProfitBrl))}
+                        </b>
+                        <small className="br-asset-estimate">
+                          ≈ {item.estimatedAssetAmount} {item.distributionAsset}
+                        </small>
+                      </td>
+                      <td className="mono">
+                        {item.stacksWalletAddress
+                          ? `${item.stacksWalletAddress.slice(0, 9)}…${item.stacksWalletAddress.slice(-5)}`
+                          : "Não configurado"}
+                      </td>
+                      <td>
+                        <span
+                          className={`br-ops-state ${item.status === "simulated_sent" ? "ready" : ""}`}
+                        >
+                          {sweep?.status === "simulated_sent"
+                            ? "stBTC simulado"
+                            : sweep?.status === "pending_approval"
+                              ? "Sweep aguardando"
+                              : item.status === "blocked"
+                                ? "Bloqueado"
+                                : item.status === "pending_approval"
+                                  ? "Fechado"
+                                  : "Simulado"}
+                        </span>
+                      </td>
+                      <td>
+                        {sweep?.status === "pending_approval" ? (
+                          <button
+                            className="br-small-action"
+                            type="button"
+                            onClick={() =>
+                              approveSweep.mutate({ sweepId: sweep.id })
+                            }
+                          >
+                            Aprovar sweep
+                          </button>
+                        ) : item.status === "pending_approval" &&
+                          !sweep &&
+                          item.distributionAsset === "stBTC" ? (
+                          <button
+                            className="br-small-action"
+                            type="button"
+                            onClick={() =>
+                              proposeSweep.mutate({
+                                distributionId: item.id,
+                                idempotencyKey: `profit-sweep-${item.id}`,
+                              })
+                            }
+                          >
+                            Propor stBTC
+                          </button>
+                        ) : item.status === "pending_approval" && !sweep ? (
+                          <span className="br-table-muted">
+                            Fechamento em {item.distributionAsset}
+                          </span>
+                        ) : sweep?.status === "blocked" ? (
+                          <span className="br-table-muted">Bloqueado</span>
+                        ) : (
+                          (sweep?.transactionId ?? item.transactionId ?? "—")
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="br-panel br-profit-account-card">
+        <div className="br-section-head">
+          <div>
+            <span className="br-eyebrow">CONTA PESSOAL DE LUCROS · stBTC</span>
+            <h2>Capital da organização, separado dos clientes.</h2>
+          </div>
+          <span className="br-help-honesty">
+            <WalletCards size={15} /> {capitalSweeps.length} sweeps
+          </span>
+        </div>
+        <div className="br-profit-account-grid">
+          <div>
+            <small>Origem</small>
+            <b>organization_distributable_profit_brl</b>
+            <span>Receita realizada − custos − reservas</span>
+          </div>
+          <div>
+            <small>Rota metodológica</small>
+            <b>BRL → BTC → sBTC → stBTC</b>
+            <span>Conversão com cotação registrada e slippage de 0,50%</span>
+          </div>
+          <div>
+            <small>Destino contábil</small>
+            <b>owner_personal_profit_stbtc</b>
+            <span>Carteira pública configurada; nunca o saldo do cliente</span>
+          </div>
+        </div>
+        {capitalSweeps.length === 0 ? (
+          <div className="br-ops-empty">
+            Feche um período e proponha um sweep para criar a primeira trilha de
+            lucro em stBTC.
+          </div>
+        ) : (
+          <div className="br-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Criado</th>
+                  <th>Origem BRL</th>
+                  <th>Estimativa</th>
+                  <th>Mínimo protegido</th>
+                  <th>Rede</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {capitalSweeps.map(item => (
+                  <tr key={item.id}>
+                    <td>{new Date(item.createdAt).toLocaleString("pt-BR")}</td>
+                    <td>
+                      <b>{currency.format(Number(item.sourceAmountBrl))}</b>
+                    </td>
+                    <td className="mono">{item.estimatedAssetAmount} stBTC</td>
+                    <td className="mono">{item.minimumAssetAmount} stBTC</td>
+                    <td>{item.network}</td>
+                    <td>
+                      <span
+                        className={`br-ops-state ${item.status === "simulated_sent" ? "ready" : ""}`}
+                      >
+                        {item.status === "blocked"
+                          ? "Bloqueado"
+                          : item.status === "pending_approval"
+                            ? "Aguardando aprovação"
+                            : "Simulado"}
+                      </span>
+                      {item.blockerReason && item.status === "blocked" && (
+                        <small className="br-table-muted">
+                          {item.blockerReason}
+                        </small>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="br-safety-note">
+          <ShieldCheck />
+          <p>
+            <b>Gate de produção:</b> esta conta só poderá receber stBTC real com
+            bridge/issuer verificável, liquidez, cotação assinada, cofre ou
+            multisig, dupla aprovação e reconciliação independente.
+          </p>
+        </div>
       </section>
 
       <section className="br-panel br-table-card">
-        <div className="br-section-head"><div><span className="br-eyebrow">DEPÓSITOS VIA PIX</span><h2>Cobranças e conciliação</h2></div><span className="br-help-honesty"><ArrowRight size={15} /> {pixDeposits.length} registros</span></div>
-        {pixDeposits.length === 0 ? <div className="br-ops-empty">Nenhum depósito Pix registrado ainda.</div> : <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Cliente</th><th>Valor BRL</th><th>Status</th><th>Cobrança</th><th>EndToEndId</th></tr></thead><tbody>{pixDeposits.map(item => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString("pt-BR")}</td><td>#{item.userId}</td><td><b>{currency.format(Number(item.amountBrl))}</b></td><td><span className={`br-ops-state ${item.status === "paid" ? "ready" : ""}`}>{item.status}</span></td><td className="mono">{item.providerReference || "—"}</td><td className="mono">{item.endToEndId || "—"}</td></tr>)}</tbody></table></div>}
+        <div className="br-section-head">
+          <div>
+            <span className="br-eyebrow">DEPÓSITOS VIA PIX</span>
+            <h2>Cobranças e conciliação</h2>
+          </div>
+          <span className="br-help-honesty">
+            <ArrowRight size={15} /> {pixDeposits.length} registros
+          </span>
+        </div>
+        {pixDeposits.length === 0 ? (
+          <div className="br-ops-empty">
+            Nenhum depósito Pix registrado ainda.
+          </div>
+        ) : (
+          <div className="br-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Cliente</th>
+                  <th>Valor BRL</th>
+                  <th>Status</th>
+                  <th>Cobrança</th>
+                  <th>EndToEndId</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pixDeposits.map(item => (
+                  <tr key={item.id}>
+                    <td>{new Date(item.createdAt).toLocaleString("pt-BR")}</td>
+                    <td>#{item.userId}</td>
+                    <td>
+                      <b>{currency.format(Number(item.amountBrl))}</b>
+                    </td>
+                    <td>
+                      <span
+                        className={`br-ops-state ${item.status === "paid" ? "ready" : ""}`}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="mono">{item.providerReference || "—"}</td>
+                    <td className="mono">{item.endToEndId || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="br-panel br-table-card">
-        <div className="br-section-head"><div><span className="br-eyebrow">RESGATES VIA PIX</span><h2>Fila operacional e reconciliação</h2></div><span className="br-help-honesty"><Landmark size={15} /> {redemptions.length} solicitações</span></div>
-        {redemptions.length === 0 ? <div className="br-ops-empty">Nenhum resgate solicitado ainda.</div> : <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Cliente</th><th>BTC</th><th>Líquido BRL</th><th>Etapa</th><th>Status</th><th>Referência Pix</th></tr></thead><tbody>{redemptions.map(item => <tr key={item.id}><td>{new Date(item.requestedAt).toLocaleString("pt-BR")}</td><td>#{item.userId}</td><td className="mono">{item.btcAmount}</td><td>{currency.format(Number(item.netBrl))}</td><td>{item.stage}</td><td><span className={`br-ops-state ${item.status === "settled" ? "ready" : ""}`}>{item.status}</span></td><td className="mono">{item.pixEndToEndId || "—"}</td></tr>)}</tbody></table></div>}
+        <div className="br-section-head">
+          <div>
+            <span className="br-eyebrow">RESGATES VIA PIX</span>
+            <h2>Fila operacional e reconciliação</h2>
+          </div>
+          <span className="br-help-honesty">
+            <Landmark size={15} /> {redemptions.length} solicitações
+          </span>
+        </div>
+        {redemptions.length === 0 ? (
+          <div className="br-ops-empty">Nenhum resgate solicitado ainda.</div>
+        ) : (
+          <div className="br-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Cliente</th>
+                  <th>BTC</th>
+                  <th>Líquido BRL</th>
+                  <th>Etapa</th>
+                  <th>Status</th>
+                  <th>Referência Pix</th>
+                </tr>
+              </thead>
+              <tbody>
+                {redemptions.map(item => (
+                  <tr key={item.id}>
+                    <td>
+                      {new Date(item.requestedAt).toLocaleString("pt-BR")}
+                    </td>
+                    <td>#{item.userId}</td>
+                    <td className="mono">{item.btcAmount}</td>
+                    <td>{currency.format(Number(item.netBrl))}</td>
+                    <td>{item.stage}</td>
+                    <td>
+                      <span
+                        className={`br-ops-state ${item.status === "settled" ? "ready" : ""}`}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="mono">{item.pixEndToEndId || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="br-panel br-table-card">
-        <div className="br-section-head"><div><span className="br-eyebrow">LEDGER</span><h2>Trilha contábil persistida</h2></div><span>{entries.length} lançamentos</span></div>
-        <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Tipo</th><th>Conta</th><th>Direção</th><th>Valor</th><th>Chave idempotente</th></tr></thead><tbody>{entries.map(entry => <tr key={entry.id}><td>{new Date(entry.createdAt).toLocaleString("pt-BR")}</td><td>{entry.entryType}</td><td>{entry.account}</td><td>{entry.direction}</td><td>{entry.currency} {entry.amount}</td><td className="mono">{entry.idempotencyKey}</td></tr>)}</tbody></table></div>
+        <div className="br-section-head">
+          <div>
+            <span className="br-eyebrow">LEDGER</span>
+            <h2>Trilha contábil persistida</h2>
+          </div>
+          <span>{entries.length} lançamentos</span>
+        </div>
+        <div className="br-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Conta</th>
+                <th>Direção</th>
+                <th>Valor</th>
+                <th>Chave idempotente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map(entry => (
+                <tr key={entry.id}>
+                  <td>{new Date(entry.createdAt).toLocaleString("pt-BR")}</td>
+                  <td>{entry.entryType}</td>
+                  <td>{entry.account}</td>
+                  <td>{entry.direction}</td>
+                  <td>
+                    {entry.currency} {entry.amount}
+                  </td>
+                  <td className="mono">{entry.idempotencyKey}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <footer className="br-ops-footer"><Bitcoin size={17} /><span>Política configurada: 100% do <b>lucro distribuível</b> vai para a carteira Stacks definida — nunca o principal do cliente.</span><Banknote size={17} /></footer>
+      <footer className="br-ops-footer">
+        <Bitcoin size={17} />
+        <span>
+          Política configurada: 100% do <b>lucro distribuível</b> pode seguir
+          para a conta dedicada em stBTC — nunca o principal do cliente.
+        </span>
+        <Banknote size={17} />
+      </footer>
       <RendeBitFooter />
     </div>
   );

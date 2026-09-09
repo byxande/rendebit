@@ -13,7 +13,7 @@ A Xverse foi classificada como integração opcional de autocustódia. Sua API p
 ## Controles implementados
 
 | Controle | Implementação atual | Condição para produção |
-|---|---|---|
+| ------------------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Autenticação | OAuth e procedimentos protegidos | Revisar política de sessão e recuperação de conta |
 | KYC | Adaptador determinístico, dados mascarados e webhook idempotente | Contrato e credenciais de MetaMap, Veriff ou parceiro escolhido; LGPD e retenção |
 | Titularidade Pix | Declaração persistida no sandbox | Validação pelo parceiro bancário e comparação de CPF/nome do titular |
@@ -32,10 +32,12 @@ O sistema interpreta “todo lucro” como **100% do lucro distribuível**, e n�
 
 A carteira organizacional recebe apenas o ativo configurado — STX, sBTC ou stBTC — após o fechamento do período. A interface solicita somente o endereço público e valida checksum e rede. O sandbox nunca solicita seed phrase, chave privada ou assinatura. Uma ativação real deverá usar um cofre de chaves ou uma carteira multisig e manter aprovação manual como padrão inicial.
 
+Para o ativo **stBTC**, o sistema passou a manter uma carteira dedicada de lucros, diferente da carteira operacional. O fluxo registra uma proposta de sweep `BRL → BTC → sBTC → stBTC` que parte exclusivamente de `organization_distributable_profit_brl` e credita `owner_personal_profit_stbtc`; inclui cotação de referência, mínimo protegido por slippage, carteira de destino, rede, bloqueador e chave idempotente. A aprovação no sandbox cria somente lançamentos de ledger correlacionados. Mainnet, bridge real, assinatura e broadcast permanecem bloqueados. A metodologia detalhada está em `docs/metodologia-fluxo-capitais-lucros-stbtc.md`.
+
 ## Modelo de dados
 
 | Tabela | Finalidade |
-|---|---|
+| ----------------------- | --------------------------------------------------------------------------- |
 | `customer_profiles` | Perfil, elegibilidade, titularidade Pix e estado do KYC |
 | `purchase_quotes` | Cotações, taxas, expiração e idempotência |
 | `purchases` | Compras, liquidação e estado da estratégia de rendimento |
@@ -43,6 +45,7 @@ A carteira organizacional recebe apenas o ativo configurado — STX, sBTC ou stB
 | `provider_events` | Webhooks simulados e deduplicação |
 | `treasury_settings` | Carteira, rede, ativo, frequência, aprovação e reservas |
 | `profit_distributions` | Fechamento mensal e repasse simulado, único por período |
+| `profit_capital_sweeps` | Proposta segregada de lucro distribuível BRL para a conta dedicada em stBTC |
 
 ## Próxima ativação
 

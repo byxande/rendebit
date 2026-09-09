@@ -1685,6 +1685,9 @@ h1 em { color: #caff4a; font-style: normal; }
 .br-pix-proof-bar small { margin-left: auto; color: #b69272; font: 8px "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; }
 .br-pix-history-heading { display: flex; align-items: center; gap: 10px; }
 .br-pix-history-heading > div { display: grid; gap: 2px; }
+.br-table-download { display: inline-flex; align-items: center; gap: 4px; padding: 5px 7px; border: 1px solid #e3c99f; border-radius: 6px; color: #a95e10; background: #fff8ec; font: 600 9px "Space Grotesk", sans-serif; cursor: pointer; white-space: nowrap; }
+.br-table-download:hover { border-color: #d97a1f; color: #7b4210; background: #ffefd6; }
+.br-pix-charge .br-outline + .br-outline { margin-top: 8px; }
 @media (max-width: 600px) {
   .br-pix-pending { align-items: flex-start; }
   .br-pix-proof-bar small { display: none; }

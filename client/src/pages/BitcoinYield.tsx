@@ -13,6 +13,7 @@ import {
   Copy,
   CreditCard,
   FileCheck2,
+  FileDown,
   FileText,
   Fingerprint,
   HelpCircle,
@@ -39,7 +40,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -218,6 +219,61 @@ function DemoPill() {
 
 function PixBrand({ compact = false }: { compact?: boolean }) {
   return <span className={`br-pix-brand${compact ? " compact" : ""}`}><img src={PIX_LOGO_SRC} alt="Logo Pix" /></span>;
+}
+
+function pdfText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\u00A0/g, " ").replace(/[^\x20-\x7E]/g, "-").replace(/([\\()])/g, "\\$1");
+}
+
+export function createPixReceiptPdf(deposit: PixDepositRecord) {
+  const issuedAt = new Date(deposit.paidAt ?? deposit.createdAt).toLocaleString("pt-BR");
+  const status = deposit.status === "paid" ? "Pagamento confirmado no sandbox" : deposit.status === "awaiting_payment" ? "Pix aguardando pagamento" : `Status: ${deposit.status}`;
+  const lines = [
+    "RENDEBIT  |  PIX",
+    "Comprovante demonstrativo de deposito",
+    "",
+    `Valor: ${currency.format(Number(deposit.amountBrl))}`,
+    `Status: ${status}`,
+    `Emitido em: ${issuedAt}`,
+    `Referencia do provedor: ${deposit.providerReference ?? "Aguardando confirmacao"}`,
+    `End-to-end ID: ${deposit.endToEndId ?? "Aguardando webhook"}`,
+    "",
+    "Este documento e demonstrativo. Nenhum Pix real foi movimentado.",
+    "A confirmacao depende de webhook assinado e conciliacao do parceiro Pix.",
+  ];
+  const commands = ["BT", "/F1 20 Tf", "50 790 Td"];
+  lines.forEach((line, index) => {
+    if (index > 0) commands.push(`0 -${index === 1 ? 34 : 25} Td`);
+    commands.push(`/F1 ${index === 0 ? 20 : index === 1 ? 12 : 10} Tf (${pdfText(line)}) Tj`);
+  });
+  commands.push("ET");
+  const stream = commands.join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objects.forEach((object, index) => {
+    offsets[index] = pdf.length;
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map(offset => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\ntrailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+function downloadPixReceipt(deposit: PixDepositRecord) {
+  const url = URL.createObjectURL(createPixReceiptPdf(deposit));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `comprovante-pix-rendebit-${deposit.id}.pdf`;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast.success("Comprovante Pix baixado", { description: "PDF demonstrativo gerado no seu navegador." });
 }
 
 function BrazilFirstStrip() {
@@ -487,13 +543,14 @@ function PixDepositPage({ deposits, availableBrl, amount, setAmount, authenticat
             <div className="br-pix-charge-head"><div><span className="br-eyebrow">COBRANÇA ATIVA</span><h2>{currency.format(Number(active.amountBrl))}</h2></div><span className={`br-pix-timer ${secondsLeft === 0 ? "expired" : ""}`}>{secondsLeft > 0 ? `${String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:${String(secondsLeft % 60).padStart(2, "0")}` : "Expirada"}</span></div>
             {qrDataUrl && <img className="br-pix-qr" src={qrDataUrl} alt="QR Code da cobrança Pix sandbox" />}
             <div className="br-pix-code"><span>Pix Copia e Cola</span><code>{active.pixCopyPaste}</code><CopyButton value={active.pixCopyPaste ?? ""} label="Copiar código" /></div>
+            <button className="br-outline full" type="button" onClick={() => downloadPixReceipt(active)}><FileDown size={16} /> Baixar comprovante Pix (PDF)</button>
             <button className="br-outline full" type="button" onClick={() => onPay(active.id)} disabled={loading || secondsLeft === 0}><BadgeCheck size={16} /> Simular pagamento no sandbox</button>
             <p className="br-inline-note">Em produção, este botão não existe: o crédito ocorre somente após webhook assinado e conciliação.</p>
           </>}
         </section>
       </div>
 
-      <section className="br-panel br-table-card br-pix-history"><div className="br-section-head"><div className="br-pix-history-heading"><PixBrand compact /><div><span className="br-eyebrow">HISTÓRICO PIX</span><h2>Depósitos e conciliação</h2></div></div><span className="br-help-honesty"><ReceiptText size={15} /> {deposits.length} registros</span></div>{deposits.length === 0 ? <div className="br-ops-empty">Nenhum depósito Pix registrado.</div> : <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Valor</th><th>Status Pix</th><th>Referência</th><th>Confirmação</th></tr></thead><tbody>{deposits.map(item => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString("pt-BR")}</td><td><b>{currency.format(Number(item.amountBrl))}</b></td><td><span className={`br-status ${item.status === "paid" ? "" : "warning"}`}><i /> {item.status === "awaiting_payment" && new Date(item.expiresAt).getTime() <= now ? "Expirado" : statusLabel[item.status]}</span></td><td className="mono">{item.providerReference ?? "—"}</td><td className="mono">{item.endToEndId ?? "—"}</td></tr>)}</tbody></table></div>}</section>
+      <section className="br-panel br-table-card br-pix-history"><div className="br-section-head"><div className="br-pix-history-heading"><PixBrand compact /><div><span className="br-eyebrow">HISTÓRICO PIX</span><h2>Depósitos e conciliação</h2></div></div><span className="br-help-honesty"><ReceiptText size={15} /> {deposits.length} registros</span></div>{deposits.length === 0 ? <div className="br-ops-empty">Nenhum depósito Pix registrado.</div> : <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Valor</th><th>Status Pix</th><th>Referência</th><th>Confirmação</th><th>Comprovante</th></tr></thead><tbody>{deposits.map(item => <tr key={item.id}><td>{new Date(item.createdAt).toLocaleString("pt-BR")}</td><td><b>{currency.format(Number(item.amountBrl))}</b></td><td><span className={`br-status ${item.status === "paid" ? "" : "warning"}`}><i /> {item.status === "awaiting_payment" && new Date(item.expiresAt).getTime() <= now ? "Expirado" : statusLabel[item.status]}</span></td><td className="mono">{item.providerReference ?? "—"}</td><td className="mono">{item.endToEndId ?? "—"}</td><td><button className="br-table-download" type="button" onClick={() => downloadPixReceipt(item)}><FileDown size={14} /> PDF</button></td></tr>)}</tbody></table></div>}</section>
     </div>
   );
 }
@@ -548,8 +605,8 @@ export default function BitcoinYield() {
   const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
   const utils = trpc.useUtils();
   const profileQuery = trpc.onboarding.get.useQuery(undefined, { enabled: isAuthenticated });
-  const pixDepositsQuery = trpc.pixDeposits.summary.useQuery(undefined, { enabled: isAuthenticated });
-  const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated });
+  const pixDepositsQuery = trpc.pixDeposits.summary.useQuery(undefined, { enabled: isAuthenticated, staleTime: 5_000, refetchInterval: isAuthenticated ? 15_000 : false });
+  const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated, staleTime: 5_000, refetchInterval: isAuthenticated ? 15_000 : false });
   const redemptionsQuery = trpc.redemptions.summary.useQuery(undefined, { enabled: isAuthenticated });
   const marketQuoteQuery = trpc.market.btcBrl.useQuery(undefined, { staleTime: 55_000, refetchInterval: 60_000, retry: 1 });
   const [dashboardNow, setDashboardNow] = useState(Date.now());
@@ -565,6 +622,9 @@ export default function BitcoinYield() {
   });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(() => new URLSearchParams(window.location.search).get("login") === "1");
+  const pixStatusRef = useRef<Record<number, PixDepositRecord["status"]>>({});
+  const simulatedPixIdsRef = useRef<Set<number>>(new Set());
+  const purchaseStatusRef = useRef<Record<number, string>>({});
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [addMoneyOpen, setAddMoneyOpen] = useState(false);
   const [onboardingIntent, setOnboardingIntent] = useState<"purchase" | "deposit">("purchase");
@@ -618,6 +678,40 @@ export default function BitcoinYield() {
   const confirmPurchaseMutation = trpc.purchases.confirm.useMutation();
   const createRedemptionQuoteMutation = trpc.redemptions.createQuote.useMutation();
   const confirmRedemptionMutation = trpc.redemptions.confirm.useMutation();
+
+  useEffect(() => {
+    const deposits = pixDepositsQuery.data?.deposits;
+    if (!isAuthenticated) {
+      pixStatusRef.current = {};
+      simulatedPixIdsRef.current.clear();
+      return;
+    }
+    if (!deposits) return;
+    const previous = pixStatusRef.current;
+    deposits.forEach(item => {
+      if (previous[item.id] === "awaiting_payment" && item.status === "paid" && !simulatedPixIdsRef.current.has(item.id)) {
+        toast.success("Pix confirmado pelo webhook", { description: `${currency.format(Number(item.amountBrl))} foi conciliado e já está disponível no seu saldo em reais.` });
+      }
+      if (item.status === "paid") simulatedPixIdsRef.current.delete(item.id);
+    });
+    pixStatusRef.current = Object.fromEntries(deposits.map(item => [item.id, item.status]));
+  }, [isAuthenticated, pixDepositsQuery.data?.deposits]);
+
+  useEffect(() => {
+    const purchases = purchasesQuery.data;
+    if (!isAuthenticated) {
+      purchaseStatusRef.current = {};
+      return;
+    }
+    if (!purchases) return;
+    const previous = purchaseStatusRef.current;
+    purchases.forEach(item => {
+      if (previous[item.id] === "pending" && item.paymentStatus === "approved") {
+        toast.success("Pagamento confirmado pelo webhook", { description: "Seu aporte foi validado pelo provedor e seguirá para conciliação." });
+      }
+    });
+    purchaseStatusRef.current = Object.fromEntries(purchases.map(item => [item.id, item.paymentStatus]));
+  }, [isAuthenticated, purchasesQuery.data]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -765,6 +859,7 @@ export default function BitcoinYield() {
   }
 
   async function settlePixDeposit(depositId: number) {
+    simulatedPixIdsRef.current.add(depositId);
     try {
       const deposit = await settlePixDepositMutation.mutateAsync({ depositId, idempotencyKey: `pix-payment-${depositId}-${crypto.randomUUID()}` });
       await Promise.all([
@@ -774,6 +869,7 @@ export default function BitcoinYield() {
       ]);
       toast.success("Depósito Pix confirmado no sandbox", { description: `${currency.format(Number(deposit.amountBrl))} agora aparece no saldo em reais.` });
     } catch (error) {
+      simulatedPixIdsRef.current.delete(depositId);
       toast.error(error instanceof Error ? error.message : "Não foi possível confirmar o depósito Pix.");
     }
   }

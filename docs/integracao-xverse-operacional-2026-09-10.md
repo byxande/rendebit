@@ -26,6 +26,14 @@ A área **Segurança** ganhou o botão **Conectar Xverse**. Após a aprovação 
 
 O adaptador em `client/src/lib/xverse.ts` concentra as chamadas `wallet_connect`, `stx_signTransaction`, `stx_transferStx` e `disconnect`. A função de assinatura não transmite por padrão. A função de transferência existe como capacidade isolada, mas não está conectada a um botão financeiro no sandbox.
 
+### Jornada lúdica de autorização
+
+Para clientes iniciantes, a autorização aparece como uma pequena jornada de três passos, sem jargão técnico desnecessário. O primeiro passo explica que a Xverse compartilhará somente a referência pública Stacks escolhida pelo cliente. O segundo reforça que qualquer saque, troca ou yield deverá ser conferido e aprovado na própria carteira. O terceiro mostra a proteção permanente: a RendeBit nunca recebe seed phrase, chave privada ou senha.
+
+Ao tocar em **Continuar com Xverse**, o adaptador executa `wallet_connect` com a finalidade explícita e solicita somente o endereço Stacks da rede testnet. Segundo a documentação oficial, essa conexão concede permissão de leitura da conta; ela não autoriza assinaturas de transações. A interface também oferece **Revisar permissão**, usando `wallet_requestPermissions`, e **Encerrar autorização de leitura**, usando `wallet_renouncePermissions`. A consulta `wallet_getCurrentPermissions` está disponível no adaptador, mas não é chamada durante o carregamento da página, porque qualquer comunicação com a carteira deve partir de uma intenção visível do cliente.
+
+O texto da interface diferencia três coisas: ler uma referência pública, assinar uma operação específica e transmitir uma transação. A primeira é a autorização atual; a segunda exige aprovação do usuário em cada pedido; e a terceira permanece bloqueada no sandbox. Essa distinção evita a impressão de que conectar a carteira equivale a entregar controle dos ativos.
+
 ## Backend e auditoria
 
 A tabela `xverse_actions` registra a conexão e futuras intenções assinadas. O router `wallets.recordXverseConnection` verifica que a carteira pertence ao usuário autenticado antes de registrar o evento. O painel `/operacao` consulta a fila administrativa e mostra, sem expor dados sensíveis, a ação, a rede, o endereço abreviado, o status e o txid quando existir.
@@ -54,6 +62,10 @@ No sandbox atual, essa sequência financeira deliberadamente não é ativada. A 
 
 ## Testes e validação
 
-O adaptador possui testes para conexão bem-sucedida, preservação de endereço/chave pública, assinatura sem broadcast e rejeição pelo usuário. A suíte da aplicação foi executada com **70 testes aprovados**, a checagem TypeScript passou e o build de produção foi gerado com sucesso. A rota de segurança foi validada em desktop e em viewport móvel; a fila operacional Xverse foi validada em desktop.
+O adaptador possui testes para conexão bem-sucedida, preservação de endereço/chave pública, leitura de permissão, solicitação e revogação, assinatura sem broadcast e rejeição pelo usuário. A suíte da aplicação foi executada com **72 testes aprovados**, a checagem TypeScript passou e o build de produção foi gerado com sucesso. A rota de segurança foi validada em desktop e em viewport móvel; a fila operacional Xverse foi validada em desktop.
 
 A integração não deve ser descrita ao cliente como “rendimento automático pela Xverse”. A comunicação correta é: **a Xverse é uma opção autocustodial para conectar a carteira e aprovar transações específicas; a RendeBit não recebe nem controla suas chaves privadas**.
+
+## Fontes oficiais consultadas
+
+As regras de consentimento e os textos da jornada foram alinhados à documentação oficial da Xverse: [permissões da carteira](https://docs.xverse.app/sats-connect/xverse-wallet-permissions), [conexão com `wallet_connect`](https://docs.xverse.app/sats-connect/connecting-to-the-wallet/connect-to-xverse-wallet) e [assinatura `stx_signTransaction`](https://docs.xverse.app/sats-connect/stacks-methods/stx_signtransaction). Essas fontes distinguem permissão de leitura, assinatura de transação e broadcast, e devem ser revisitadas antes de qualquer ativação em produção.

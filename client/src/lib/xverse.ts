@@ -9,11 +9,58 @@ export type XverseWalletConnection = {
   walletType: "software" | "ledger" | "keystone";
 };
 
+export type XversePermissionState = {
+  connected: boolean;
+  read: boolean;
+  permissions: unknown[];
+};
+
 function xverseError(error: unknown) {
   if (error && typeof error === "object" && "message" in error) {
     return String((error as { message: unknown }).message);
   }
   return "Não foi possível falar com a carteira Xverse.";
+}
+
+export async function getXversePermissions(): Promise<XversePermissionState> {
+  const response = await XverseWallet.request(
+    "wallet_getCurrentPermissions",
+    undefined
+  );
+  if (response.status !== "success") {
+    return { connected: false, read: false, permissions: [] };
+  }
+  const permissions = Array.isArray(response.result) ? response.result : [];
+  const read = permissions.some(
+    permission =>
+      typeof permission === "object" &&
+      permission !== null &&
+      "actions" in permission &&
+      Boolean((permission as { actions?: { read?: boolean } }).actions?.read)
+  );
+  return { connected: read, read, permissions };
+}
+
+export async function requestXverseReadPermission() {
+  const response = await XverseWallet.request(
+    "wallet_requestPermissions",
+    undefined
+  );
+  if (response.status !== "success") {
+    throw new Error(xverseError(response.error));
+  }
+  return response.result;
+}
+
+export async function revokeXversePermissions() {
+  const response = await XverseWallet.request(
+    "wallet_renouncePermissions",
+    undefined
+  );
+  if (response.status !== "success") {
+    throw new Error(xverseError(response.error));
+  }
+  return response.result;
 }
 
 export async function connectXverse(): Promise<XverseWalletConnection> {

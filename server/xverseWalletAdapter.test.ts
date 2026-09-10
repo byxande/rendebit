@@ -11,7 +11,13 @@ vi.mock("sats-connect", () => ({
   BitcoinNetworkType: { Testnet: "Testnet" },
 }));
 
-import { connectXverse, signStacksTransaction } from "../client/src/lib/xverse";
+import {
+  connectXverse,
+  getXversePermissions,
+  requestXverseReadPermission,
+  revokeXversePermissions,
+  signStacksTransaction,
+} from "../client/src/lib/xverse";
 
 describe("Xverse wallet adapter", () => {
   beforeEach(() => {
@@ -61,6 +67,40 @@ describe("Xverse wallet adapter", () => {
       transaction: "aabbcc",
       broadcast: false,
     });
+  });
+
+  it("identifica quando a permissão de leitura está ativa", async () => {
+    xverseMock.request.mockResolvedValue({
+      status: "success",
+      result: [{ type: "account", actions: { read: true } }],
+    });
+
+    await expect(getXversePermissions()).resolves.toEqual({
+      connected: true,
+      read: true,
+      permissions: [{ type: "account", actions: { read: true } }],
+    });
+    expect(xverseMock.request).toHaveBeenCalledWith(
+      "wallet_getCurrentPermissions",
+      undefined
+    );
+  });
+
+  it("solicita e revoga a permissão sem misturar com assinatura de transação", async () => {
+    xverseMock.request.mockResolvedValue({ status: "success", result: [] });
+
+    await expect(requestXverseReadPermission()).resolves.toEqual([]);
+    await expect(revokeXversePermissions()).resolves.toEqual([]);
+    expect(xverseMock.request).toHaveBeenNthCalledWith(
+      1,
+      "wallet_requestPermissions",
+      undefined
+    );
+    expect(xverseMock.request).toHaveBeenNthCalledWith(
+      2,
+      "wallet_renouncePermissions",
+      undefined
+    );
   });
 
   it("propaga a rejeição visível da carteira", async () => {

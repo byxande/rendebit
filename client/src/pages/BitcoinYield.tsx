@@ -47,6 +47,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { createPixReceiptPdf } from "@/lib/pixReceipt";
+import { connectXverse } from "@/lib/xverse";
 import RendeBitFooter from "@/components/RendeBitFooter";
 import FutureCalculator from "./FutureCalculator";
 import BusinessSolutions from "./BusinessSolutions";
@@ -579,9 +580,12 @@ function FiscalPage() {
 function ReservesPage({
   wallets,
   settlements,
+  xverseActions,
   authenticated,
   saving,
+  connectingXverse,
   onSaveWallet,
+  onConnectXverse,
   onLogin,
 }: {
   wallets: Array<{
@@ -599,13 +603,24 @@ function ReservesPage({
     blockerReason: string | null;
     stacksTxId: string | null;
   }>;
+  xverseActions: Array<{
+    id: number;
+    actionType: "wallet_connection" | "withdrawal" | "swap" | "yield";
+    status: string;
+    network: "testnet" | "mainnet";
+    walletAddress: string;
+    transactionId: string | null;
+    createdAt: Date | string;
+  }>;
   authenticated: boolean;
   saving: boolean;
+  connectingXverse: boolean;
   onSaveWallet: (input: {
     address: string;
     network: "testnet" | "mainnet";
     label: string;
   }) => void;
+  onConnectXverse: () => void;
   onLogin: () => void;
 }) {
   const [address, setAddress] = useState("");
@@ -613,6 +628,9 @@ function ReservesPage({
   const [label, setLabel] = useState("Minha carteira Stacks");
   const primary = wallets.find(wallet => wallet.isPrimary && wallet.network === network) ?? null;
   const latestSettlement = settlements[0] ?? null;
+  const latestXverseConnection = xverseActions.find(
+    action => action.actionType === "wallet_connection"
+  );
 
   function saveWallet() {
     if (!authenticated) {
@@ -655,7 +673,10 @@ function ReservesPage({
             <label><span>Rede</span><select value={network} onChange={event => setNetwork(event.target.value as "testnet" | "mainnet")}><option value="testnet">Stacks testnet</option><option value="mainnet">Stacks mainnet</option></select></label>
             <label><span>Apelido</span><input value={label} maxLength={100} onChange={event => setLabel(event.target.value)} placeholder="Ex.: minha carteira" /></label>
             <label className="wide"><span>Endereço público Stacks</span><input value={address} spellCheck={false} autoCapitalize="characters" onChange={event => setAddress(event.target.value.toUpperCase())} placeholder={network === "testnet" ? "ST..." : "SP..."} /></label>
-            <button className="br-primary" type="button" onClick={saveWallet} disabled={saving}>{saving ? <RefreshCw className="animate-spin" size={16} /> : <WalletCards size={16} />}{authenticated ? "Salvar endereço público" : "Entrar para cadastrar"}</button>
+            <div className="br-stacks-wallet-actions">
+              <button className="br-primary" type="button" onClick={saveWallet} disabled={saving || connectingXverse}>{saving ? <RefreshCw className="animate-spin" size={16} /> : <WalletCards size={16} />}{authenticated ? "Salvar endereço público" : "Entrar para cadastrar"}</button>
+              <button className="br-outline" type="button" onClick={onConnectXverse} disabled={!authenticated || saving || connectingXverse}>{connectingXverse ? <RefreshCw className="animate-spin" size={16} /> : <Network size={16} />} {connectingXverse ? "Abrindo Xverse…" : "Conectar Xverse"}</button>
+            </div>
           </div>
           <div className="br-stacks-wallet-status">
             <div><small>Carteira principal</small><code>{primary?.address ?? "Ainda não informada"}</code><span>{primary ? `${primary.label || "Carteira principal"} · ${primary.network}` : "Cadastre antes de habilitar transações Stacks no ambiente escolhido."}</span></div>
@@ -663,6 +684,17 @@ function ReservesPage({
           </div>
         </div>
         <p className="br-inline-note"><ShieldCheck size={14} /> No sandbox, o endereço é registrado e a liquidez BTCBRL é simulada. Em produção, qualquer envio para a rede Stacks exigirá contrato verificado, política de assinatura e reconciliação antes da transmissão.</p>
+        <div className="br-xverse-panel">
+          <div className="br-section-head"><div><span className="br-eyebrow">ASSINATURA AUTOCUSTODIAL</span><h3>Xverse: você aprova cada transação.</h3><p>A RendeBit não recebe seed phrase nem chave privada. A Xverse pode assinar uma intenção de saque, troca ou yield preparada para a sua carteira, sempre com confirmação visível.</p></div><span className="br-help-honesty">{latestXverseConnection ? "Conectada" : "Não conectada"}</span></div>
+          <div className="br-xverse-action-grid">
+            {(["withdrawal", "swap", "yield"] as const).map(actionType => {
+              const latest = xverseActions.find(action => action.actionType === actionType);
+              const labels = { withdrawal: "Saques", swap: "Trocas", yield: "Yield BTC" };
+              return <div className="br-xverse-action" key={actionType}><small>{labels[actionType]}</small><b>{latest ? latest.status : "Aguardando intenção"}</b><span>{latest ? `Último registro · ${new Date(latest.createdAt).toLocaleDateString("pt-BR")}` : "Sem assinatura solicitada"}</span></div>;
+            })}
+          </div>
+          <p className="br-inline-note"><Network size={14} /> A conexão Xverse está pronta para a carteira pública e para auditoria de assinaturas. O módulo operacional ainda bloqueia broadcast automático e não usa Xverse como custodiante da RendeBit.</p>
+        </div>
       </section>
     </div>
   );
@@ -680,6 +712,7 @@ export default function BitcoinYield() {
   const purchasesQuery = trpc.purchases.list.useQuery(undefined, { enabled: isAuthenticated, staleTime: 5_000, refetchInterval: isAuthenticated ? 15_000 : false });
   const walletsQuery = trpc.wallets.list.useQuery(undefined, { enabled: isAuthenticated });
   const walletSettlementsQuery = trpc.wallets.settlements.useQuery(undefined, { enabled: isAuthenticated, refetchInterval: isAuthenticated ? 15_000 : false });
+  const xverseActionsQuery = trpc.wallets.xverseActions.useQuery(undefined, { enabled: isAuthenticated, refetchInterval: isAuthenticated ? 15_000 : false });
   const redemptionsQuery = trpc.redemptions.summary.useQuery(undefined, { enabled: isAuthenticated });
   const marketQuoteQuery = trpc.market.btcBrl.useQuery(undefined, { staleTime: 55_000, refetchInterval: 60_000, retry: 1 });
   const [dashboardNow, setDashboardNow] = useState(Date.now());
@@ -761,6 +794,46 @@ export default function BitcoinYield() {
     },
     onError: error => toast.error(error.message),
   });
+  const recordXverseConnectionMutation = trpc.wallets.recordXverseConnection.useMutation({
+    onSuccess: async () => {
+      await utils.wallets.xverseActions.invalidate();
+    },
+    onError: error => toast.error(error.message),
+  });
+  const [connectingXverse, setConnectingXverse] = useState(false);
+
+  async function connectCustomerXverse() {
+    if (!isAuthenticated) {
+      setLoginOpen(true);
+      return;
+    }
+    setConnectingXverse(true);
+    try {
+      const connection = await connectXverse();
+      const wallet = await saveStacksWalletMutation.mutateAsync({
+        address: connection.address,
+        network: connection.network,
+        label: "Xverse",
+      });
+      await recordXverseConnectionMutation.mutateAsync({
+        walletId: wallet.id,
+        publicKey: connection.publicKey,
+        walletType: connection.walletType,
+        idempotencyKey: `xverse-connect-${wallet.id}-${connection.network}`,
+      });
+      toast.success("Xverse conectada", {
+        description: "Endereço público Stacks salvo sem custodiar sua chave.",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "A conexão Xverse foi cancelada."
+      );
+    } finally {
+      setConnectingXverse(false);
+    }
+  }
   const createRedemptionQuoteMutation = trpc.redemptions.createQuote.useMutation();
   const confirmRedemptionMutation = trpc.redemptions.confirm.useMutation();
 
@@ -1112,7 +1185,7 @@ export default function BitcoinYield() {
           {section === "lotes" && <LotsPage purchases={purchases} />}
           {section === "resgate" && <RedeemPage amount={amount} setAmount={value => { setAmount(value); setRedemptionQuote(null); }} availableBtc={isAuthenticated ? redemptionsQuery.data?.availableBtc ?? 0 : 0.284215} pixDestination={profileQuery.data?.pixAccountMasked ?? ""} quote={redemptionQuote} quoteSeconds={redemptionQuoteSeconds} redemptions={redemptionsQuery.data?.redemptions ?? []} authenticated={isAuthenticated} loading={createRedemptionQuoteMutation.isPending || redemptionsQuery.isLoading} btcPriceBrl={liveBtcBrl} onQuote={() => void prepareRedemption()} />}
           {section === "fiscal" && <FiscalPage />}
-          {section === "reservas" && <ReservesPage wallets={walletsQuery.data ?? []} settlements={walletSettlementsQuery.data ?? []} authenticated={isAuthenticated} saving={saveStacksWalletMutation.isPending} onSaveWallet={input => saveStacksWalletMutation.mutate(input)} onLogin={requestLogin} />}
+          {section === "reservas" && <ReservesPage wallets={walletsQuery.data ?? []} settlements={walletSettlementsQuery.data ?? []} xverseActions={xverseActionsQuery.data ?? []} authenticated={isAuthenticated} saving={saveStacksWalletMutation.isPending} connectingXverse={connectingXverse} onSaveWallet={input => saveStacksWalletMutation.mutate(input)} onConnectXverse={() => void connectCustomerXverse()} onLogin={requestLogin} />}
           {section === "empresas" && <BusinessPage />}
           {section === "ajuda" && <HelpPage onNavigate={navigate} />}
         </div>

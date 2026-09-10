@@ -17,6 +17,7 @@ import {
   listDailyReconciliations,
   listOperationalLedger,
   listOperationalBtcLiquiditySettlements,
+  listOperationalXverseActions,
   listProfitDistributions,
   updateTreasurySettings,
   approveSandboxProfitCapitalSweep,
@@ -44,6 +45,7 @@ export const treasuryRouter = router({
   btcLiquiditySettlements: adminProcedure.query(() =>
     listOperationalBtcLiquiditySettlements()
   ),
+  xverseActions: adminProcedure.query(() => listOperationalXverseActions()),
 
   updateSettings: adminProcedure
     .input(

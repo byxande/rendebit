@@ -19,6 +19,7 @@ import {
   redemptions,
   treasurySettings,
   users,
+  xverseActions,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import {
@@ -235,6 +236,98 @@ export async function getPrimaryCustomerStacksWallet(
         .limit(1)
     )[0] ?? null
   );
+}
+
+export async function getCustomerWalletById(userId: number, walletId: number) {
+  const db = await requireDb();
+  return (
+    (
+      await db
+        .select()
+        .from(customerWallets)
+        .where(
+          and(
+            eq(customerWallets.id, walletId),
+            eq(customerWallets.userId, userId),
+            eq(customerWallets.status, "active")
+          )
+        )
+        .limit(1)
+    )[0] ?? null
+  );
+}
+
+export async function recordXverseAction(input: {
+  userId: number;
+  actionType: "wallet_connection" | "withdrawal" | "swap" | "yield";
+  network: "testnet" | "mainnet";
+  walletAddress: string;
+  status:
+    | "connected"
+    | "intent_created"
+    | "signed"
+    | "submitted"
+    | "confirmed"
+    | "rejected"
+    | "blocked";
+  customerWalletId?: number | null;
+  unsignedTransaction?: string | null;
+  signedTransaction?: string | null;
+  transactionId?: string | null;
+  providerReference?: string | null;
+  failureReason?: string | null;
+  metadata?: unknown;
+  idempotencyKey: string;
+}) {
+  const db = await requireDb();
+  const existing = (
+    await db
+      .select()
+      .from(xverseActions)
+      .where(eq(xverseActions.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
+  if (existing) {
+    if (existing.userId !== input.userId)
+      throw new Error("Chave idempotente já pertence a outro usuário.");
+    return existing;
+  }
+  await db.insert(xverseActions).values({
+    userId: input.userId,
+    customerWalletId: input.customerWalletId ?? null,
+    actionType: input.actionType,
+    network: input.network,
+    walletAddress: input.walletAddress,
+    status: input.status,
+    unsignedTransaction: input.unsignedTransaction ?? null,
+    signedTransaction: input.signedTransaction ?? null,
+    transactionId: input.transactionId ?? null,
+    providerReference: input.providerReference ?? null,
+    failureReason: input.failureReason?.slice(0, 2_000) ?? null,
+    metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+    idempotencyKey: input.idempotencyKey,
+  });
+  return (
+    await db
+      .select()
+      .from(xverseActions)
+      .where(eq(xverseActions.idempotencyKey, input.idempotencyKey))
+      .limit(1)
+  )[0];
+}
+
+export async function listXverseActions(userId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(xverseActions)
+    .where(eq(xverseActions.userId, userId))
+    .orderBy(desc(xverseActions.createdAt));
+}
+
+export async function listOperationalXverseActions() {
+  const db = await requireDb();
+  return db.select().from(xverseActions).orderBy(desc(xverseActions.createdAt));
 }
 
 export async function upsertSandboxProfile(input: {

@@ -48,6 +48,10 @@ export default function OperationsSandbox() {
     undefined,
     { enabled: isAdmin, refetchInterval: isAdmin ? 15_000 : false }
   );
+  const xverseActionsQuery = trpc.treasury.xverseActions.useQuery(undefined, {
+    enabled: isAdmin,
+    refetchInterval: isAdmin ? 15_000 : false,
+  });
   const ledgerQuery = trpc.treasury.ledger.useQuery(undefined, {
     enabled: isAdmin,
   });
@@ -230,6 +234,7 @@ export default function OperationsSandbox() {
   const approvals = approvalsQuery.data ?? [];
   const reconciliations = reconciliationsQuery.data ?? [];
   const btcLiquiditySettlements = btcLiquidityQuery.data ?? [];
+  const xverseActions = xverseActionsQuery.data ?? [];
   const grossRevenue = entries
     .filter(item => item.entryType === "fee_revenue" && item.currency === "BRL")
     .reduce((sum, item) => sum + Number(item.amount), 0);
@@ -1032,6 +1037,38 @@ export default function OperationsSandbox() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="br-panel br-table-card br-xverse-ops-card">
+        <div className="br-section-head">
+          <div>
+            <span className="br-eyebrow">CARTEIRA EXTERNA · XVERSE</span>
+            <h2>Assinaturas solicitadas pelo cliente</h2>
+            <p>Leitura de endereço e assinatura acontecem na carteira do usuário. Esta fila é somente auditável; não há chave privada nem broadcast automático no backend.</p>
+          </div>
+          <span className="br-help-honesty"><ShieldCheck size={15} /> {xverseActions.length} eventos</span>
+        </div>
+        {xverseActions.length === 0 ? (
+          <div className="br-ops-empty">Nenhuma carteira Xverse foi conectada ainda.</div>
+        ) : (
+          <div className="br-table-scroll">
+            <table>
+              <thead><tr><th>Data</th><th>Cliente</th><th>Ação</th><th>Rede</th><th>Carteira</th><th>Status</th><th>Transação</th></tr></thead>
+              <tbody>{xverseActions.slice(0, 30).map(item => (
+                <tr key={item.id}>
+                  <td>{new Date(item.createdAt).toLocaleString("pt-BR")}</td>
+                  <td>#{item.userId}</td>
+                  <td>{item.actionType === "wallet_connection" ? "Conexão" : item.actionType === "withdrawal" ? "Saque" : item.actionType === "swap" ? "Troca" : "Yield BTC"}</td>
+                  <td>{item.network}</td>
+                  <td className="mono">{item.walletAddress.slice(0, 10)}…{item.walletAddress.slice(-6)}</td>
+                  <td><span className={`br-ops-state ${["connected", "confirmed"].includes(item.status) ? "ready" : item.status === "blocked" || item.status === "rejected" ? "warning" : ""}`}>{item.status}</span></td>
+                  <td className="mono">{item.transactionId || "Sem broadcast"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+        <p className="br-dialog-footnote"><KeyRound size={13} /> Para saques, trocas e yield, o backend deve criar uma transação com post-conditions, o cliente aprovar no Xverse e a reconciliação confirmar o txid. Nenhuma dessas etapas é ativada automaticamente neste sandbox.</p>
       </section>
 
       <footer className="br-ops-footer">

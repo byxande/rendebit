@@ -196,6 +196,9 @@ importers:
       recharts:
         specifier: ^2.15.2
         version: 2.15.4(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      sats-connect:
+        specifier: ^4.2.1
+        version: 4.2.1(typescript@5.9.3)
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
@@ -1999,6 +2002,23 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@sats-connect/core@0.10.0':
+    resolution: {integrity: sha512-a/YvGuAC+4og1Ownp3r0OFOHEdBV1xB8EWLFasURfMPSuU3LuFhxSv8rd6PSpqixhNY28fUWamjyjXYjxvGm7w==}
+    peerDependencies:
+      valibot: 1.1.0
+
+  '@sats-connect/make-default-provider-config@0.0.10':
+    resolution: {integrity: sha512-BBot3Ofa2J7OwXprgYPD4C8dppX4nnPxj4FXWq1H7fDsvwJmW4sAnfmnAIzwmyWZJOR2uZqtTkXAA08sVkoN5g==}
+    peerDependencies:
+      '@sats-connect/core': '*'
+      typescript: ^5.0.0
+
+  '@sats-connect/ui@0.0.6':
+    resolution: {integrity: sha512-H3bFFhr9CcY1oNosNi/QJszmMHSht4U19bUWfM3vzayAKgV4ebY6iUnRK5g3p2rVLLWVzlpaw1J9m+7JWwyBfA==}
+
+  '@sats-connect/ui@0.0.7':
+    resolution: {integrity: sha512-dq02JxvTSAkfgFzEz4iWDSamm6Dte1omzxK0F1yytRZbIrbjjz1KmlMHM+uuxnFN9+EzHIHNsA4aS2dEDwh0xw==}
+
   '@scure/base@1.2.6':
     resolution: {integrity: sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg==}
 
@@ -2607,6 +2627,9 @@ packages:
     resolution: {integrity: sha512-NZKeq9AfyQvEeNlN0zSYAaWrmBffJh3IELMZfRpJVWgrpEbtEpnjvzqBPf+mxoI287JohRDoa+/nsfqqiZmF6g==}
     engines: {node: '>= 6.0.0'}
 
+  axios@1.12.0:
+    resolution: {integrity: sha512-oXTDccv8PcfjZmPGlWsPSwtOJCZ/b6W5jAMCNcfwJbCzDckwG0jrYJFaWH1yvivfCXjVzV/SPDEhMB3Q+DSurg==}
+
   axios@1.12.2:
     resolution: {integrity: sha512-vMJzPewAlRyOgxV2dU0Cuz2O8zzzx9VYtbJOaBgXFeLc4IV/Eg50n4LowmehOOR61S8ZMpc2K5Sa7g6A4jfkUw==}
 
@@ -2621,6 +2644,10 @@ packages:
 
   base-x@5.0.1:
     resolution: {integrity: sha512-M7uio8Zt++eg3jPj+rHMfCC+IuygQHHCOU+IYsVtik6FWjuYpVt/+MRKcgsAMHh8mMFAwnB+Bs+mTrFiXjMzKg==}
+
+  base58-js@3.0.3:
+    resolution: {integrity: sha512-3hf42BysHnUqmZO7mK6e5X/hs1AvyEJIhdVLbG/Mxn/fhFnhGxOO37mWbMHg1RT4TxqcPKXgqj9/bp1YG0GBXA==}
+    engines: {node: '>=16.0.0', npm: '>=7.0.0'}
 
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
@@ -2650,6 +2677,9 @@ packages:
 
   bip66@1.1.5:
     resolution: {integrity: sha512-nemMHz95EmS38a26XbbdxIYj5csHd3RMP3H5bwQknX0WYHF01qhpufP42mLOwVICuH2JmhIhXiWs89MfUGL7Xw==}
+
+  bitcoin-address-validation@3.0.0:
+    resolution: {integrity: sha512-R1X1c9EdgjgjTpjshjk5e16TbgF7HYasxBcu7l5ScWMxVs53845vMUg5PvnQ/R/3h8Grly6Y52DgH6/77gazLQ==}
 
   bitcoinjs-lib@6.1.8:
     resolution: {integrity: sha512-A6o+yq7BvwlmLj4F0NC5f3XX109rRe5evxi368S9zil5voOtUfiqfiMCzZYKHk4k7iIJ3+NmcQW05Ar4CBlKyg==}
@@ -4552,6 +4582,9 @@ packages:
   safer-buffer@2.1.2:
     resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
 
+  sats-connect@4.2.1:
+    resolution: {integrity: sha512-6PxLGmYIToxz/3DSb2owykcV3Qs2n+RhzE1gZp6a/6c70XYniUvImGA3Hmymf90NhyjR6J/t6OE/08Fiyjw9YA==}
+
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
 
@@ -4597,6 +4630,9 @@ packages:
     resolution: {integrity: sha512-8LzC5+bvI45BjpfXU8V5fdU2mfeKiQe1D1gIMn7XUlF3OTUrpdJpPPH4EMAnF0DsHHdSZqCdSss5qCmJKuiO3w==}
     engines: {node: '>= 0.10'}
     hasBin: true
+
+  sha256-uint8array@0.10.7:
+    resolution: {integrity: sha512-1Q6JQU4tX9NqsDGodej6pkrUVQVNapLZnvkwIhddH/JqzBZF1fSaxSWNY6sziXBE8aEa2twtGkXUrwzGeZCMpQ==}
 
   shiki@3.14.0:
     resolution: {integrity: sha512-J0yvpLI7LSig3Z3acIuDLouV5UCKQqu8qOArwMx+/yPVC3WRMgrP67beaG8F+j4xfEWE0eVC4GeBCIXeOPra1g==}
@@ -4974,6 +5010,14 @@ packages:
   uuid@11.1.0:
     resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
     hasBin: true
+
+  valibot@1.1.0:
+    resolution: {integrity: sha512-Nk8lX30Qhu+9txPYTwM0cFlWLdPFsFr6LblzqIySfbZph9+BFsAHsNvHOymEviUepeIW6KFHzpX8TKhbptBXXw==}
+    peerDependencies:
+      typescript: '>=5'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   valtio@2.1.5:
     resolution: {integrity: sha512-vsh1Ixu5mT0pJFZm+Jspvhga5GzHUTYv0/+Th203pLfh3/wbHwxhu/Z2OkZDXIgHfjnjBns7SN9HNcbDvPmaGw==}
@@ -7099,6 +7143,27 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.52.4':
     optional: true
 
+  '@sats-connect/core@0.10.0(valibot@1.1.0(typescript@5.9.3))':
+    dependencies:
+      axios: 1.12.0
+      bitcoin-address-validation: 3.0.0
+      buffer: 6.0.3
+      jsontokens: 4.0.1
+      valibot: 1.1.0(typescript@5.9.3)
+    transitivePeerDependencies:
+      - debug
+
+  '@sats-connect/make-default-provider-config@0.0.10(@sats-connect/core@0.10.0(valibot@1.1.0(typescript@5.9.3)))(typescript@5.9.3)':
+    dependencies:
+      '@sats-connect/core': 0.10.0(valibot@1.1.0(typescript@5.9.3))
+      '@sats-connect/ui': 0.0.6
+      bowser: 2.14.1
+      typescript: 5.9.3
+
+  '@sats-connect/ui@0.0.6': {}
+
+  '@sats-connect/ui@0.0.7': {}
+
   '@scure/base@1.2.6': {}
 
   '@scure/bip32@1.7.0':
@@ -8065,6 +8130,14 @@ snapshots:
 
   aws-ssl-profiles@1.1.2: {}
 
+  axios@1.12.0:
+    dependencies:
+      follow-redirects: 1.15.11
+      form-data: 4.0.4
+      proxy-from-env: 1.1.0
+    transitivePeerDependencies:
+      - debug
+
   axios@1.12.2:
     dependencies:
       follow-redirects: 1.15.11
@@ -8084,6 +8157,8 @@ snapshots:
 
   base-x@5.0.1: {}
 
+  base58-js@3.0.3: {}
+
   base64-js@1.5.1: {}
 
   baseline-browser-mapping@2.8.13: {}
@@ -8091,8 +8166,7 @@ snapshots:
   bech32@1.1.4:
     optional: true
 
-  bech32@2.0.0:
-    optional: true
+  bech32@2.0.0: {}
 
   big.js@6.2.2: {}
 
@@ -8119,6 +8193,12 @@ snapshots:
     dependencies:
       safe-buffer: 5.2.1
     optional: true
+
+  bitcoin-address-validation@3.0.0:
+    dependencies:
+      base58-js: 3.0.3
+      bech32: 2.0.0
+      sha256-uint8array: 0.10.7
 
   bitcoinjs-lib@6.1.8:
     dependencies:
@@ -10487,6 +10567,16 @@ snapshots:
 
   safer-buffer@2.1.2: {}
 
+  sats-connect@4.2.1(typescript@5.9.3):
+    dependencies:
+      '@sats-connect/core': 0.10.0(valibot@1.1.0(typescript@5.9.3))
+      '@sats-connect/make-default-provider-config': 0.0.10(@sats-connect/core@0.10.0(valibot@1.1.0(typescript@5.9.3)))(typescript@5.9.3)
+      '@sats-connect/ui': 0.0.7
+      valibot: 1.1.0(typescript@5.9.3)
+    transitivePeerDependencies:
+      - debug
+      - typescript
+
   scheduler@0.27.0: {}
 
   schema-inspector@2.1.0:
@@ -10563,6 +10653,8 @@ snapshots:
       safe-buffer: 5.2.1
       to-buffer: 1.2.2
     optional: true
+
+  sha256-uint8array@0.10.7: {}
 
   shiki@3.14.0:
     dependencies:
@@ -10904,6 +10996,10 @@ snapshots:
   utils-merge@1.0.1: {}
 
   uuid@11.1.0: {}
+
+  valibot@1.1.0(typescript@5.9.3):
+    optionalDependencies:
+      typescript: 5.9.3
 
   valtio@2.1.5(@types/react@19.2.1)(react@19.2.1):
     dependencies:

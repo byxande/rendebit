@@ -92,6 +92,13 @@
       "when": 1788979843920,
       "tag": "0012_brave_sharon_carter",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1789033487569,
+      "tag": "0013_wide_steel_serpent",
+      "breakpoints": true
     }
   ]
 }

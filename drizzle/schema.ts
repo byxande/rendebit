@@ -634,6 +634,46 @@ export const dailyReconciliations = mysqlTable(
   })
 );
 
+export const xverseActions = mysqlTable("xverse_actions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id),
+  customerWalletId: int("customerWalletId").references(() => customerWallets.id),
+  actionType: mysqlEnum("actionType", [
+    "wallet_connection",
+    "withdrawal",
+    "swap",
+    "yield",
+  ]).notNull(),
+  network: mysqlEnum("network", ["testnet", "mainnet"])
+    .default("testnet")
+    .notNull(),
+  walletAddress: varchar("walletAddress", { length: 80 }).notNull(),
+  status: mysqlEnum("status", [
+    "connected",
+    "intent_created",
+    "signed",
+    "submitted",
+    "confirmed",
+    "rejected",
+    "blocked",
+  ])
+    .default("connected")
+    .notNull(),
+  unsignedTransaction: text("unsignedTransaction"),
+  signedTransaction: text("signedTransaction"),
+  transactionId: varchar("transactionId", { length: 140 }),
+  providerReference: varchar("providerReference", { length: 180 }),
+  failureReason: text("failureReason"),
+  metadata: text("metadata"),
+  idempotencyKey: varchar("idempotencyKey", { length: 180 })
+    .notNull()
+    .unique(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type CustomerWallet = typeof customerWallets.$inferSelect;
@@ -649,3 +689,4 @@ export type ProfitDistribution = typeof profitDistributions.$inferSelect;
 export type ProfitCapitalSweep = typeof profitCapitalSweeps.$inferSelect;
 export type ProfitSweepApproval = typeof profitSweepApprovals.$inferSelect;
 export type DailyReconciliation = typeof dailyReconciliations.$inferSelect;
+export type XverseAction = typeof xverseActions.$inferSelect;

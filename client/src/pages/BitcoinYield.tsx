@@ -51,6 +51,7 @@ import {
   connectXverse,
   requestXverseReadPermission,
   revokeXversePermissions,
+  signStacksTransaction,
 } from "@/lib/xverse";
 import RendeBitFooter from "@/components/RendeBitFooter";
 import FutureCalculator from "./FutureCalculator";
@@ -594,6 +595,7 @@ function ReservesPage({
   onConnectXverse,
   onRequestPermission,
   onRevokePermission,
+  onSignAction,
   onLogin,
 }: {
   wallets: Array<{
@@ -618,6 +620,7 @@ function ReservesPage({
     network: "testnet" | "mainnet";
     walletAddress: string;
     transactionId: string | null;
+    unsignedTransaction: string | null;
     createdAt: Date | string;
   }>;
   authenticated: boolean;
@@ -633,6 +636,11 @@ function ReservesPage({
   onConnectXverse: () => void;
   onRequestPermission: () => void;
   onRevokePermission: () => void;
+  onSignAction: (action: {
+    id: number;
+    actionType: "withdrawal" | "swap" | "yield";
+    unsignedTransaction: string;
+  }) => Promise<void>;
   onLogin: () => void;
 }) {
   const [address, setAddress] = useState("");
@@ -640,10 +648,26 @@ function ReservesPage({
   const [label, setLabel] = useState("Minha carteira Stacks");
   const primary = wallets.find(wallet => wallet.isPrimary && wallet.network === network) ?? null;
   const latestSettlement = settlements[0] ?? null;
-  const latestXverseConnection = xverseActions.find(
-    action => action.actionType === "wallet_connection"
-  );
   const [xverseGuideOpen, setXverseGuideOpen] = useState(false);
+  const [signatureDialogAction, setSignatureDialogAction] = useState<{
+    id: number;
+    actionType: "withdrawal" | "swap" | "yield";
+    unsignedTransaction: string;
+  } | null>(null);
+  const [signatureLoading, setSignatureLoading] = useState(false);
+  const pendingSignature = xverseActions.find(
+    action =>
+      action.status === "intent_created" &&
+      action.actionType !== "wallet_connection" &&
+      Boolean(action.unsignedTransaction)
+  );
+  const pendingSignatureLabel = pendingSignature?.actionType === "withdrawal"
+    ? "um recebimento"
+    : pendingSignature?.actionType === "swap"
+      ? "uma troca"
+      : pendingSignature?.actionType === "yield"
+        ? "uma atualização"
+        : null;
 
   function saveWallet() {
     if (!authenticated) {
@@ -678,87 +702,87 @@ function ReservesPage({
       <section className="br-panel br-contract-card"><div><span className="br-eyebrow">ENDEREÇO DEMONSTRATIVO</span><h3>Vault segregado de clientes</h3><code>SP2NEXO...8FA2.stbtc-client-vault-v1</code></div><CopyButton value="SP2NEXO8EXAMPLE8FA2.stbtc-client-vault-v1" label="Copiar endereço" /></section>
       <section className="br-panel br-stacks-wallet-card">
         <div className="br-section-head">
-          <div><span className="br-eyebrow">SUA REFERÊNCIA ON-CHAIN</span><h2>Carteira Stacks pública</h2><p>Salvamos somente o endereço público para vincular sua posição à trilha Stacks. A RendeBit não recebe seed phrase, chave privada ou senha.</p></div>
+          <div><span className="br-eyebrow">SUA CARTEIRA</span><h2>Endereço da sua carteira</h2><p>Usamos somente o endereço público para organizar sua conta. Você não precisa compartilhar senha ou qualquer código secreto.</p></div>
           <span className="br-help-honesty"><Network size={15} /> {primary ? "Endereço cadastrado" : "Pendente"}</span>
         </div>
         <div className="br-stacks-wallet-grid">
           <div className="br-stacks-wallet-form">
-            <label><span>Rede</span><select value={network} onChange={event => setNetwork(event.target.value as "testnet" | "mainnet")}><option value="testnet">Stacks testnet</option><option value="mainnet">Stacks mainnet</option></select></label>
+            <label><span>Ambiente</span><select value={network} onChange={event => setNetwork(event.target.value as "testnet" | "mainnet")}><option value="testnet">Ambiente de teste</option><option value="mainnet">Ambiente principal</option></select></label>
             <label><span>Apelido</span><input value={label} maxLength={100} onChange={event => setLabel(event.target.value)} placeholder="Ex.: minha carteira" /></label>
-            <label className="wide"><span>Endereço público Stacks</span><input value={address} spellCheck={false} autoCapitalize="characters" onChange={event => setAddress(event.target.value.toUpperCase())} placeholder={network === "testnet" ? "ST..." : "SP..."} /></label>
+            <label className="wide"><span>Endereço da carteira</span><input value={address} spellCheck={false} autoCapitalize="characters" onChange={event => setAddress(event.target.value.toUpperCase())} placeholder={network === "testnet" ? "ST..." : "SP..."} /></label>
             <div className="br-stacks-wallet-actions">
               <button className="br-primary" type="button" onClick={saveWallet} disabled={saving || connectingXverse}>{saving ? <RefreshCw className="animate-spin" size={16} /> : <WalletCards size={16} />}{authenticated ? "Salvar endereço público" : "Entrar para cadastrar"}</button>
-              <button className="br-outline br-xverse-trigger" type="button" onClick={() => setXverseGuideOpen(true)} disabled={saving || connectingXverse}>{connectingXverse ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} />} {connectingXverse ? "Abrindo Xverse…" : xversePermissionGranted ? "Permissão Xverse ativa" : "Começar com Xverse"}</button>
+              <button className="br-outline br-xverse-trigger" type="button" onClick={() => setXverseGuideOpen(true)} disabled={saving || connectingXverse}>{connectingXverse ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} />} {connectingXverse ? "Abrindo sua carteira…" : xversePermissionGranted ? "Carteira conectada" : "Conectar carteira"}</button>
             </div>
           </div>
           <div className="br-stacks-wallet-status">
-            <div><small>Carteira principal</small><code>{primary?.address ?? "Ainda não informada"}</code><span>{primary ? `${primary.label || "Carteira principal"} · ${primary.network}` : "Cadastre antes de habilitar transações Stacks no ambiente escolhido."}</span></div>
-            <div className={`br-stacks-settlement ${latestSettlement?.status === "blocked" ? "blocked" : ""}`}><b>Liquidez BTC → Stacks</b><span>{latestSettlement ? latestSettlement.status === "blocked" ? latestSettlement.blockerReason || "Aguardando carteira Stacks." : `Etapa atual: ${latestSettlement.status}` : "Nenhuma compra aguardando a trilha on-chain."}</span>{latestSettlement?.stacksTxId && <code>{latestSettlement.stacksTxId}</code>}</div>
+            <div><small>Carteira principal</small><code>{primary?.address ?? "Ainda não informada"}</code><span>{primary ? `${primary.label || "Carteira principal"} · ${primary.network === "testnet" ? "ambiente de teste" : "ambiente principal"}` : "Cadastre antes de habilitar esta opção."}</span></div>
+            <div className={`br-stacks-settlement ${latestSettlement?.status === "blocked" ? "blocked" : ""}`}><b>Preparação da compra</b><span>{latestSettlement ? latestSettlement.status === "blocked" ? "Aguardando uma revisão de segurança." : "Em preparação." : "Nenhuma compra aguardando preparação."}</span>{latestSettlement?.stacksTxId && <code>{latestSettlement.stacksTxId}</code>}</div>
           </div>
         </div>
-        <p className="br-inline-note"><ShieldCheck size={14} /> No sandbox, o endereço é registrado e a liquidez BTCBRL é simulada. Em produção, qualquer envio para a rede Stacks exigirá contrato verificado, política de assinatura e reconciliação antes da transmissão.</p>
-        <div className="br-xverse-panel">
-          <div className="br-section-head br-xverse-heading">
-            <div>
-              <span className="br-eyebrow">ASSINATURA AUTOCUSTODIAL</span>
-              <h3>Xverse: você aprova cada transação.</h3>
-              <p>
-                A RendeBit não recebe seed phrase nem chave privada. Primeiro,
-                você escolhe o que compartilhar; depois, aprova cada operação
-                na própria carteira.
-              </p>
-            </div>
-            <span className={`br-xverse-status ${xversePermissionGranted ? "is-ready" : ""}`}>
-              {xversePermissionGranted ? <CircleCheckBig size={14} /> : <Fingerprint size={14} />}
-              {xversePermissionGranted ? "Leitura pública autorizada" : "Ainda não autorizada"}
-            </span>
+        <p className="br-inline-note"><ShieldCheck size={14} /> Este é um ambiente de demonstração: nada é enviado de verdade. Antes de qualquer operação real, todos os controles serão revisados.</p>
+        <div className="br-wallet-helper">
+          <div className="br-wallet-helper-icon"><Sparkles size={18} /></div>
+          <div>
+            <b>{pendingSignature ? "Há um pedido esperando sua confirmação." : "Sua carteira fica com você."}</b>
+            <p>{pendingSignature ? `Confira ${pendingSignatureLabel} com calma antes de decidir.` : "Quando algo precisar da sua confirmação, abriremos uma janelinha simples para você conferir com calma."}</p>
           </div>
-          <div className="br-xverse-action-grid">
-            {(["withdrawal", "swap", "yield"] as const).map(actionType => {
-              const latest = xverseActions.find(action => action.actionType === actionType);
-              const labels = { withdrawal: "Saques", swap: "Trocas", yield: "Yield BTC" };
-              return <div className="br-xverse-action" key={actionType}><small>{labels[actionType]}</small><b>{latest ? latest.status : "Aguardando intenção"}</b><span>{latest ? `Último registro · ${new Date(latest.createdAt).toLocaleDateString("pt-BR")}` : "Sem assinatura solicitada"}</span></div>;
-            })}
-          </div>
-          <div className="br-xverse-bottomline">
-            <p className="br-inline-note"><Network size={14} /> A conexão Xverse está pronta para a carteira pública e para auditoria de assinaturas. O módulo operacional ainda bloqueia broadcast automático e não usa Xverse como custodiante da RendeBit.</p>
-            {xversePermissionGranted && <button className="br-text-action br-xverse-revoke" type="button" onClick={onRevokePermission} disabled={permissionLoading}>{permissionLoading ? "Encerrando…" : "Encerrar autorização de leitura"}</button>}
-          </div>
+          {pendingSignature ? <button className="br-primary br-wallet-helper-action" type="button" onClick={() => setSignatureDialogAction({ id: pendingSignature.id, actionType: pendingSignature.actionType as "withdrawal" | "swap" | "yield", unsignedTransaction: pendingSignature.unsignedTransaction! })}>Conferir agora <ArrowRight size={14} /></button> : <button className="br-text-action" type="button" onClick={() => setXverseGuideOpen(true)}>Como funciona</button>}
         </div>
       </section>
       <Dialog open={xverseGuideOpen} onOpenChange={setXverseGuideOpen}>
         <DialogContent className="br-confirm-dialog br-xverse-dialog">
           <DialogHeader>
             <div className="br-xverse-dialog-icon"><Sparkles size={22} /></div>
-            <DialogTitle>Vamos deixar sua carteira falar com a RendeBit?</DialogTitle>
+            <DialogTitle>Sua carteira confirma com você</DialogTitle>
             <DialogDescription>
-              É uma conexão leve e reversível. Você continua no comando o tempo todo.
+              Quando algo precisar da sua autorização, vamos explicar o que está acontecendo antes de pedir sua confirmação.
             </DialogDescription>
           </DialogHeader>
           <div className="br-xverse-journey" aria-label="Etapas da autorização Xverse">
             <div className="br-xverse-journey-step is-current">
               <span>1</span>
-              <div><b>Mostrar sua referência pública</b><small>A Xverse compartilha apenas o endereço Stacks escolhido por você.</small></div>
+              <div><b>Mostrar o endereço da sua carteira</b><small>Compartilhamos apenas o endereço público escolhido por você.</small></div>
               <WalletCards size={18} />
             </div>
             <div className="br-xverse-journey-step">
               <span>2</span>
-              <div><b>Você confere cada pedido</b><small>Saques, trocas e yield só pedem assinatura quando houver uma intenção clara.</small></div>
+              <div><b>Você confere cada pedido</b><small>Se uma ação precisar de confirmação, mostraremos o pedido em uma janelinha clara.</small></div>
               <Fingerprint size={18} />
             </div>
             <div className="br-xverse-journey-step is-locked">
               <span>3</span>
-              <div><b>Suas chaves continuam só suas</b><small>A RendeBit não vê seed phrase, chave privada ou senha. Nunca.</small></div>
+              <div><b>Seu acesso continua protegido</b><small>A RendeBit nunca pede sua senha ou qualquer código secreto.</small></div>
               <ShieldCheck size={18} />
             </div>
           </div>
           <div className="br-xverse-permission-note">
             <CircleCheckBig size={16} />
-            <p><b>O que será pedido agora?</b> Permissão de leitura da conta para identificar sua carteira pública. A Xverse mostra o pedido e você pode recusar.</p>
+            <p><b>O que acontece agora?</b> Sua carteira mostrará um pedido para compartilhar o endereço público. Você pode aceitar ou fechar sem continuar.</p>
           </div>
           <div className="br-xverse-dialog-actions">
             <button className="br-dialog-cancel" type="button" onClick={() => setXverseGuideOpen(false)}>Agora não</button>
-            {xversePermissionGranted ? <button className="br-primary" type="button" onClick={onRequestPermission} disabled={permissionLoading}>{permissionLoading ? "Abrindo Xverse…" : "Revisar permissão"} <ArrowRight size={16} /></button> : <button className="br-primary" type="button" onClick={() => { setXverseGuideOpen(false); onConnectXverse(); }} disabled={connectingXverse}>{connectingXverse ? "Abrindo Xverse…" : "Continuar com Xverse"} <ArrowRight size={16} /></button>}
+            {xversePermissionGranted ? <button className="br-primary" type="button" onClick={onRequestPermission} disabled={permissionLoading}>{permissionLoading ? "Abrindo sua carteira…" : "Revisar conexão"} <ArrowRight size={16} /></button> : <button className="br-primary" type="button" onClick={() => { setXverseGuideOpen(false); onConnectXverse(); }} disabled={connectingXverse}>{connectingXverse ? "Abrindo sua carteira…" : "Continuar"} <ArrowRight size={16} /></button>}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(signatureDialogAction)} onOpenChange={open => { if (!open && !signatureLoading) setSignatureDialogAction(null); }}>
+        <DialogContent className="br-confirm-dialog br-xverse-dialog br-signature-dialog">
+          <DialogHeader>
+            <div className="br-xverse-dialog-icon"><ShieldCheck size={22} /></div>
+            <DialogTitle>Confira antes de confirmar</DialogTitle>
+            <DialogDescription>
+              Sua carteira vai mostrar os detalhes de {signatureDialogAction?.actionType === "withdrawal" ? "um recebimento" : signatureDialogAction?.actionType === "swap" ? "uma troca" : "uma atualização"}. Só continue se tudo fizer sentido para você.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="br-signature-checklist">
+            <div><CircleCheckBig size={16} /><span>Você verá o pedido na sua carteira.</span></div>
+            <div><CircleCheckBig size={16} /><span>Nada acontece sem sua confirmação.</span></div>
+            <div><CircleCheckBig size={16} /><span>Se preferir, basta fechar esta janela.</span></div>
+          </div>
+          <div className="br-xverse-dialog-actions">
+            <button className="br-dialog-cancel" type="button" onClick={() => setSignatureDialogAction(null)} disabled={signatureLoading}>Agora não</button>
+            <button className="br-primary" type="button" disabled={!signatureDialogAction || signatureLoading} onClick={async () => { if (!signatureDialogAction) return; setSignatureLoading(true); try { await onSignAction(signatureDialogAction); setSignatureDialogAction(null); } finally { setSignatureLoading(false); } }}>{signatureLoading ? "Abrindo sua carteira…" : "Conferir na carteira"} <ArrowRight size={16} /></button>
           </div>
         </DialogContent>
       </Dialog>
@@ -866,6 +890,15 @@ export default function BitcoinYield() {
     },
     onError: error => toast.error(error.message),
   });
+  const recordXverseSignatureMutation = trpc.wallets.recordXverseSignature.useMutation({
+    onSuccess: async () => {
+      await utils.wallets.xverseActions.invalidate();
+      toast.success("Tudo certo", {
+        description: "Sua confirmação foi registrada. A operação continua em análise antes de qualquer envio.",
+      });
+    },
+    onError: error => toast.error(error.message),
+  });
   const [connectingXverse, setConnectingXverse] = useState(false);
   const [xversePermissionGranted, setXversePermissionGranted] = useState(false);
   const [permissionLoading, setPermissionLoading] = useState(false);
@@ -920,6 +953,23 @@ export default function BitcoinYield() {
       toast.error(error instanceof Error ? error.message : "A autorização foi cancelada.");
     } finally {
       setPermissionLoading(false);
+    }
+  }
+
+  async function signCustomerXverseAction(action: {
+    id: number;
+    actionType: "withdrawal" | "swap" | "yield";
+    unsignedTransaction: string;
+  }) {
+    try {
+      const signed = await signStacksTransaction(action.unsignedTransaction, false);
+      await recordXverseSignatureMutation.mutateAsync({
+        actionId: action.id,
+        signedTransaction: signed.transaction,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível concluir sua confirmação.");
+      throw error;
     }
   }
 
@@ -1288,7 +1338,7 @@ export default function BitcoinYield() {
           {section === "lotes" && <LotsPage purchases={purchases} />}
           {section === "resgate" && <RedeemPage amount={amount} setAmount={value => { setAmount(value); setRedemptionQuote(null); }} availableBtc={isAuthenticated ? redemptionsQuery.data?.availableBtc ?? 0 : 0.284215} pixDestination={profileQuery.data?.pixAccountMasked ?? ""} quote={redemptionQuote} quoteSeconds={redemptionQuoteSeconds} redemptions={redemptionsQuery.data?.redemptions ?? []} authenticated={isAuthenticated} loading={createRedemptionQuoteMutation.isPending || redemptionsQuery.isLoading} btcPriceBrl={liveBtcBrl} onQuote={() => void prepareRedemption()} />}
           {section === "fiscal" && <FiscalPage />}
-          {section === "reservas" && <ReservesPage wallets={walletsQuery.data ?? []} settlements={walletSettlementsQuery.data ?? []} xverseActions={xverseActionsQuery.data ?? []} authenticated={isAuthenticated} saving={saveStacksWalletMutation.isPending} connectingXverse={connectingXverse} xversePermissionGranted={xversePermissionGranted} permissionLoading={permissionLoading} onSaveWallet={input => saveStacksWalletMutation.mutate(input)} onConnectXverse={() => void connectCustomerXverse()} onRequestPermission={() => void requestCustomerXversePermission()} onRevokePermission={() => void revokeCustomerXversePermission()} onLogin={requestLogin} />}
+          {section === "reservas" && <ReservesPage wallets={walletsQuery.data ?? []} settlements={walletSettlementsQuery.data ?? []} xverseActions={xverseActionsQuery.data ?? []} authenticated={isAuthenticated} saving={saveStacksWalletMutation.isPending} connectingXverse={connectingXverse} xversePermissionGranted={xversePermissionGranted} permissionLoading={permissionLoading} onSaveWallet={input => saveStacksWalletMutation.mutate(input)} onConnectXverse={() => void connectCustomerXverse()} onRequestPermission={() => void requestCustomerXversePermission()} onRevokePermission={() => void revokeCustomerXversePermission()} onSignAction={signCustomerXverseAction} onLogin={requestLogin} />}
           {section === "empresas" && <BusinessPage />}
           {section === "ajuda" && <HelpPage onNavigate={navigate} />}
         </div>

@@ -2105,3 +2105,115 @@ h1 em { color: #caff4a; font-style: normal; }
     50% { transform: translateY(-3px) rotate(2deg); }
   }
 }
+
+
+/* Convite simples para ações da carteira; detalhes ficam no pop-up */
+.br-wallet-helper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 13px 15px;
+  border: 1px solid #eadfd2;
+  border-radius: 14px;
+  background: rgba(255, 253, 249, 0.82);
+}
+
+.br-wallet-helper-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 11px;
+  color: #c56d13;
+  background: #fff1d5;
+}
+
+.br-wallet-helper > div:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+
+.br-wallet-helper b {
+  display: block;
+  color: #3b2a1d;
+  font-size: 11px;
+}
+
+.br-wallet-helper p {
+  margin: 3px 0 0;
+  color: #8a7767;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.br-wallet-helper .br-text-action {
+  flex: 0 0 auto;
+  color: #a35f18;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.br-wallet-helper .br-text-action:hover {
+  color: #7d430b;
+}
+
+@media (max-width: 600px) {
+  .br-wallet-helper {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .br-wallet-helper .br-text-action {
+    margin-left: 46px;
+  }
+}
+
+
+.br-wallet-helper-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  font-size: 9px;
+}
+
+.br-signature-dialog .br-xverse-dialog-icon {
+  color: #168064;
+  border-color: #bfe7d7;
+  background: #e8faf2;
+}
+
+.br-signature-checklist {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 13px;
+  border: 1px solid #eadfd2;
+  border-radius: 13px;
+  background: #fffdf9;
+}
+
+.br-signature-checklist div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #675542;
+  font-size: 10px;
+}
+
+.br-signature-checklist svg {
+  flex: 0 0 auto;
+  color: #168064;
+}
+
+@media (max-width: 600px) {
+  .br-wallet-helper-action {
+    width: 100%;
+    justify-content: center;
+    margin-left: 46px;
+  }
+}

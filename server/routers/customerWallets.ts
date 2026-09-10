@@ -4,6 +4,7 @@ import {
   listBtcLiquiditySettlements,
   listCustomerWallets,
   listXverseActions,
+  markXverseActionSigned,
   recordXverseAction,
   saveCustomerStacksWallet,
 } from "../db";
@@ -65,4 +66,19 @@ export const customerWalletsRouter = router({
         idempotencyKey: input.idempotencyKey,
       });
     }),
+
+  recordXverseSignature: protectedProcedure
+    .input(
+      z.object({
+        actionId: z.number().int().positive(),
+        signedTransaction: z.string().min(2).max(200_000),
+      })
+    )
+    .mutation(({ ctx, input }) =>
+      markXverseActionSigned({
+        userId: ctx.user.id,
+        actionId: input.actionId,
+        signedTransaction: input.signedTransaction,
+      })
+    ),
 });

@@ -22,13 +22,13 @@ Essa arquitetura é diferente de uma custódia institucional. A Xverse não é u
 
 ## Frontend
 
-A área **Segurança** ganhou o botão **Conectar Xverse**. Após a aprovação na carteira, a interface salva o endereço público, informa que a conexão foi concluída sem custódia e exibe o estado de três trilhas: **Saques**, **Trocas** e **Yield BTC**. O estado vazio informa que nenhuma intenção foi assinada; isso evita apresentar uma ação financeira como se já estivesse disponível.
+A área **Segurança** mostra apenas um convite simples: **Sua carteira fica com você**. O painel técnico de assinatura não aparece na jornada principal do cliente. Ao tocar em **Como funciona** ou iniciar uma conexão, a pessoa vê um pop-up curto, com linguagem cotidiana e explicação do que será pedido. Quando uma operação real estiver pronta para aprovação, o mesmo padrão de pop-up apresenta o pedido antes de abrir a carteira. A tela não apresenta estados internos como `intent_created`, `signed` ou `submitted` ao cliente.
 
 O adaptador em `client/src/lib/xverse.ts` concentra as chamadas `wallet_connect`, `stx_signTransaction`, `stx_transferStx` e `disconnect`. A função de assinatura não transmite por padrão. A função de transferência existe como capacidade isolada, mas não está conectada a um botão financeiro no sandbox.
 
 ### Jornada lúdica de autorização
 
-Para clientes iniciantes, a autorização aparece como uma pequena jornada de três passos, sem jargão técnico desnecessário. O primeiro passo explica que a Xverse compartilhará somente a referência pública Stacks escolhida pelo cliente. O segundo reforça que qualquer saque, troca ou yield deverá ser conferido e aprovado na própria carteira. O terceiro mostra a proteção permanente: a RendeBit nunca recebe seed phrase, chave privada ou senha.
+Para clientes iniciantes, a autorização aparece como uma pequena jornada de três passos, sem jargão técnico desnecessário. O primeiro passo explica que a carteira compartilhará somente o endereço público escolhido pelo cliente. O segundo reforça que qualquer ação que precisar de confirmação será mostrada em uma janelinha clara. O terceiro mostra a proteção permanente: a RendeBit nunca pede senha ou código secreto.
 
 Ao tocar em **Continuar com Xverse**, o adaptador executa `wallet_connect` com a finalidade explícita e solicita somente o endereço Stacks da rede testnet. Segundo a documentação oficial, essa conexão concede permissão de leitura da conta; ela não autoriza assinaturas de transações. A interface também oferece **Revisar permissão**, usando `wallet_requestPermissions`, e **Encerrar autorização de leitura**, usando `wallet_renouncePermissions`. A consulta `wallet_getCurrentPermissions` está disponível no adaptador, mas não é chamada durante o carregamento da página, porque qualquer comunicação com a carteira deve partir de uma intenção visível do cliente.
 
@@ -38,7 +38,7 @@ O texto da interface diferencia três coisas: ler uma referência pública, assi
 
 A tabela `xverse_actions` registra a conexão e futuras intenções assinadas. O router `wallets.recordXverseConnection` verifica que a carteira pertence ao usuário autenticado antes de registrar o evento. O painel `/operacao` consulta a fila administrativa e mostra, sem expor dados sensíveis, a ação, a rede, o endereço abreviado, o status e o txid quando existir.
 
-A idempotência é aplicada por `idempotencyKey`. O backend não deve considerar um status enviado pelo navegador como prova de liquidação: em produção, `signed`, `submitted` e `confirmed` deverão ser derivados de uma transação construída, validada e reconciliada pelo servidor. A tabela foi desenhada para suportar essa evolução sem armazenar chaves privadas.
+A idempotência é aplicada por `idempotencyKey`. O backend não deve considerar um status enviado pelo navegador como prova de liquidação: em produção, `signed`, `submitted` e `confirmed` deverão ser derivados de uma transação construída, validada e reconciliada pelo servidor. A rota protegida `wallets.recordXverseSignature` só aceita um pedido pertencente ao usuário e ainda aguardando confirmação; depois, registra o resultado assinado para a fila de reconciliação. A tabela foi desenhada para suportar essa evolução sem armazenar chaves privadas.
 
 ## Saques, trocas e yield
 

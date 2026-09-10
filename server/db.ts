@@ -325,6 +325,56 @@ export async function listXverseActions(userId: number) {
     .orderBy(desc(xverseActions.createdAt));
 }
 
+export async function markXverseActionSigned(input: {
+  userId: number;
+  actionId: number;
+  signedTransaction: string;
+}) {
+  const db = await requireDb();
+  const action = (
+    await db
+      .select()
+      .from(xverseActions)
+      .where(
+        and(
+          eq(xverseActions.id, input.actionId),
+          eq(xverseActions.userId, input.userId)
+        )
+      )
+      .limit(1)
+  )[0];
+
+  if (!action) throw new Error("Pedido de confirmação não encontrado.");
+  if (action.status === "signed") return action;
+  if (action.status !== "intent_created") {
+    throw new Error("Este pedido não está mais disponível para confirmação.");
+  }
+
+  await db
+    .update(xverseActions)
+    .set({ status: "signed", signedTransaction: input.signedTransaction })
+    .where(
+      and(
+        eq(xverseActions.id, input.actionId),
+        eq(xverseActions.userId, input.userId),
+        eq(xverseActions.status, "intent_created")
+      )
+    );
+
+  return (
+    await db
+      .select()
+      .from(xverseActions)
+      .where(
+        and(
+          eq(xverseActions.id, input.actionId),
+          eq(xverseActions.userId, input.userId)
+        )
+      )
+      .limit(1)
+  )[0];
+}
+
 export async function listOperationalXverseActions() {
   const db = await requireDb();
   return db.select().from(xverseActions).orderBy(desc(xverseActions.createdAt));

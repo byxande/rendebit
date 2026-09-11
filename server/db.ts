@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   authEvents,
+  appNotifications,
   btcLiquiditySettlements,
   customerWallets,
   customerProfiles,
@@ -307,13 +308,61 @@ export async function recordXverseAction(input: {
     metadata: input.metadata ? JSON.stringify(input.metadata) : null,
     idempotencyKey: input.idempotencyKey,
   });
-  return (
+  const action = (
     await db
       .select()
       .from(xverseActions)
       .where(eq(xverseActions.idempotencyKey, input.idempotencyKey))
       .limit(1)
   )[0];
+  if (action?.status === "intent_created") {
+    await ensureXverseConfirmationNotification(action);
+  }
+  return action;
+}
+
+function xverseActionCopy(actionType: "withdrawal" | "swap" | "yield") {
+  if (actionType === "withdrawal") {
+    return {
+      title: "Confira um recebimento",
+      body: "Há um pedido de recebimento esperando sua confirmação. Confira os detalhes antes de continuar.",
+    };
+  }
+  if (actionType === "swap") {
+    return {
+      title: "Confira uma troca",
+      body: "Há um pedido de troca esperando sua confirmação. Confira os detalhes antes de continuar.",
+    };
+  }
+  return {
+    title: "Confira uma atualização",
+    body: "Há uma atualização da sua conta esperando sua confirmação. Confira os detalhes antes de continuar.",
+  };
+}
+
+async function ensureXverseConfirmationNotification(action: {
+  id: number;
+  userId: number;
+  actionType: "wallet_connection" | "withdrawal" | "swap" | "yield";
+}) {
+  if (action.actionType === "wallet_connection") return;
+  const copy = xverseActionCopy(action.actionType);
+  const db = await requireDb();
+  await db
+    .insert(appNotifications)
+    .values({
+      userId: action.userId,
+      kind: "confirmation_required",
+      title: copy.title,
+      body: copy.body,
+      actionLabel: "Conferir agora",
+      actionView: "reservas",
+      relatedXverseActionId: action.id,
+      dedupeKey: `xverse-confirmation-${action.id}`,
+    })
+    .onDuplicateKeyUpdate({
+      set: { dedupeKey: `xverse-confirmation-${action.id}` },
+    });
 }
 
 export async function listXverseActions(userId: number) {
@@ -323,6 +372,67 @@ export async function listXverseActions(userId: number) {
     .from(xverseActions)
     .where(eq(xverseActions.userId, userId))
     .orderBy(desc(xverseActions.createdAt));
+}
+
+export async function listAppNotifications(userId: number) {
+  const db = await requireDb();
+  const pendingActions = await db
+    .select({
+      id: xverseActions.id,
+      userId: xverseActions.userId,
+      actionType: xverseActions.actionType,
+    })
+    .from(xverseActions)
+    .where(
+      and(
+        eq(xverseActions.userId, userId),
+        eq(xverseActions.status, "intent_created")
+      )
+    );
+  for (const action of pendingActions) {
+    await ensureXverseConfirmationNotification(action);
+  }
+  const notifications = await db
+    .select()
+    .from(appNotifications)
+    .where(eq(appNotifications.userId, userId))
+    .orderBy(desc(appNotifications.createdAt))
+    .limit(30);
+  return {
+    notifications,
+    unreadCount: notifications.filter(notification => !notification.readAt).length,
+  };
+}
+
+export async function markAppNotificationRead(input: {
+  userId: number;
+  notificationId: number;
+}) {
+  const db = await requireDb();
+  await db
+    .update(appNotifications)
+    .set({ readAt: new Date() })
+    .where(
+      and(
+        eq(appNotifications.id, input.notificationId),
+        eq(appNotifications.userId, input.userId)
+      )
+    );
+  return { success: true as const };
+}
+
+export async function markAllAppNotificationsRead(userId: number) {
+  const db = await requireDb();
+  await db
+    .update(appNotifications)
+    .set({ readAt: new Date() })
+    .where(
+      and(
+        eq(appNotifications.userId, userId),
+        sql`${appNotifications.readAt} IS NULL`
+      )
+    );
+  return { success: true as const };
 }
 
 export async function markXverseActionSigned(input: {
@@ -358,6 +468,16 @@ export async function markXverseActionSigned(input: {
         eq(xverseActions.id, input.actionId),
         eq(xverseActions.userId, input.userId),
         eq(xverseActions.status, "intent_created")
+      )
+    );
+
+  await db
+    .update(appNotifications)
+    .set({ readAt: new Date() })
+    .where(
+      and(
+        eq(appNotifications.userId, input.userId),
+        eq(appNotifications.relatedXverseActionId, input.actionId)
       )
     );
 

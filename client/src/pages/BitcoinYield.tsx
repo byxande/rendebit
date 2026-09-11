@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BadgeCheck,
   Banknote,
+  Bell,
   Bitcoin,
   Building2,
   Check,
@@ -54,6 +55,7 @@ import {
   signStacksTransaction,
 } from "@/lib/xverse";
 import RendeBitFooter from "@/components/RendeBitFooter";
+import NotificationCenter, { type AppNotificationView } from "@/components/NotificationCenter";
 import FutureCalculator from "./FutureCalculator";
 import BusinessSolutions from "./BusinessSolutions";
 import {
@@ -596,6 +598,8 @@ function ReservesPage({
   onRequestPermission,
   onRevokePermission,
   onSignAction,
+  focusActionId,
+  onFocusActionConsumed,
   onLogin,
 }: {
   wallets: Array<{
@@ -641,6 +645,8 @@ function ReservesPage({
     actionType: "withdrawal" | "swap" | "yield";
     unsignedTransaction: string;
   }) => Promise<void>;
+  focusActionId: number | null;
+  onFocusActionConsumed: () => void;
   onLogin: () => void;
 }) {
   const [address, setAddress] = useState("");
@@ -668,6 +674,15 @@ function ReservesPage({
       : pendingSignature?.actionType === "yield"
         ? "uma atualização"
         : null;
+  useEffect(() => {
+    if (!focusActionId || pendingSignature?.id !== focusActionId) return;
+    setSignatureDialogAction({
+      id: pendingSignature.id,
+      actionType: pendingSignature.actionType as "withdrawal" | "swap" | "yield",
+      unsignedTransaction: pendingSignature.unsignedTransaction!,
+    });
+    onFocusActionConsumed();
+  }, [focusActionId, onFocusActionConsumed, pendingSignature]);
 
   function saveWallet() {
     if (!authenticated) {
@@ -803,6 +818,7 @@ export default function BitcoinYield() {
   const walletsQuery = trpc.wallets.list.useQuery(undefined, { enabled: isAuthenticated });
   const walletSettlementsQuery = trpc.wallets.settlements.useQuery(undefined, { enabled: isAuthenticated, refetchInterval: isAuthenticated ? 15_000 : false });
   const xverseActionsQuery = trpc.wallets.xverseActions.useQuery(undefined, { enabled: isAuthenticated, refetchInterval: isAuthenticated ? 15_000 : false });
+  const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: isAuthenticated, refetchInterval: isAuthenticated ? 15_000 : false });
   const redemptionsQuery = trpc.redemptions.summary.useQuery(undefined, { enabled: isAuthenticated });
   const marketQuoteQuery = trpc.market.btcBrl.useQuery(undefined, { staleTime: 55_000, refetchInterval: 60_000, retry: 1 });
   const [dashboardNow, setDashboardNow] = useState(Date.now());
@@ -817,10 +833,13 @@ export default function BitcoinYield() {
     return navItems.some(item => item.id === requested) ? requested as SectionId : "inicio";
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [focusNotificationActionId, setFocusNotificationActionId] = useState<number | null>(null);
   const [loginOpen, setLoginOpen] = useState(() => new URLSearchParams(window.location.search).get("login") === "1");
   const pixStatusRef = useRef<Record<number, PixDepositRecord["status"]>>({});
   const simulatedPixIdsRef = useRef<Set<number>>(new Set());
   const purchaseStatusRef = useRef<Record<number, string>>({});
+  const notifiedConfirmationIdsRef = useRef<Set<number>>(new Set());
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [addMoneyOpen, setAddMoneyOpen] = useState(false);
   const [onboardingIntent, setOnboardingIntent] = useState<"purchase" | "deposit">("purchase");
@@ -849,6 +868,20 @@ export default function BitcoinYield() {
   const pendingPixDeposit = isAuthenticated
     ? pixDepositsQuery.data?.deposits.find(item => item.status === "awaiting_payment" && new Date(item.expiresAt).getTime() > dashboardNow) ?? null
     : null;
+  useEffect(() => {
+    if (!isAuthenticated) {
+      notifiedConfirmationIdsRef.current.clear();
+      return;
+    }
+    const confirmations = (notificationsQuery.data?.notifications ?? []).filter(
+      notification => notification.kind === "confirmation_required" && !notification.readAt
+    );
+    confirmations.forEach(notification => {
+      if (notifiedConfirmationIdsRef.current.has(notification.id)) return;
+      notifiedConfirmationIdsRef.current.add(notification.id);
+      toast.info(notification.title, { description: "Abra o sino no topo para conferir com calma." });
+    });
+  }, [isAuthenticated, notificationsQuery.data?.notifications]);
   const marketQuoteTime = marketQuoteQuery.data ? new Date(marketQuoteQuery.data.marketUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null;
   const localPurchaseQuote = useMemo(() => {
     const amountInBrl = parseBrl(addAmount);
@@ -892,12 +925,21 @@ export default function BitcoinYield() {
   });
   const recordXverseSignatureMutation = trpc.wallets.recordXverseSignature.useMutation({
     onSuccess: async () => {
-      await utils.wallets.xverseActions.invalidate();
+      await Promise.all([
+        utils.wallets.xverseActions.invalidate(),
+        utils.notifications.list.invalidate(),
+      ]);
       toast.success("Tudo certo", {
         description: "Sua confirmação foi registrada. A operação continua em análise antes de qualquer envio.",
       });
     },
     onError: error => toast.error(error.message),
+  });
+  const markNotificationReadMutation = trpc.notifications.markRead.useMutation({
+    onSuccess: () => void utils.notifications.list.invalidate(),
+  });
+  const markAllNotificationsReadMutation = trpc.notifications.markAllRead.useMutation({
+    onSuccess: () => void utils.notifications.list.invalidate(),
   });
   const [connectingXverse, setConnectingXverse] = useState(false);
   const [xversePermissionGranted, setXversePermissionGranted] = useState(false);
@@ -970,6 +1012,17 @@ export default function BitcoinYield() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível concluir sua confirmação.");
       throw error;
+    }
+  }
+
+  function openNotification(notification: AppNotificationView) {
+    if (!notification.readAt) {
+      markNotificationReadMutation.mutate({ notificationId: notification.id });
+    }
+    setNotificationsOpen(false);
+    setFocusNotificationActionId(notification.relatedXverseActionId);
+    if (notification.actionView === "reservas") {
+      navigate("reservas");
     }
   }
 
@@ -1328,7 +1381,7 @@ export default function BitcoinYield() {
       </aside>
 
       <main className="br-main">
-        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill /><button className="br-account-button" type="button" onClick={requestLogin}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? loginProviderLabel : "Entrar"} <ChevronDown size={14} /></button></div></div>
+        <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill />{isAuthenticated && <NotificationCenter open={notificationsOpen} onOpenChange={setNotificationsOpen} notifications={(notificationsQuery.data?.notifications ?? []) as AppNotificationView[]} unreadCount={notificationsQuery.data?.unreadCount ?? 0} onMarkRead={notificationId => markNotificationReadMutation.mutate({ notificationId })} onMarkAllRead={() => markAllNotificationsReadMutation.mutate()} onAction={openNotification} />}<button className="br-account-button" type="button" onClick={requestLogin}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? loginProviderLabel : "Entrar"} <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
           {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN DO JEITO BRASILEIRO</span><h1>Acumule BTC.<br /><em>Receba rendimentos em reais.</em></h1><p>Uma experiência feita exclusivamente para residentes no Brasil. Comece com Pix ou cartão, acompanhe tudo em reais e, quando quiser, peça o resgate via Pix. A referência atual de rendimento é de <b>~3% a.a.</b></p></div><div className="br-trust-row"><span><BadgeCheck /> Exclusiva para residentes no Brasil</span><span><ShieldCheck /> Seu dinheiro separado</span><span><Sparkles /> Simples e em português</span></div></section><BrazilFirstStrip /><BtcBrlQuoteCard quote={marketQuoteQuery.data} loading={marketQuoteQuery.isLoading} refreshing={marketQuoteQuery.isFetching} onRefresh={() => void marketQuoteQuery.refetch()} /><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} onSimulate={() => navigate("simulador")} btcPriceBrl={liveBtcBrl} quoteSource={marketQuoteQuery.data?.source ?? "Referência temporária"} quoteTime={marketQuoteTime} quoteStale={marketQuoteQuery.data?.stale ?? true} pendingPixDeposit={pendingPixDeposit} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Você cuida da sua vida. A RendeBit simplifica o caminho.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Comece em reais</h3><p>Use Pix ou cartão, como você já faz no dia a dia.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe com clareza</h3><p>Veja seu Bitcoin e o rendimento estimado sempre em BRL.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Receba via Pix</h3><p>Confira o valor líquido e mande para sua conta verificada.</p></div></div></section></div>}
           {section === "depositar" && <PixDepositPage deposits={(pixDepositsQuery.data?.deposits ?? []) as PixDepositRecord[]} availableBrl={pixDepositsQuery.data?.availableBrl ?? 0} amount={pixDepositAmount} setAmount={setPixDepositAmount} authenticated={isAuthenticated} loading={createPixDepositMutation.isPending || settlePixDepositMutation.isPending || pixDepositsQuery.isLoading} onCreate={() => void createPixDeposit()} onPay={depositId => void settlePixDeposit(depositId)} onLogin={requestLogin} />}
@@ -1338,7 +1391,7 @@ export default function BitcoinYield() {
           {section === "lotes" && <LotsPage purchases={purchases} />}
           {section === "resgate" && <RedeemPage amount={amount} setAmount={value => { setAmount(value); setRedemptionQuote(null); }} availableBtc={isAuthenticated ? redemptionsQuery.data?.availableBtc ?? 0 : 0.284215} pixDestination={profileQuery.data?.pixAccountMasked ?? ""} quote={redemptionQuote} quoteSeconds={redemptionQuoteSeconds} redemptions={redemptionsQuery.data?.redemptions ?? []} authenticated={isAuthenticated} loading={createRedemptionQuoteMutation.isPending || redemptionsQuery.isLoading} btcPriceBrl={liveBtcBrl} onQuote={() => void prepareRedemption()} />}
           {section === "fiscal" && <FiscalPage />}
-          {section === "reservas" && <ReservesPage wallets={walletsQuery.data ?? []} settlements={walletSettlementsQuery.data ?? []} xverseActions={xverseActionsQuery.data ?? []} authenticated={isAuthenticated} saving={saveStacksWalletMutation.isPending} connectingXverse={connectingXverse} xversePermissionGranted={xversePermissionGranted} permissionLoading={permissionLoading} onSaveWallet={input => saveStacksWalletMutation.mutate(input)} onConnectXverse={() => void connectCustomerXverse()} onRequestPermission={() => void requestCustomerXversePermission()} onRevokePermission={() => void revokeCustomerXversePermission()} onSignAction={signCustomerXverseAction} onLogin={requestLogin} />}
+          {section === "reservas" && <ReservesPage wallets={walletsQuery.data ?? []} settlements={walletSettlementsQuery.data ?? []} xverseActions={xverseActionsQuery.data ?? []} authenticated={isAuthenticated} saving={saveStacksWalletMutation.isPending} connectingXverse={connectingXverse} xversePermissionGranted={xversePermissionGranted} permissionLoading={permissionLoading} onSaveWallet={input => saveStacksWalletMutation.mutate(input)} onConnectXverse={() => void connectCustomerXverse()} onRequestPermission={() => void requestCustomerXversePermission()} onRevokePermission={() => void revokeCustomerXversePermission()} onSignAction={signCustomerXverseAction} focusActionId={focusNotificationActionId} onFocusActionConsumed={() => setFocusNotificationActionId(null)} onLogin={requestLogin} />}
           {section === "empresas" && <BusinessPage />}
           {section === "ajuda" && <HelpPage onNavigate={navigate} />}
         </div>

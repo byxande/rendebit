@@ -6,6 +6,7 @@ import { onboardingRouter } from "./routers/onboarding";
 import { integrationsRouter } from "./routers/integrations";
 import { customerWalletsRouter } from "./routers/customerWallets";
 import { marketRouter } from "./routers/market";
+import { notificationsRouter } from "./routers/notifications";
 import { pixDepositsRouter } from "./routers/pixDeposits";
 import { purchasesRouter } from "./routers/purchases";
 import { redemptionsRouter } from "./routers/redemptions";
@@ -46,6 +47,7 @@ export const appRouter = router({
   integrations: integrationsRouter,
   wallets: customerWalletsRouter,
   market: marketRouter,
+  notifications: notificationsRouter,
   onboarding: onboardingRouter,
   pixDeposits: pixDepositsRouter,
   purchases: purchasesRouter,

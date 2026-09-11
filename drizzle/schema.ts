@@ -4,6 +4,7 @@ import {
   int,
   mysqlEnum,
   mysqlTable,
+  index,
   text,
   timestamp,
   uniqueIndex,
@@ -674,6 +675,41 @@ export const xverseActions = mysqlTable("xverse_actions", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const appNotifications = mysqlTable(
+  "app_notifications",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id),
+    kind: mysqlEnum("kind", [
+      "confirmation_required",
+      "info",
+      "success",
+      "warning",
+    ])
+      .default("info")
+      .notNull(),
+    title: varchar("title", { length: 180 }).notNull(),
+    body: text("body").notNull(),
+    actionLabel: varchar("actionLabel", { length: 80 }),
+    actionView: varchar("actionView", { length: 40 }),
+    relatedXverseActionId: int("relatedXverseActionId").references(
+      () => xverseActions.id
+    ),
+    dedupeKey: varchar("dedupeKey", { length: 180 }).notNull().unique(),
+    readAt: timestamp("readAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    userReadCreatedIndex: index("app_notifications_user_read_created").on(
+      table.userId,
+      table.readAt,
+      table.createdAt
+    ),
+  })
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type CustomerWallet = typeof customerWallets.$inferSelect;
@@ -690,3 +726,4 @@ export type ProfitCapitalSweep = typeof profitCapitalSweeps.$inferSelect;
 export type ProfitSweepApproval = typeof profitSweepApprovals.$inferSelect;
 export type DailyReconciliation = typeof dailyReconciliations.$inferSelect;
 export type XverseAction = typeof xverseActions.$inferSelect;
+export type AppNotification = typeof appNotifications.$inferSelect;

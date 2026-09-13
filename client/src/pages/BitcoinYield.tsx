@@ -305,6 +305,7 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney, onSimulate, btcPriceBrl
   const currentValue = DEMO_BTC_BALANCE * btcPriceBrl;
   const initialValue = currentValue * wealthPattern[0].factor;
   const wealthGain = currentValue - initialValue;
+  const nativeYieldBtc = DEMO_BTC_BALANCE * 0.03;
   return (
     <>
       <section className="br-hero-grid">
@@ -313,11 +314,11 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney, onSimulate, btcPriceBrl
             <div>
               <span className="br-eyebrow light">SEU SALDO EM BITCOIN</span>
               <div className="br-btc-value"><span>₿</span> {formatBtc(DEMO_BTC_BALANCE)}</div>
-              <p>Seu rendimento é acompanhado em reais (BRL)</p>
+              <p>Seu rendimento é acumulado nativamente em BTC</p>
             </div>
             <div className="br-orbit"><Bitcoin size={28} /><i /><i /></div>
           </div>
-          <div className="br-brl-badge"><Banknote size={15} /> Rendimento calculado e exibido em reais (BRL)</div>
+          <div className="br-brl-badge"><Bitcoin size={15} /> Rendimento nativo em BTC · BRL é apenas referência de valor</div>
           <div className="br-balance-brl">
             <div><small>Valor em reais hoje (BRL)</small><strong>{currency.format(currentValue)}</strong></div>
             <span className="br-positive">+0,74% em 90 dias</span>
@@ -331,14 +332,14 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney, onSimulate, btcPriceBrl
         </div>
 
         <div className="br-yield-card br-panel">
-          <div className="br-card-headline"><span>Retorno nativo estimado</span><span className="br-live"><i /> REFERÊNCIA</span></div>
+          <div className="br-card-headline"><span>Rendimento nativo em BTC</span><span className="br-live"><i /> REFERÊNCIA</span></div>
           <strong className="br-yield-number">~3% a.a.</strong>
-          <span className="br-yield-btc">≈ {currency.format(currentValue * 0.03)} em 12 meses sobre o saldo atual</span>
+          <span className="br-yield-btc">≈ ₿ {formatBtc(nativeYieldBtc)} em 12 meses · valor equivalente em BRL: {currency.format(currentValue * 0.03)}</span>
           <div className="br-divider" />
-          <div className="br-kv"><span>Estimativa para 90 dias</span><b>+0,74%</b></div>
+          <div className="br-kv"><span>Rendimento nativo em 90 dias</span><b>+0,74%</b></div>
           <div className="br-kv"><span>Conversão BTC/BRL</span><b>{currency.format(btcPriceBrl)}</b></div>
           <div className="br-kv"><span>{quoteStale ? "Último valor conhecido" : "Cotação ao vivo"}</span><b>{quoteSource}{quoteTime ? ` · ${quoteTime}` : ""}</b></div>
-          <div className="br-kv"><span>Referência utilizada</span><b>~3% ao ano</b></div>
+          <div className="br-kv"><span>Referência nativa utilizada</span><b>~3% ao ano em BTC</b></div>
           <button type="button" className="br-text-action" onClick={onSimulate}>Simule seus ganhos futuros <ArrowRight size={15} /></button>
         </div>
       </section>
@@ -358,7 +359,7 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney, onSimulate, btcPriceBrl
           <span className="br-positive">+{currency.format(wealthGain)}</span>
         </div>
         <MiniChart currentValue={currentValue} />
-        <div className="br-chart-note"><Fingerprint size={15} /> Simulação com saldo demonstrativo e cotação BTC/BRL ao vivo.</div>
+        <div className="br-chart-note"><Fingerprint size={15} /> Patrimônio exibido em BRL para referência; o rendimento nativo é acumulado em BTC.</div>
       </section>
     </>
   );
@@ -366,7 +367,7 @@ function YieldSummary({ onRedeem, onDeposit, onAddMoney, onSimulate, btcPriceBrl
 
 function InnovationGrid({ setSection }: { setSection: (section: SectionId) => void }) {
   const items = [
-    { icon: Bitcoin, title: "Bitcoin com rendimento", text: "Seu Bitcoin pode render sem você precisar lidar com a parte técnica.", tone: "lime" },
+    { icon: Bitcoin, title: "Bitcoin com rendimento", text: "Seu Bitcoin pode gerar rendimento nativo em BTC sem você precisar lidar com a parte técnica.", tone: "lime" },
     { icon: QrCode, title: "Pix para entrar e sair", text: "Coloque reais e peça seu resgate para uma conta Pix da sua titularidade.", tone: "cyan" },
     { icon: ReceiptText, title: "Tudo bem organizado", text: "Veja quanto colocou, quando comprou e como cada aporte está hoje.", tone: "violet" },
     { icon: FileCheck2, title: "Ajuda para o seu contador", text: "Relatórios em reais, pensados para facilitar sua declaração e sua organização.", tone: "orange" },
@@ -395,19 +396,19 @@ function YieldPage({ btcPriceBrl }: { btcPriceBrl: number }) {
   const currentValue = DEMO_BTC_BALANCE * btcPriceBrl;
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact"><div><span className="br-eyebrow">SEU BITCOIN TRABALHANDO</span><h1>Veja seu rendimento sem complicação.</h1><p>A referência atual é de ~3% ao ano. Mostramos o rendimento e a variação do Bitcoin separadamente, sempre em reais.</p></div><div className="br-big-icon"><TrendingUp /></div></section>
+      <section className="br-page-hero compact"><div><span className="br-eyebrow">SEU BITCOIN TRABALHANDO</span><h1>Veja seu rendimento sem complicação.</h1><p>A referência atual é de ~3% ao ano em BTC. Mostramos o rendimento nativo em BTC e a variação do preço do Bitcoin em reais separadamente.</p></div><div className="br-big-icon"><TrendingUp /></div></section>
       <div className="br-metric-grid">
-        <div className="br-panel br-metric"><small>Retorno anual estimado</small><strong>~3% a.a.</strong><span>referência atual</span></div>
-        <div className="br-panel br-metric"><small>Estimativa em 90 dias</small><strong>+0,74%</strong><span>aprox. {currency.format(currentValue * 0.0074)}</span></div>
+        <div className="br-panel br-metric"><small>Rendimento nativo anual estimado em BTC</small><strong>~3% a.a.</strong><span>referência atual</span></div>
+        <div className="br-panel br-metric"><small>Estimativa em 90 dias</small><strong>+0,74%</strong><span>aprox. {currency.format(currentValue * 0.0074)} em BRL</span></div>
         <div className="br-panel br-metric"><small>Variação do Bitcoin</small><strong>Separada</strong><span>pode aumentar ou reduzir o valor em BRL</span></div>
       </div>
       <section className="br-panel br-formula-card">
         <div><span className="br-eyebrow">TRANSPARÊNCIA SEM COMPLICAÇÃO</span><h2>Como chegamos ao seu valor</h2></div>
-        <div className="br-formula"><span>Bitcoin comprado</span><i>+</i><span>rendimento acumulado</span><i>×</i><span>cotação em reais</span><i>=</i><b>{currency.format(currentValue)}</b></div>
-        <p>O painel combina seu saldo em Bitcoin, o rendimento acumulado e a cotação em BRL. Custos e diferenças de execução aparecem separadamente antes da compra ou do resgate.</p>
+        <div className="br-formula"><span>Bitcoin comprado</span><i>+</i><span>rendimento nativo em BTC</span><i>×</i><span>cotação em reais</span><i>=</i><b>{currency.format(currentValue)}</b></div>
+        <p>O painel combina seu saldo em BTC, o rendimento nativo acumulado em BTC e a cotação em BRL. O valor em reais é uma referência; custos e diferenças de execução aparecem separadamente antes da compra ou do resgate.</p>
       </section>
       <section className="br-panel br-breakdown">
-        <div className="br-section-head"><div><span className="br-eyebrow">HISTÓRICO</span><h2>Evolução estimada do retorno nativo</h2></div><span className="br-positive">+0,74% em 90 dias</span></div>
+        <div className="br-section-head"><div><span className="br-eyebrow">HISTÓRICO</span><h2>Patrimônio em reais com rendimento nativo em BTC</h2></div><span className="br-positive">+0,74% em 90 dias</span></div>
         <MiniChart currentValue={currentValue} />
       </section>
     </div>
@@ -420,12 +421,12 @@ function LotsPage({ purchases }: { purchases: PurchaseRecord[] }) {
   const totals = completedPurchases.reduce((acc, purchase) => ({ invested: acc.invested + purchase.invested, current: acc.current + purchase.currentValue, gain: acc.gain + purchase.gain }), { invested: 0, current: 0, gain: 0 });
   return (
     <div className="br-stack">
-      <section className="br-page-hero compact"><div><span className="br-eyebrow">SEUS APORTES, BEM ORGANIZADOS</span><h1>Cada compra conta uma parte da sua história.</h1><p>Confira quanto colocou em reais, quanto Bitcoin recebeu e como cada aporte está hoje.</p></div><div className="br-big-icon"><Layers3 /></div></section>
+      <section className="br-page-hero compact"><div><span className="br-eyebrow">SEUS APORTES, BEM ORGANIZADOS</span><h1>Cada compra conta uma parte da sua história.</h1><p>Confira quanto colocou em reais, quanto Bitcoin recebeu, o rendimento nativo acumulado e como cada aporte está hoje.</p></div><div className="br-big-icon"><Layers3 /></div></section>
       <div className="br-purchase-summary"><div className="br-panel"><small>Total investido</small><b>{currency.format(totals.invested)}</b><span>{completedPurchases.length} concluídas{pendingPurchases ? ` · ${pendingPurchases} pendentes` : ""}</span></div><div className="br-panel"><small>Valor atual</small><b>{currency.format(totals.current)}</b><span>somente compras concluídas</span></div><div className="br-panel"><small>Resultado estimado</small><b className={totals.gain >= 0 ? "gain" : "loss"}>{formatSignedCurrency(totals.gain)}</b><span>estimativa em BRL</span></div></div>
       <section className="br-panel br-table-card">
         <div className="br-section-head"><div><h2>Compras e ativações</h2><p>Valores demonstrativos atualizados em 08/09/2026.</p></div><button className="br-outline" type="button" onClick={() => toast.success("CSV demonstrativo preparado")}>Exportar CSV <ArrowDownToLine size={16} /></button></div>
         <div className="br-table-scroll"><table><thead><tr><th>Data</th><th>Aporte em BRL</th><th>Pagamento</th><th>Bitcoin comprado</th><th>Cotação BTC/BRL</th><th>Valor atual</th><th>Resultado</th><th>Status</th></tr></thead><tbody>{purchases.map((purchase) => <tr key={purchase.id}><td><b>{purchase.date}</b></td><td>{currency.format(purchase.invested)}</td><td>{purchase.paymentMethod === "credit_card" ? "Cartão" : "Pix"}</td><td className="mono">{purchase.completed ? `₿ ${formatBtc(purchase.btc)}` : "Aguardando"}</td><td>{currency.format(purchase.quote)}</td><td>{purchase.completed ? currency.format(purchase.currentValue) : "—"}</td><td className={purchase.completed ? (purchase.gain >= 0 ? "gain" : "loss") : ""}>{purchase.completed ? formatSignedCurrency(purchase.gain) : "—"}</td><td><span className={`br-status ${purchase.completed ? "" : "pending"}`}><i />{purchase.status}</span>{purchase.checkoutUrl && !purchase.completed && <button className="br-resume-checkout" type="button" onClick={() => window.location.assign(purchase.checkoutUrl!)}>Continuar pagamento</button>}</td></tr>)}</tbody></table></div>
-        <div className="br-history-disclosure"><ShieldCheck size={17} /><div><b>Rendimento ativado nos bastidores</b><span>A tela mostra a experiência em reais e Bitcoin. A trilha técnica de conversão e aplicação permanece verificável na área Segurança.</span></div></div>
+        <div className="br-history-disclosure"><ShieldCheck size={17} /><div><b>Rendimento nativo em BTC ativado</b><span>A tela mostra o valor em reais para facilitar a leitura, mas o rendimento é gerado e acumulado em BTC. A trilha técnica de conversão e aplicação permanece verificável na área Segurança.</span></div></div>
       </section>
     </div>
   );
@@ -1383,7 +1384,7 @@ export default function BitcoinYield() {
       <main className="br-main">
         <div className="br-topbar"><div><span>CONTA PESSOAL</span><b>{activeLabel}</b></div><div className="br-top-actions"><DemoPill />{isAuthenticated && <NotificationCenter open={notificationsOpen} onOpenChange={setNotificationsOpen} notifications={(notificationsQuery.data?.notifications ?? []) as AppNotificationView[]} unreadCount={notificationsQuery.data?.unreadCount ?? 0} onMarkRead={notificationId => markNotificationReadMutation.mutate({ notificationId })} onMarkAllRead={() => markAllNotificationsReadMutation.mutate()} onAction={openNotification} />}<button className="br-account-button" type="button" onClick={requestLogin}><span className="br-account-status"><i /></span> {authLoading ? "Carregando…" : isAuthenticated ? loginProviderLabel : "Entrar"} <ChevronDown size={14} /></button></div></div>
         <div className="br-content">
-          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN DO JEITO BRASILEIRO</span><h1>Acumule BTC.<br /><em>Receba rendimentos em reais.</em></h1><p>Uma experiência feita exclusivamente para residentes no Brasil. Comece com Pix ou cartão, acompanhe tudo em reais e, quando quiser, peça o resgate via Pix. A referência atual de rendimento é de <b>~3% a.a.</b></p></div><div className="br-trust-row"><span><BadgeCheck /> Exclusiva para residentes no Brasil</span><span><ShieldCheck /> Seu dinheiro separado</span><span><Sparkles /> Simples e em português</span></div></section><BrazilFirstStrip /><BtcBrlQuoteCard quote={marketQuoteQuery.data} loading={marketQuoteQuery.isLoading} refreshing={marketQuoteQuery.isFetching} onRefresh={() => void marketQuoteQuery.refetch()} /><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} onSimulate={() => navigate("simulador")} btcPriceBrl={liveBtcBrl} quoteSource={marketQuoteQuery.data?.source ?? "Referência temporária"} quoteTime={marketQuoteTime} quoteStale={marketQuoteQuery.data?.stale ?? true} pendingPixDeposit={pendingPixDeposit} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Você cuida da sua vida. A RendeBit simplifica o caminho.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Comece em reais</h3><p>Use Pix ou cartão, como você já faz no dia a dia.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe com clareza</h3><p>Veja seu Bitcoin e o rendimento estimado sempre em BRL.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Receba via Pix</h3><p>Confira o valor líquido e mande para sua conta verificada.</p></div></div></section></div>}
+          {section === "inicio" && <div className="br-stack"><section className="br-welcome"><div><span className="br-eyebrow">BITCOIN DO JEITO BRASILEIRO</span><h1>Acumule BTC.<br /><em>Receba rendimento nativo em BTC.</em></h1><p>Uma experiência feita exclusivamente para residentes no Brasil. Comece com Pix ou cartão, acompanhe o valor em reais e veja seu rendimento nativo em BTC. Quando quiser, peça o resgate via Pix. A referência atual é de <b>~3% a.a. em BTC</b>.</p></div><div className="br-trust-row"><span><BadgeCheck /> Exclusiva para residentes no Brasil</span><span><ShieldCheck /> Seu dinheiro separado</span><span><Sparkles /> Simples e em português</span></div></section><BrazilFirstStrip /><BtcBrlQuoteCard quote={marketQuoteQuery.data} loading={marketQuoteQuery.isLoading} refreshing={marketQuoteQuery.isFetching} onRefresh={() => void marketQuoteQuery.refetch()} /><YieldSummary onRedeem={() => navigate("resgate")} onDeposit={() => navigate("depositar")} onAddMoney={openPurchase} onSimulate={() => navigate("simulador")} btcPriceBrl={liveBtcBrl} quoteSource={marketQuoteQuery.data?.source ?? "Referência temporária"} quoteTime={marketQuoteTime} quoteStale={marketQuoteQuery.data?.stale ?? true} pendingPixDeposit={pendingPixDeposit} /><InnovationGrid setSection={navigate} /><section className="br-panel br-how-card"><div><span className="br-eyebrow">SIMPLES POR FORA. BITCOIN POR DENTRO.</span><h2>Você cuida da sua vida. A RendeBit simplifica o caminho.</h2></div><div className="br-steps"><div><span>01</span><WalletCards /><h3>Comece em reais</h3><p>Use Pix ou cartão, como você já faz no dia a dia.</p></div><ArrowRight /><div><span>02</span><TrendingUp /><h3>Acompanhe com clareza</h3><p>Veja seu Bitcoin, o rendimento nativo em BTC e o valor equivalente em BRL.</p></div><ArrowRight /><div><span>03</span><QrCode /><h3>Receba via Pix</h3><p>Confira o valor líquido e mande para sua conta verificada.</p></div></div></section></div>}
           {section === "depositar" && <PixDepositPage deposits={(pixDepositsQuery.data?.deposits ?? []) as PixDepositRecord[]} availableBrl={pixDepositsQuery.data?.availableBrl ?? 0} amount={pixDepositAmount} setAmount={setPixDepositAmount} authenticated={isAuthenticated} loading={createPixDepositMutation.isPending || settlePixDepositMutation.isPending || pixDepositsQuery.isLoading} onCreate={() => void createPixDeposit()} onPay={depositId => void settlePixDeposit(depositId)} onLogin={requestLogin} />}
           {section === "rendimento" && <YieldPage btcPriceBrl={liveBtcBrl} />}
           {section === "mercado" && <Suspense fallback={<section className="br-panel btc-chart-loading"><RefreshCw className="spinning" /><b>Abrindo o mercado para você…</b></section>}><BtcMarketChart /></Suspense>}
@@ -1453,7 +1454,7 @@ export default function BitcoinYield() {
             <label className="br-amount-label" htmlFor="add-money-amount">Quanto você quer investir?</label>
             <div className="br-amount-field"><span>R$</span><input id="add-money-amount" inputMode="decimal" value={addAmount} onChange={(event) => { setAddAmount(event.target.value); setQuoteSeconds(0); setServerQuote(null); }} aria-label="Valor da compra em reais" /></div>
             <div className="br-buy-chips"><button type="button" onClick={() => { setAddAmount("500,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 500</button><button type="button" onClick={() => { setAddAmount("1.000,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 1.000</button><button type="button" onClick={() => { setAddAmount("5.000,00"); setServerQuote(null); setQuoteSeconds(0); }}>R$ 5.000</button></div>
-            <section className="br-buy-quote"><div className="br-buy-quote-head"><span><i /> Cotação persistida</span><b className={quoteSeconds === 0 ? "expired" : ""}>{quoteSeconds === 0 ? "Atualize" : `00:${String(quoteSeconds).padStart(2, "0")}`}</b></div><div className="br-kv"><span>Referência BTC/BRL</span><b>{currency.format(serverQuote ? Number(serverQuote.referenceBtcBrl) : liveBtcBrl)}</b></div><div className="br-kv"><span>Preço de execução (spread 0,65%)</span><b>{currency.format(purchaseQuote.executionPrice)}</b></div><div className="br-kv"><span>Taxa de serviço (0,50%)</span><b>-{currency.format(purchaseQuote.serviceFee)}</b></div><div className="br-kv"><span>Valor aplicado</span><b>{currency.format(purchaseQuote.applied)}</b></div><div className="br-buy-total"><span>Você compra aproximadamente</span><strong>₿ {formatBtc(purchaseQuote.btc)}</strong><small>Referência de rendimento: ~3% a.a.</small></div></section>
+            <section className="br-buy-quote"><div className="br-buy-quote-head"><span><i /> Cotação persistida</span><b className={quoteSeconds === 0 ? "expired" : ""}>{quoteSeconds === 0 ? "Atualize" : `00:${String(quoteSeconds).padStart(2, "0")}`}</b></div><div className="br-kv"><span>Referência BTC/BRL</span><b>{currency.format(serverQuote ? Number(serverQuote.referenceBtcBrl) : liveBtcBrl)}</b></div><div className="br-kv"><span>Preço de execução (spread 0,65%)</span><b>{currency.format(purchaseQuote.executionPrice)}</b></div><div className="br-kv"><span>Taxa de serviço (0,50%)</span><b>-{currency.format(purchaseQuote.serviceFee)}</b></div><div className="br-kv"><span>Valor aplicado</span><b>{currency.format(purchaseQuote.applied)}</b></div><div className="br-buy-total"><span>Você compra aproximadamente</span><strong>₿ {formatBtc(purchaseQuote.btc)}</strong><small>Rendimento nativo estimado em BTC: ~3% a.a.</small></div></section>
             <div className="br-payment-methods" role="radiogroup" aria-label="Forma de pagamento"><button className={paymentMethod === "pix" ? "active" : ""} type="button" role="radio" aria-checked={paymentMethod === "pix"} onClick={() => setPaymentMethod("pix")}><Banknote /><span><b>Pix</b><small>Pagamento à vista</small></span><i /></button><button className={paymentMethod === "credit_card" ? "active" : ""} type="button" role="radio" aria-checked={paymentMethod === "credit_card"} onClick={() => setPaymentMethod("credit_card")}><CreditCard /><span><b>Cartão de crédito</b><small>Processado pelo Mercado Pago</small></span><i /></button></div>
             <div className="br-mercado-pago-note"><ShieldCheck size={16} /><span>O Mercado Pago processa o pagamento em BRL. Depois da aprovação, a liquidez BTCBRL é tratada separadamente na conta institucional e a trilha Stacks só continua após os controles de rede, carteira pública e contrato. Dados do cartão não passam pelo backend da RendeBit.</span></div>
             {(!serverQuote || quoteSeconds === 0) && <button className="br-outline full" type="button" onClick={() => void regenerateServerQuote()} disabled={createQuoteMutation.isPending}><RefreshCw className={createQuoteMutation.isPending ? "animate-spin" : ""} size={15} /> Atualizar cotação</button>}
@@ -1463,7 +1464,7 @@ export default function BitcoinYield() {
             <button className="br-dialog-cancel" type="button" onClick={() => setPurchaseStep("eligibility")}>Voltar</button>
           </>}
 
-          {purchaseStep === "success" && <div className="br-purchase-success"><div className="br-success-icon"><CircleCheckBig /></div><span className="br-eyebrow">SIMULAÇÃO CONCLUÍDA</span><h2>Bitcoin comprado. Rendimento ativado.</h2><p>Sua compra demonstrativa foi registrada e já aparece em Meus aportes.</p><div className="br-success-values"><div><span>Investido</span><b>{currency.format(purchaseQuote.amountInBrl)}</b></div><div><span>Bitcoin comprado</span><b>₿ {formatBtc(purchaseQuote.btc)}</b></div><div><span>Status</span><b className="gain">Rendimento ativo</b></div></div><button className="br-primary full" type="button" onClick={() => { setAddMoneyOpen(false); navigate("lotes"); }}>Ver meus aportes <ArrowRight size={17} /></button><button className="br-dialog-cancel" type="button" onClick={() => setAddMoneyOpen(false)}>Voltar para o início</button></div>}
+          {purchaseStep === "success" && <div className="br-purchase-success"><div className="br-success-icon"><CircleCheckBig /></div><span className="br-eyebrow">SIMULAÇÃO CONCLUÍDA</span><h2>Bitcoin comprado. Rendimento nativo em BTC ativado.</h2><p>Sua compra demonstrativa foi registrada e já aparece em Meus aportes.</p><div className="br-success-values"><div><span>Investido</span><b>{currency.format(purchaseQuote.amountInBrl)}</b></div><div><span>Bitcoin comprado</span><b>₿ {formatBtc(purchaseQuote.btc)}</b></div><div><span>Status</span><b className="gain">Rendimento nativo em BTC ativo</b></div></div><button className="br-primary full" type="button" onClick={() => { setAddMoneyOpen(false); navigate("lotes"); }}>Ver meus aportes <ArrowRight size={17} /></button><button className="br-dialog-cancel" type="button" onClick={() => setAddMoneyOpen(false)}>Voltar para o início</button></div>}
         </DialogContent>
       </Dialog>
     </div>
@@ -1480,12 +1481,12 @@ function HelpPage({ onNavigate }: { onNavigate: (section: SectionId) => void }) 
     {
       category: "Rendimento",
       question: "Quanto o meu Bitcoin pode render?",
-      answer: "A referência atual da experiência é aproximadamente 3% ao ano sobre a quantidade de Bitcoin aplicada. É uma estimativa variável, não garantida, e pode mudar conforme o protocolo e a liquidez. A variação do preço do BTC em reais é outro efeito e aparece separadamente.",
+      answer: "O rendimento é nativo em BTC: a referência atual da experiência é aproximadamente 3% ao ano sobre a quantidade de Bitcoin aplicada. É uma estimativa variável, não garantida, e pode mudar conforme o protocolo e a liquidez. A variação do preço do BTC em reais é outro efeito e aparece separadamente.",
     },
     {
       category: "Rendimento",
       question: "Como funciona a calculadora de ganhos futuros?",
-      answer: "Você escolhe um valor inicial, os aportes mensais, o prazo e um cenário para o preço do Bitcoin. A calculadora separa o dinheiro colocado, o rendimento estimado da estratégia e o efeito da cotação do BTC. As premissas completas ficam disponíveis no fim da simulação.",
+      answer: "Você escolhe um valor inicial, os aportes mensais, o prazo e um cenário para o preço do Bitcoin. A calculadora separa o dinheiro colocado, o rendimento nativo estimado em BTC e o efeito da cotação em reais. As premissas completas ficam disponíveis no fim da simulação.",
     },
     {
       category: "Primeiros passos",
@@ -1500,7 +1501,7 @@ function HelpPage({ onNavigate }: { onNavigate: (section: SectionId) => void }) 
     {
       category: "Mercado",
       question: "O gráfico mostra o rendimento da estratégia?",
-      answer: "Não. Ele mostra somente quanto o preço do Bitcoin variou em reais. O rendimento estimado da estratégia, hoje com referência de aproximadamente 3% ao ano, aparece separado para você não confundir retorno do protocolo com alta ou queda do BTC.",
+      answer: "Não. Ele mostra somente quanto o preço do Bitcoin variou em reais. O rendimento nativo da estratégia, hoje com referência de aproximadamente 3% ao ano em BTC, aparece separado para você não confundir BTC gerado pelo protocolo com alta ou queda do preço do BTC.",
     },
     {
       category: "Primeiros passos",
@@ -1550,17 +1551,17 @@ function HelpPage({ onNavigate }: { onNavigate: (section: SectionId) => void }) 
     {
       category: "Rendimento",
       question: "Meu rendimento é garantido?",
-      answer: "Não. O rendimento é variável e pode mudar conforme o protocolo, a liquidez e as condições do mercado. Além disso, a valorização do Bitcoin em reais é diferente do rendimento gerado pelo protocolo. Nunca use um cenário demonstrativo como promessa de resultado.",
+      answer: "Não. O rendimento nativo em BTC é variável e pode mudar conforme o protocolo, a liquidez e as condições do mercado. Além disso, a valorização do Bitcoin em reais é diferente do BTC gerado pelo protocolo. Nunca use um cenário demonstrativo como promessa de resultado.",
     },
     {
       category: "Rendimento",
       question: "Vocês oferecem juros reais em BRL?",
-      answer: "A proposta é que o rendimento realizado seja convertido e pago em reais (BRL), com a cotação e as taxas mostradas antes do resgate. Isso não é juro fixo nem rendimento garantido: o valor pode mudar conforme o Bitcoin, o protocolo, a liquidez e as condições do mercado.",
+      answer: "Não. O rendimento é nativo em BTC, não um juro creditado diretamente em BRL. O valor em reais serve para acompanhamento e, se você pedir um resgate, o BTC pode ser convertido para Pix com cotação e taxas mostradas antes da confirmação. É uma estimativa variável e não garantida.",
     },
     {
       category: "Rendimento",
       question: "Por que meu saldo pode cair mesmo com rendimento?",
-      answer: "Porque o rendimento do protocolo e o preço do Bitcoin são coisas diferentes. O protocolo pode gerar uma evolução positiva enquanto o Bitcoin perde valor em reais. O painel separa esses efeitos para tornar a leitura mais honesta.",
+      answer: "Porque o rendimento nativo é acumulado em BTC, enquanto o painel também mostra o preço do Bitcoin em reais. O protocolo pode gerar uma evolução positiva em BTC enquanto o Bitcoin perde valor em BRL. O painel separa esses efeitos para tornar a leitura mais honesta.",
     },
     {
       category: "Impostos",

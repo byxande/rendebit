@@ -84,9 +84,9 @@ export default function FutureCalculator() {
         <section className="future-result-card">
           <div className="future-result-kicker"><Sparkles /> SUA PROJEÇÃO EM {years} {years === 1 ? "ANO" : "ANOS"}</div>
           <strong>{currency.format(final.projectedValueBrl)}</strong>
-          <p>Valor futuro no cenário de BTC a {btcAnnualChange > 0 ? "+" : ""}{btcAnnualChange}% ao ano</p>
-          <div className="future-result-grid"><div><span>Você terá colocado</span><b>{currency.format(final.contributedBrl)}</b></div><div><span>Diferença projetada</span><b className={earnings >= 0 ? "positive" : "negative"}>{earnings >= 0 ? "+" : ""}{currency.format(earnings)}</b></div><div><span>Rendimento da estratégia</span><b>+{currency.format(final.protocolYieldBrl)}</b></div><div><span>Bitcoin acumulado</span><b>₿ {btcFormat.format(final.projectedBtc)}</b></div></div>
-          <div className="future-result-note"><Info /><span>O efeito do preço do Bitcoin é mostrado separado do rendimento da estratégia.</span></div>
+          <p>Valor de referência em BRL no cenário de BTC a {btcAnnualChange > 0 ? "+" : ""}{btcAnnualChange}% ao ano</p>
+          <div className="future-result-grid"><div><span>Você terá colocado</span><b>{currency.format(final.contributedBrl)}</b></div><div><span>Diferença projetada</span><b className={earnings >= 0 ? "positive" : "negative"}>{earnings >= 0 ? "+" : ""}{currency.format(earnings)}</b></div><div><span>Rendimento nativo em BTC</span><b>+₿ {btcFormat.format(final.protocolYieldBtc)}</b></div><div><span>Bitcoin acumulado</span><b>₿ {btcFormat.format(final.projectedBtc)}</b></div></div>
+          <div className="future-result-note"><Info /><span>O rendimento é projetado em BTC; o efeito do preço do Bitcoin em BRL aparece separado.</span></div>
         </section>
       </div>
 
@@ -96,19 +96,19 @@ export default function FutureCalculator() {
       </section>
 
       <section className="br-panel future-scenarios-card">
-        <div className="br-section-head"><div><span className="br-eyebrow">COMPARE POSSIBILIDADES</span><h2>O mesmo plano em três cenários</h2><p>O rendimento da estratégia continua em 3% a.a.; o que muda abaixo é o preço do Bitcoin.</p></div><CalendarDays /></div>
+        <div className="br-section-head"><div><span className="br-eyebrow">COMPARE POSSIBILIDADES</span><h2>O mesmo plano em três cenários</h2><p>O rendimento nativo continua em 3% a.a. em BTC; o que muda abaixo é o preço do Bitcoin em reais.</p></div><CalendarDays /></div>
         <div className="future-scenario-grid">{scenarioResults.map(item => { const difference = item.final.projectedValueBrl - item.final.contributedBrl; return <article key={item.id}><div className="future-scenario-head"><span>{item.label}</span><b>{item.btcAnnualChange > 0 ? "+" : ""}{Math.round(item.btcAnnualChange * 100)}% a.a.</b></div><strong>{currency.format(item.final.projectedValueBrl)}</strong><div className="future-scenario-track"><i style={{ width: `${Math.max(4, item.final.projectedValueBrl / maxScenario * 100)}%` }} /></div><p><span>Total colocado</span><b>{currency.format(item.final.contributedBrl)}</b></p><p><span>Diferença projetada</span><b className={difference >= 0 ? "positive" : "negative"}>{difference >= 0 ? "+" : ""}{currency.format(difference)}</b></p></article>; })}</div>
       </section>
 
       <section className="future-breakdown">
         <article className="br-panel"><WalletCards /><span>Dinheiro colocado</span><strong>{currency.format(final.contributedBrl)}</strong><p>Valor inicial mais {years * 12} aportes mensais.</p></article>
         <ArrowRight />
-        <article className="br-panel"><TrendingUp /><span>Rendimento da estratégia</span><strong>+{currency.format(final.protocolYieldBrl)}</strong><p>Estimativa com referência de ~3% a.a. sobre o saldo em BTC.</p></article>
+        <article className="br-panel"><TrendingUp /><span>Rendimento nativo em BTC</span><strong>+₿ {btcFormat.format(final.protocolYieldBtc)}</strong><p>Estimativa de ~3% a.a. acumulada em BTC; o equivalente em BRL varia com a cotação.</p></article>
         <ArrowRight />
         <article className="br-panel"><Bitcoin /><span>Efeito do preço do BTC</span><strong className={final.marketEffectBrl >= 0 ? "positive" : "negative"}>{final.marketEffectBrl >= 0 ? "+" : ""}{currency.format(final.marketEffectBrl)}</strong><p>Cenário escolhido: {btcAnnualChange > 0 ? "+" : ""}{btcAnnualChange}% ao ano.</p></article>
       </section>
 
-      <details className="br-panel future-assumptions"><summary>Ver premissas e riscos da simulação</summary><div><p>Esta calculadora é educativa. Ela mantém a taxa da estratégia em 3% a.a. e aplica a variação escolhida ao preço do Bitcoin. Aportes são convertidos mensalmente pela cotação projetada, e o rendimento é composto mês a mês.</p><p>Custos de compra, spread, taxas, impostos, liquidez, interrupções e mudanças de protocolo não entram nesta projeção. Os resultados podem ser maiores ou menores e não representam promessa de retorno.</p><p><b>Referência BTC/BRL:</b> {btcQuote.data ? `${currencyPrecise.format(currentBtcBrl)}, consultada na ${btcQuote.data.source} às ${quoteTime}.` : `${currencyPrecise.format(FALLBACK_BTC_BRL)}, usada temporariamente enquanto a cotação ao vivo não responde.`}</p></div></details>
+      <details className="br-panel future-assumptions"><summary>Ver premissas e riscos da simulação</summary><div><p>Esta calculadora é educativa. Ela mantém o rendimento nativo estimado em 3% a.a. em BTC e aplica a variação escolhida ao preço do Bitcoin em reais. Aportes são convertidos mensalmente pela cotação projetada, e o rendimento em BTC é composto mês a mês.</p><p>Custos de compra, spread, taxas, impostos, liquidez, interrupções e mudanças de protocolo não entram nesta projeção. Os resultados podem ser maiores ou menores e não representam promessa de retorno.</p><p><b>Referência BTC/BRL:</b> {btcQuote.data ? `${currencyPrecise.format(currentBtcBrl)}, consultada na ${btcQuote.data.source} às ${quoteTime}.` : `${currencyPrecise.format(FALLBACK_BTC_BRL)}, usada temporariamente enquanto a cotação ao vivo não responde.`}</p></div></details>
     </div>
   );
 }

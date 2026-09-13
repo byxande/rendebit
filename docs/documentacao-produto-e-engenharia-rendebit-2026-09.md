@@ -107,12 +107,12 @@ O comprovante visual não é prova suficiente de liquidação. Em produção, a 
 
 ### US-05 — Acompanhar rendimento estimado
 
-**Como** cliente iniciante, **quero** ver a evolução do meu patrimônio em reais, **para** entender a jornada.
+**Como** cliente iniciante, **quero** ver o rendimento nativo acumulado em BTC e seu valor de referência em reais, **para** entender a jornada.
 
 **Critérios de aceite:**
 
-- **Dado** que visualizo a posição, **quando** vejo `~3% a.a.`, **então** o texto identifica a natureza estimada ou referencial, a data, a fonte e o risco de variação.
-- **Dado** que altero o prazo no simulador, **quando** comparo cenários, **então** o sistema separa dinheiro aportado, efeito de cotação e rendimento estimado.
+- **Dado** que visualizo a posição, **quando** vejo `~3% a.a.`, **então** o texto informa que o rendimento é nativo em BTC, identifica a natureza estimada ou referencial, a data, a fonte e o risco de variação.
+- **Dado** que altero o prazo no simulador, **quando** comparo cenários, **então** o sistema separa dinheiro aportado, efeito da cotação em BRL e rendimento nativo estimado em BTC.
 - **Dado** que a cotação está atrasada ou indisponível, **quando** abro o painel, **então** a interface informa horário, fonte e estado do último valor conhecido.
 - **Dado** que o cliente interpreta o retorno como garantia, **quando** consulta ajuda ou confirmação, **então** há texto explícito de que não é juro fixo nem retorno garantido.
 

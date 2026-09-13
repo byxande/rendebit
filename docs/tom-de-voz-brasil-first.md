@@ -18,7 +18,7 @@ A RendeBit é feita exclusivamente para residentes no Brasil. Toda comunicação
 | Liquidação em BRL | Receber em reais via Pix |
 | Custódia segregada | Seu dinheiro separado |
 | Ativo subjacente | Bitcoin por trás da sua posição |
-| Yield / APY | Rendimento estimado por ano |
+| Yield / APY | Rendimento nativo estimado em BTC por ano |
 | Onboarding / KYC | Cadastro e verificação de identidade |
 | Off-ramp | Resgate para sua conta Pix |
 | Falha na operação | Não conseguimos concluir agora |

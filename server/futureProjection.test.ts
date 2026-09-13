@@ -5,6 +5,7 @@ describe("projeções futuras", () => {
   it("aplica 3% ao ano à quantidade de Bitcoin em cenário estável", () => {
     const points = projectFuture({ initialBrl: 1_000, monthlyBrl: 0, years: 1, protocolAnnualYield: 0.03, btcAnnualChange: 0, currentBtcBrl: 500_000 });
     expect(points.at(-1)?.projectedValueBrl).toBeCloseTo(1_030, 8);
+    expect(points.at(-1)?.protocolYieldBtc).toBeCloseTo(0.00006, 8);
     expect(points.at(-1)?.protocolYieldBrl).toBeCloseTo(30, 8);
     expect(points.at(-1)?.marketEffectBrl).toBeCloseTo(0, 8);
   });

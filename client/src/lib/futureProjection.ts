@@ -7,6 +7,7 @@ export type ProjectionScenario = {
 export type ProjectionPoint = {
   month: number;
   contributedBrl: number;
+  protocolYieldBtc: number;
   protocolYieldBrl: number;
   marketEffectBrl: number;
   projectedValueBrl: number;
@@ -57,6 +58,7 @@ export function projectFuture(input: {
     points.push({
       month,
       contributedBrl,
+      protocolYieldBtc,
       protocolYieldBrl,
       marketEffectBrl,
       projectedValueBrl,

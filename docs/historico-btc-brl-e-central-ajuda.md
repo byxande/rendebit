@@ -10,7 +10,7 @@ Como contingência, o backend consulta as séries estruturadas `BTC-USD` e `BRL=
 
 Cada período tem cache independente de cinco minutos. Se ambas as fontes falharem, uma série previamente obtida pode ser exibida por até 24 horas com o marcador de **última série conhecida**. As séries são reduzidas para no máximo 240 pontos, preservando primeiro ponto, último ponto, mínimas e máximas de cada janela visual.
 
-O gráfico é uma referência de mercado. O preço de execução de compra ou resgate pode conter spread, taxas, liquidez e diferença temporal. A variação do BTC é apresentada separadamente do rendimento estimado da estratégia.
+O gráfico é uma referência de mercado. O preço de execução de compra ou resgate pode conter spread, taxas, liquidez e diferença temporal. A variação do BTC em reais é apresentada separadamente do rendimento nativo estimado em BTC da estratégia.
 
 ## Central de Ajuda
 

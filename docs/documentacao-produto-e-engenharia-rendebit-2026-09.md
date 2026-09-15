@@ -25,7 +25,7 @@ A decisão de produto para produção é conservadora: a RendeBit deve começar 
 | Capital de cliente separado | Subledger por cliente, origem/destino explícitos e reconciliação | Divergência ou saldo sem origem comprovada bloqueia o fluxo |
 | Falha fechada | Identidade, pagamento, provedor, contrato, destino e ledger precisam estar confirmados | Em caso de dúvida, não creditar, não assinar, não pagar |
 | Autocustódia não é custódia da RendeBit | O app pode registrar endereço público, sem receber seed phrase ou chave privada | Nunca solicitar chave privada, seed phrase ou senha de carteira |
-| Rendimento não é garantia | Qualquer referência a `~3% a.a.` deve ser estimativa, cenário ou referência de protocolo | Proibir linguagem de capital garantido, juro fixo ou retorno certo |
+| Rendimento não é garantia | Qualquer referência a `até 6% a.a.` deve ser uma estimativa máxima, cenário ou referência de protocolo; o cenário-base deve ficar identificado | Proibir linguagem de capital garantido, juro fixo ou retorno certo |
 | Simplicidade sem ocultação material | A mecânica técnica pode ficar em “Como funciona”, mas riscos, taxas e natureza da posição devem ser visíveis | Não esconder informação que altere decisão financeira |
 
 A Lei nº 14.478/2022 alcança serviços relacionados a ativos virtuais, incluindo troca e custódia em determinadas estruturas, e o Decreto nº 11.563/2023 atribui ao Banco Central competência regulatória e supervisora sobre PSAVs. O enquadramento concreto da RendeBit e de seus parceiros precisa ser documentado antes de qualquer operação real.[1] [2]
@@ -111,7 +111,7 @@ O comprovante visual não é prova suficiente de liquidação. Em produção, a 
 
 **Critérios de aceite:**
 
-- **Dado** que visualizo a posição, **quando** vejo `~3% a.a.`, **então** o texto informa que o rendimento é nativo em BTC, identifica a natureza estimada ou referencial, a data, a fonte e o risco de variação.
+- **Dado** que visualizo a posição, **quando** vejo `até 6% a.a.`, **então** o texto informa que esse é um teto de referência, identifica o cenário-base, a natureza estimada ou referencial, a data, a fonte e o risco de variação.
 - **Dado** que altero o prazo no simulador, **quando** comparo cenários, **então** o sistema separa dinheiro aportado, efeito da cotação em BRL e rendimento nativo estimado em BTC.
 - **Dado** que a cotação está atrasada ou indisponível, **quando** abro o painel, **então** a interface informa horário, fonte e estado do último valor conhecido.
 - **Dado** que o cliente interpreta o retorno como garantia, **quando** consulta ajuda ou confirmação, **então** há texto explícito de que não é juro fixo nem retorno garantido.

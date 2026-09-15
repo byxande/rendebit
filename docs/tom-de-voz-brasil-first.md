@@ -6,7 +6,7 @@ A RendeBit é feita exclusivamente para residentes no Brasil. Toda comunicação
 
 1. **Falar como gente.** Preferir frases curtas, naturais e respeitosas. “Pode contar com a gente” é melhor do que “contate o suporte”.
 2. **Explicar antes de nomear.** Usar “receber na sua conta Pix” antes de “liquidação”; “seu dinheiro separado” antes de “custódia segregada”.
-3. **Ser claro sem prometer.** O retorno de ~3% a.a. deve sempre aparecer como estimado, variável e não garantido.
+3. **Ser claro sem prometer.** A comunicação de até 6% a.a. deve sempre aparecer como estimativa máxima de referência, variável e não garantida; o cenário-base precisa ficar identificado.
 4. **Usar referências brasileiras.** Datas em `dd/mm/aaaa`, valores em `R$`, idioma `pt-BR`, horários no fuso do usuário e Pix como principal meio de entrada e saída.
 5. **Acolher sem infantilizar.** A pessoa pode ser iniciante, mas merece transparência sobre preço, taxas, prazo e riscos.
 6. **Não esconder a segurança.** A interface principal simplifica a tecnologia; a área Segurança preserva contratos, reservas e trilha verificável.
